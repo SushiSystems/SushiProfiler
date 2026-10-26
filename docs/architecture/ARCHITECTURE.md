@@ -16,7 +16,7 @@ Modules sit in tiers, lowest first. `cmake/SushiProfilerTiers.cmake` states the 
 | `capture` | `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods` |
 | `record` | `record`, `record_json`, `statistics`, `analysis`, `record_writers`, `compare`, `checks` |
 | `session` | `config`, `window`, `sources`, `environment`, `fold`, `stream_writers`, `registry`, `consumer`, `session` |
-| `tools` | `umbrella` |
+| `tools` | `umbrella`, `record_tool` |
 
 A tier is the folder `modules/<tier>/`; it appears with its first module.
 

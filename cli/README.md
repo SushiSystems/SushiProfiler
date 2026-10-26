@@ -1,7 +1,7 @@
 # cli
 
 The `sp` command line interface. `sushiprofiler/cli.py` parses the four commands, `build`, `test`,
-`bench` and `check`, and `sushiprofiler/services/project.py` does the work. The `docs` group, with its one command
+`bench` and `check`, and the `record` group, and `sushiprofiler/services/project.py` does the work. The `docs` group, with its one command
 `bundle`, the config loader, the console, the process runner and the CMake driver come from
 sushicore 0.9.2. `tests/` is the pytest suite:
 `cd cli && python -m pytest tests -q`.
@@ -32,5 +32,7 @@ Each sanitizer has its own build tree: `build/`, `build-asan/` and `build-tsan/`
 does not rebuild the plain tree. `sp test` leaves the quarantined tests out. `sp test --package`
 installs the tree, builds `tests/package/` against the install and runs its test. `sp build
 --benchmarks` turns on `SP_BUILD_BENCHMARKS`, and `sp bench` runs every `sp_bench_*` program in
-`build/benchmarks/<config>/` in name order. `sp check` runs the nine shared checkers and, with
+`build/benchmarks/<config>/` in name order. `sp record show|compare|check|validate` runs `sp_record` from
+`build/applications/<config>/` in the current folder, so relative record paths work, and exits
+with its code. `sp check` runs the nine shared checkers and, with
 `--rule`, only those whose `--list-rules` names the rule.

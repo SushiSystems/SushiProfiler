@@ -3,10 +3,10 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Drives SushiProfiler's build, test, bench and check steps.
+"""Drives SushiProfiler's build, test, bench, record and check steps.
 
 Holds the build policy: the build tree of each sanitizer, the test sizes and their CTest labels,
-the benchmark programs, the install the package test builds against, and the checkers. cmake and ctest run through
+the benchmark programs and sp_record, the install the package test builds against, and the checkers. cmake and ctest run through
 ``sushicore.cmake_driver.CMakeDriver`` under the environment ``sushiprofiler.env`` assembles.
 """
 
@@ -64,6 +64,8 @@ K_PACKAGE_SOURCE = Path("tests", "package")
 K_BENCHMARKS_VARIABLE = "SP_BUILD_BENCHMARKS"
 K_BENCHMARK_FOLDER = "benchmarks"
 K_BENCHMARK_PREFIX = "sp_bench_"
+K_APPLICATION_FOLDER = "applications"
+K_RECORD_PROGRAM = "sp_record"
 
 K_CHECKERS = (
     Path("tools", "documentation", "check_source_comments.py"),
@@ -260,6 +262,35 @@ def bench(build_type: BuildType | None = None) -> int:
         console.header(program.name)
         code = code or _RUNNER.run([str(program)], root, env)
     return code
+
+
+def record_program(folder: Path) -> Path | None:
+    """Returns the sp_record program in *folder*, or None when the build has not made it."""
+    for name in (f"{K_RECORD_PROGRAM}.exe", K_RECORD_PROGRAM):
+        if (folder / name).is_file():
+            return folder / name
+    return None
+
+
+def record(arguments: Sequence[str], build_type: BuildType | None = None) -> int:
+    """Runs sp_record of the plain tree on *arguments*, from the current folder.
+
+    Args:
+        arguments: The command, then its arguments, as sp_record takes them.
+        build_type: The build whose program runs; the tree's type when None.
+
+    Returns:
+        sp_record's exit code, or 1 when the tree holds no sp_record.
+    """
+    root = find_project_root()
+    cfg = load_config()
+    tree = build_dir(root, None)
+    folder = tree / K_APPLICATION_FOLDER / K_CMAKE_BUILD_TYPE[resolve_build_type(build_type, tree)]
+    program = record_program(folder)
+    if program is None:
+        console.error(f"no {K_RECORD_PROGRAM} in {folder}; run {PROFILE.program} build first")
+        return 1
+    return _RUNNER.run([str(program), *arguments], Path.cwd(), load_build_env(cfg, tree))
 
 
 def check(report: bool = False, rule: str | None = None) -> int:

@@ -37,7 +37,8 @@ _help_group = help_group(console.current)
 app = typer.Typer(
     name=K_PROGRAM,
     cls=_help_group,
-    help="SushiProfiler developer CLI: build, test, bench and check SushiProfiler.",
+    help="SushiProfiler developer CLI: build, test, bench and check SushiProfiler, and read "
+         "its run records.",
     no_args_is_help=True,
     add_completion=False,
     rich_markup_mode="rich",
@@ -143,6 +144,98 @@ def check(
 ) -> None:
     """Run the shared checkers under tools/."""
     raise typer.Exit(project_service.check(report=report, rule=rule))
+
+
+K_RECORD_PANEL = "Records"
+
+record_app = typer.Typer(
+    name="record",
+    cls=_help_group,
+    help="Show, compare, check and validate run records with the sp_record program.",
+    no_args_is_help=True,
+    add_completion=False,
+    rich_markup_mode="rich",
+)
+app.add_typer(record_app, name="record", rich_help_panel=K_RECORD_PANEL)
+
+
+def _repeated(option: str, values: Optional[list[str]]) -> list[str]:
+    """Returns *option* before each of *values*, as sp_record takes a repeated option."""
+    words: list[str] = []
+    for value in values or ():
+        words += [option, value]
+    return words
+
+
+@record_app.command(
+    "show",
+    epilog="sp record show build/profiles/run.sprec.json\n"
+           "sp record show run.sprec.json --analysis breakdown --analysis top_spans --top 10\n"
+           "sp record show run.sprec.json --analysis overhead --baseline off.sprec.json",
+)
+def record_show(
+    record: str = typer.Argument(..., help="The record file."),
+    analysis: Optional[list[str]] = typer.Option(
+        None, "--analysis", "-a", help="An analysis to run; repeat for more. Default: six."),
+    top: Optional[int] = typer.Option(None, "--top", min=1, help="Rows a ranking keeps."),
+    group_by: Optional[list[str]] = typer.Option(
+        None, "--group-by", help="An attribute key top_spans groups by; repeat for more."),
+    baseline: Optional[str] = typer.Option(
+        None, "--baseline", help="A record of the run without profiling, for overhead."),
+    type: Optional[BuildType] = _type_option(),
+) -> None:
+    """Print a record's analyses as tables."""
+    arguments = ["show", record, *_repeated("--analysis", analysis),
+                 *_repeated("--group-by", group_by)]
+    if top is not None:
+        arguments += ["--top", str(top)]
+    if baseline is not None:
+        arguments += ["--baseline", baseline]
+    raise typer.Exit(project_service.record(arguments, type))
+
+
+@record_app.command(
+    "compare",
+    epilog="sp record compare before.sprec.json after.sprec.json\n"
+           "sp record compare release.sprec.json debug.sprec.json --allow-build-mismatch",
+)
+def record_compare(
+    baseline: str = typer.Argument(..., help="The record compared against."),
+    candidate: str = typer.Argument(..., help="The record compared."),
+    allow_build_mismatch: bool = typer.Option(
+        False, "--allow-build-mismatch", help="Compare records of different builds."),
+    type: Optional[BuildType] = _type_option(),
+) -> None:
+    """Compare two records subject by subject; exit 1 when their builds differ."""
+    arguments = ["compare", baseline, candidate]
+    if allow_build_mismatch:
+        arguments.append("--allow-build-mismatch")
+    raise typer.Exit(project_service.record(arguments, type))
+
+
+@record_app.command(
+    "check",
+    epilog="sp record check run.sprec.json budgets.json",
+)
+def record_check(
+    record: str = typer.Argument(..., help="The record file."),
+    checks: str = typer.Argument(..., help="The check file, a JSON array of checks."),
+    type: Optional[BuildType] = _type_option(),
+) -> None:
+    """Check a record against bounds; exit 1 when a check fails."""
+    raise typer.Exit(project_service.record(["check", record, checks], type))
+
+
+@record_app.command(
+    "validate",
+    epilog="sp record validate run.sprec.json",
+)
+def record_validate(
+    record: str = typer.Argument(..., help="The record file."),
+    type: Optional[BuildType] = _type_option(),
+) -> None:
+    """Read a record strictly; exit 1 when it is refused."""
+    raise typer.Exit(project_service.record(["validate", record], type))
 
 
 register_docs_commands(

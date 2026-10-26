@@ -49,6 +49,21 @@ sp check
 sp check --report    # counts per rule, exit 0
 ```
 
+## sp record
+
+Reads run records with the `sp_record` program that `sp build` builds. Each command exits 1 when
+a record is invalid, a check fails or two builds differ, and 2 on a usage error.
+
+```bash
+sp record validate run.sprec.json
+sp record show run.sprec.json --analysis breakdown --top 10
+sp record compare before.sprec.json after.sprec.json
+sp record check run.sprec.json budgets.json
+```
+
+The check file is a JSON array of checks; its format is in
+`modules/record/checks/README.md`.
+
 ## sp docs bundle
 
 Writes the archive `docs.sushisystems.io` reads, in `build/docs/bundle`; `docs/publish.toml`

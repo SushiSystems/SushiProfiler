@@ -110,6 +110,27 @@ def test_bench_without_a_benchmark_program_fails_and_says_so(project):
     assert "sp build --benchmarks" in message and project.runner.commands == []
 
 
+def test_record_runs_sp_record_of_the_trees_type_with_the_arguments(project):
+    project.configure_tree("Release")
+    folder = project.tree / "applications" / "Release"
+    folder.mkdir(parents=True)
+    (folder / "sp_record.exe").write_text("", encoding="utf-8")
+
+    assert project_service.record(["validate", "run.json"]) == 0
+
+    (command,) = project.runner.commands
+    assert Path(command[0]).name == "sp_record.exe" and command[1:] == ["validate", "run.json"]
+
+
+def test_record_without_the_program_fails_and_says_so(project):
+    project.configure_tree("Debug")
+
+    assert project_service.record(["validate", "run.json"]) == 1
+
+    (message,) = project.console.of("error")
+    assert "sp build" in message and project.runner.commands == []
+
+
 def test_test_passes_the_sizes_the_jobs_and_the_filter_to_ctest(project):
     project.configure_tree("Debug")
 

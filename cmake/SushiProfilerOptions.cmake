@@ -14,6 +14,7 @@ endif()
 
 option(SP_BUILD_TESTS "Build the test programs" ${SP_IS_TOP_LEVEL})
 option(SP_BUILD_BENCHMARKS "Build the benchmark programs beside the tests" OFF)
+option(SP_BUILD_APPLICATIONS "Build the programs under applications/" ${SP_IS_TOP_LEVEL})
 option(SP_INSTALL "Add the install rules and the package files" ON)
 
 # address: AddressSanitizer with UndefinedBehaviorSanitizer; thread: ThreadSanitizer.

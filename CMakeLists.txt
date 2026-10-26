@@ -31,6 +31,10 @@ if(SP_INSTALL)
     sushiprofiler_install_package()
 endif()
 
+if(SP_BUILD_APPLICATIONS)
+    add_subdirectory(applications)
+endif()
+
 if(SP_BUILD_TESTS)
     add_subdirectory(tests)
 endif()

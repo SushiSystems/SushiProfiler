@@ -25,7 +25,7 @@ _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 def calls(monkeypatch) -> list[tuple[str, tuple, dict]]:
     """Returns the calls the commands make into the project service, which does nothing."""
     recorded: list[tuple[str, tuple, dict]] = []
-    for name in ("build", "test", "bench", "check"):
+    for name in ("build", "test", "bench", "check", "record"):
         def record(*args, _name=name, **kwargs):
             recorded.append((_name, args, kwargs))
             return 0
@@ -109,3 +109,39 @@ def test_a_failing_service_becomes_the_exit_code(monkeypatch):
     monkeypatch.setattr(cli.project_service, "check", lambda **kwargs: 2)
 
     assert _RUNNER.invoke(cli.app, ["check"]).exit_code == 2
+
+
+def test_record_show_passes_analyses_top_group_and_baseline(calls):
+    result = _RUNNER.invoke(cli.app, ["record", "show", "run.json", "-a", "breakdown",
+                                      "--analysis", "top_spans", "--top", "5", "--group-by", "op",
+                                      "--baseline", "off.json", "--type", "release"])
+
+    assert result.exit_code == 0
+    assert calls == [("record", (["show", "run.json", "--analysis", "breakdown", "--analysis",
+                                  "top_spans", "--group-by", "op", "--top", "5", "--baseline",
+                                  "off.json"], BuildType.RELEASE), {})]
+
+
+def test_record_compare_passes_both_records_and_the_mismatch_flag(calls):
+    result = _RUNNER.invoke(cli.app, ["record", "compare", "a.json", "b.json",
+                                      "--allow-build-mismatch"])
+
+    assert result.exit_code == 0
+    assert calls == [("record", (["compare", "a.json", "b.json", "--allow-build-mismatch"], None),
+                      {})]
+
+
+def test_record_check_and_validate_pass_their_files(calls):
+    assert _RUNNER.invoke(cli.app, ["record", "check", "run.json", "budgets.json"]).exit_code == 0
+    assert _RUNNER.invoke(cli.app, ["record", "validate", "run.json"]).exit_code == 0
+
+    assert calls == [("record", (["check", "run.json", "budgets.json"], None), {}),
+                     ("record", (["validate", "run.json"], None), {})]
+
+
+def test_record_exits_with_the_programs_code(monkeypatch):
+    monkeypatch.setattr(cli.project_service, "record", lambda *args, **kwargs: 1)
+
+    result = _RUNNER.invoke(cli.app, ["record", "validate", "run.json"])
+
+    assert result.exit_code == 1
