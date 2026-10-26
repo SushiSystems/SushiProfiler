@@ -73,6 +73,9 @@
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>
+#include <SushiProfiler/sources/source.hpp>
+#include <SushiProfiler/sources/source_context.hpp>
+#include <SushiProfiler/sources/span_sink.hpp>
 #include <SushiProfiler/statistics/bootstrap.hpp>
 #include <SushiProfiler/statistics/dispersion.hpp>
 #include <SushiProfiler/statistics/log2_histogram.hpp>
