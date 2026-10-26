@@ -1,0 +1,66 @@
+# Configuration format
+
+The profiler configuration is one JSON object, read by `read_profiler_config` in
+`modules/session/config/`. A host fills a `ProfilerConfig` from its own settings, or reads this
+file. Every key but the version is optional and keeps its default when left out. The reader
+refuses an unknown key, a value of the wrong kind and a value out of range, naming the JSON path:
+`window.active: out of range 1..4294967295`.
+
+## Keys
+
+| Key | Kind | Default | Holds |
+| --- | --- | --- | --- |
+| `sushiprofiler` | whole | required | The format version, `1`. Any other version is refused. |
+| `enabled` | bool | `true` | Whether the session records at all. |
+| `level` | whole, 0 to 3 | `2` | The runtime density level. It can lower what the compiled `SP_PROFILE_LEVEL` allows, never raise it. |
+| `groups` | strings | all | The site groups recorded; an empty list records every group. |
+| `timeline` | string | none | The timeline the window follows. |
+| `window` | object | below | Which periods of that timeline are recorded. |
+| `sources` | object | none | Source name to its settings object, in file order. |
+| `analyses` | strings | none | The analyses run on the record when the session stops. |
+| `writers` | object | none | Writer name to its settings object, in file order. |
+| `output` | string | none | The folder written outputs go in. |
+| `buffers` | object | below | The capture path's sizes. |
+
+`window` follows PyTorch's schedule. `skip` periods are ignored, then each cycle has `wait`
+periods not recorded, `warmup` periods recorded and marked warm-up, and `active` periods
+recorded. There are `repeat` cycles, and `repeat` 0 means until the session stops.
+
+| `window` key | Range | Default |
+| --- | --- | --- |
+| `skip` | 0 to 2^32 - 1 | 0 |
+| `wait` | 0 to 2^32 - 1 | 0 |
+| `warmup` | 0 to 2^32 - 1 | 3 |
+| `active` | 1 to 2^32 - 1 | 20 |
+| `repeat` | 0 to 2^32 - 1 | 1 |
+
+| `buffers` key | Range | Default | Holds |
+| --- | --- | --- | --- |
+| `ring_events` | 64 to 2^24 | 65 536 | Events per thread ring, rounded up to a power of two |
+| `attribute_bytes` | 0 to 2^32 | 1 048 576 | Bytes of span attributes kept per period |
+| `linger_ms` | 0 to 60 000 | 100 | How long a period stays open after its end for late events |
+
+A source's or writer's settings object is read by that part, not by the configuration reader;
+the reader only checks that each entry is an object.
+
+## Example
+
+```json
+{
+    "sushiprofiler": 1,
+    "level": 2,
+    "groups": ["Data", "Device", "Host stage"],
+    "timeline": "train.step",
+    "window": { "skip": 0, "wait": 0, "warmup": 3, "active": 20, "repeat": 1 },
+    "sources": { "sushiruntime.device": {} },
+    "analyses": ["breakdown", "device_idle", "top_spans"],
+    "writers": {
+        "terminal": { "top": 20 },
+        "record": { "path": "run.sprec.json" }
+    },
+    "output": "build/profiles/yolov5n",
+    "buffers": { "ring_events": 65536, "linger_ms": 100 }
+}
+```
+
+Source: not compiled

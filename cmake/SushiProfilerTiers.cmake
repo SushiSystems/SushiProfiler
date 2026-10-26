@@ -33,37 +33,32 @@ set(SUSHIPROFILER_MODULE_TIERS
     record_writers record
     compare     record
     checks      record
+    config      session
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.
 set(SUSHIPROFILER_SAME_TIER_EDGES
-    collector   sites
-    collector   rings
-    zones       sites
-    zones       rings
-    zones       collector
-    lock_wait   sites
-    lock_wait   zones
-    periods     rings
-    periods     collector
-    record_json record
-    analysis    record
-    record_writers record
-    compare     record
-    checks      record
-    analysis    statistics
+    collector      sites
+    collector      rings
+    zones          sites
+    zones          rings
+    zones          collector
+    lock_wait      sites
+    lock_wait      zones
+    periods        rings
+    periods        collector
+    record_json    record
+    analysis       record
+    analysis       statistics
     record_writers analysis
     record_writers record
-    compare     record
-    checks      record
     record_writers record_json
-    compare     analysis
-    compare     record
-    checks      record
-    compare     statistics
-    checks      analysis
-    checks      record
-    checks      statistics)
+    compare        analysis
+    compare        record
+    compare        statistics
+    checks         analysis
+    checks         record
+    checks         statistics)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
 function(sushiprofiler_module_tier module out)
