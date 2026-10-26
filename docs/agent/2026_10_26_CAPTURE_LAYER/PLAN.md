@@ -55,11 +55,11 @@ the only process-wide state. Draining and folding belong to P2's consumer; P1 ex
 
 ### Task 0: First commits of the skeleton
 
-- [ ] Commit SushiProfiler's skeleton (with the two CMake fixes and the design topic) as
+- [x] Commit SushiProfiler's skeleton (with the two CMake fixes and the design topic) as
       `build: create the repository skeleton` and `docs(design): open the profiler topic`.
-- [ ] Commit SushiStack's catalog change: `feat(hub): add sushiprofiler to the catalog`.
-- [ ] Commit SushiAI's SPEC: `docs(agent): design the stack profiler`.
-- [ ] Run `write_license_block.py --report` in SushiProfiler: expect `0 files pending`.
+- [x] Commit SushiStack's catalog change: `feat(hub): add sushiprofiler to the catalog`.
+- [x] Commit SushiAI's SPEC: `docs(agent): design the stack profiler`.
+- [x] Run `write_license_block.py --report` in SushiProfiler: expect `0 files pending`.
 
 ### Task 1: `clock` (foundation)
 
@@ -80,14 +80,14 @@ modify `cmake/SushiProfilerTiers.cmake` (add `clock foundation` before `umbrella
 - When ticks are not invariant, callers use `steady_now_ns()` as ticks and an identity calibration;
   the collector (Task 5) makes that choice once.
 
-- [ ] Tests: `Small_TraceClock.SteadyTimeNeverGoesBack` (1,000 reads non-decreasing);
+- [x] Tests: `Small_TraceClock.SteadyTimeNeverGoesBack` (1,000 reads non-decreasing);
       `Small_TraceClock.SampleBracketsTheSteadyReading` (a sample's `steady_ns` lies between two
       steady reads taken around it); `Small_Calibration.MapsBothEndsExactly` (points (1000, 5000)
       and (3000, 6000): 1000 → 5000, 3000 → 6000, 2000 → 5500); `Small_Calibration.ExtrapolatesBeforeTheBegin`
       (500 → 4750); `Small_Calibration.EqualTicksKeepOneNanosecondPerTick`.
-- [ ] Build and test: `sp build`, `sp test` (see Task 0's environment); expect the new tests fail
+- [x] Build and test: `sp build`, `sp test` (see Task 0's environment); expect the new tests fail
       to link before `trace_clock.cpp` exists, then pass.
-- [ ] README of the module; commit `feat(clock): read the TSC and calibrate it to steady time`.
+- [x] README of the module; commit `feat(clock): read the TSC and calibrate it to steady time`.
 
 ### Task 2: `events` (foundation)
 
@@ -111,11 +111,11 @@ header only; tests `tests/foundation/events/test_trace_event.cpp`; tier line `ev
   PeriodTag: begin = time, end = `(key << 32) | value` interned names, name = timeline;
   Flow*: begin = time, end = the caller's id; Lane*: begin = time, name = lane.
 
-- [ ] Tests: `Small_TraceEvent.IsTwentyFourBytes`; `Small_TraceEvent.KindAndSiteRoundTrip` (every
+- [x] Tests: `Small_TraceEvent.IsTwentyFourBytes`; `Small_TraceEvent.KindAndSiteRoundTrip` (every
       kind with sites 1 and `K_MAX_SITE_ID`); `Small_TraceEvent.ANaNValueKeepsItsBits` (quiet NaN
       with payload 0x7ff8000000001234 round-trips bit for bit; also +inf and -0.0);
       `Small_TraceEvent.ASpanLongerThanThirtyTwoBitsSurvives` (begin 0, end 5'000'000'000).
-- [ ] Build, test, README, commit `feat(events): define the 24-byte trace event and its kinds`.
+- [x] Build, test, README, commit `feat(events): define the 24-byte trace event and its kinds`.
 
 ### Task 3: `sites` (capture)
 
@@ -140,7 +140,7 @@ tier lines `sites capture`; depends on `events`.
 - `class NameTable`: `NameID intern(std::string_view)` (same text, same id; 0 for empty text),
   `std::string text(NameID) const`, `std::size_t size() const`. Names are never freed.
 
-- [ ] Tests: `Small_SiteRegistry.OneSiteGetsOneIdForEveryHandleCall`;
+- [x] Tests: `Small_SiteRegistry.OneSiteGetsOneIdForEveryHandleCall`;
       `Small_SiteRegistry.TwoSitesWithEqualTextAreTwoSites` (identity is the handle, not the text);
       `Small_SiteRegistry.TheFilterDisablesALevelAboveIt` (level 2 site off under level 1);
       `Small_SiteRegistry.TheFilterKeepsOnlyNamedGroups`; `Small_SiteRegistry.AFilterAppliesToSitesRegisteredLater`;
@@ -148,7 +148,7 @@ tier lines `sites capture`; depends on `events`.
       `enabled(0)` false, `refused() == 1`); `Small_SiteRegistry.InfoCopiesTheStrings` (strings in a
       buffer that is then overwritten still read back); `Medium_SiteRegistry.ConcurrentFirstUseGivesOneId`
       (8 threads, one handle). `Small_NameTable.SameTextSameId`, `Small_NameTable.EmptyTextIsZero`.
-- [ ] Build, test, README, commit `feat(sites): register sites once and filter them at run time`.
+- [x] Build, test, README, commit `feat(sites): register sites once and filter them at run time`.
 
 ### Task 4: `rings` (capture)
 
@@ -165,13 +165,13 @@ depends on `events`.
   `void set_name(std::string_view) noexcept` and `std::string name() const` (the engine's seqlock
   of 64 atomic chars).
 
-- [ ] Tests: `Small_ThreadRing.CapacityRoundsUpToAPowerOfTwo` (100 → 128, 1 → 64);
+- [x] Tests: `Small_ThreadRing.CapacityRoundsUpToAPowerOfTwo` (100 → 128, 1 → 64);
       `Small_ThreadRing.DrainsInOrder`; `Small_ThreadRing.AFullRingDropsAndCounts` (capacity 64:
       70 pushes, 64 kept, `take_dropped() == 6`, then 0); `Small_ThreadRing.FillFollowsOccupancy`
       (32 of 64 → 0.5); `Medium_ThreadRing.OneProducerOneConsumerLoseNothingWhenSized`
       (1,000,000 events through a 4096 ring with a draining thread: every event once, in order,
       or counted as dropped, sum equal to 1,000,000); `Small_ThreadRing.NameIsTruncatedAtSixtyThree`.
-- [ ] Build, test, README, commit `feat(rings): keep each thread's events in a lock-free ring`.
+- [x] Build, test, README, commit `feat(rings): keep each thread's events in a lock-free ring`.
 
 ### Task 5: `collector` (capture)
 
@@ -203,7 +203,7 @@ depends on `events`.
 - No condition variable and no notification: the consumer of P2 polls with an interval it adapts
   from `ThreadDrain::fill` (1 ms when a ring is over half full, doubling to 1 s when idle).
 
-- [ ] Tests: `Small_Collector.OpensOnceAndRefusesASecondOpen`; `Small_Collector.ClosedCollectorRecordsNothing`
+- [x] Tests: `Small_Collector.OpensOnceAndRefusesASecondOpen`; `Small_Collector.ClosedCollectorRecordsNothing`
       (`recording()` false, `ring()` registers nothing); `Small_Collector.ADrainReturnsWhatThisThreadPushed`;
       `Small_Collector.DropsReachTheDrain` (ring of 64, 70 pushes, `dropped == 6`);
       `Small_Collector.OpenDiscardsEventsFromBefore`; `Medium_Collector.EachThreadHasItsOwnRing` (4 threads, 1,000
@@ -211,7 +211,7 @@ depends on `events`.
       (thread pushes 10, joins; first drain has its 10 with `retired` true, second drain lacks it);
       `Small_Collector.NamedThreadKeepsItsName`; `Small_Collector.CalibrationPointsAdvance`.
       Each test opens in its fixture and closes plus drains in teardown, so no test sees another's events.
-- [ ] Build, test, README, commit `feat(collector): gate recording and hand every ring to one consumer`.
+- [x] Build, test, README, commit `feat(collector): gate recording and hand every ring to one consumer`.
 
 ### Task 6: `zones` (capture)
 
@@ -242,14 +242,14 @@ header only; tests `tests/capture/zones/{test_zone.cpp,test_records.cpp,test_mac
   over `SP_PROFILE_LEVEL` (default 2 when the program does not define it).
 - A site is `static constexpr Site` plus `static SiteHandle`, named with `__COUNTER__`.
 
-- [ ] Tests: `Small_Zone.WritesOneCompleteEvent` (kind Zone, begin < end, site's name and line
+- [x] Tests: `Small_Zone.WritesOneCompleteEvent` (kind Zone, begin < end, site's name and line
       read back through `sites().info`); `Small_Zone.NestedZonesNestByTime`; `Small_Zone.ADisabledSiteWritesNothing`;
       `Small_Zone.AZoneClosedAfterTheCollectorClosesWritesNothing`; `Small_Zone.ACompiledOutZoneIsEmpty`
       (`std::is_empty_v<ScopedZone<false>>`, and level 3 under compiled level 1 writes nothing);
       `Small_Records.ACounterKeepsItsOperationAndValue`; `Small_Records.AnExternalZoneKeepsTheCallersTimes`
       (begin 1, end 5'000'000'001 steady ns); `Small_Records.FlowsCarryTheirId`;
       `Small_Records.ALaneBracketsItsEvents`; `Small_Macros.EachDirectMacroWritesItsKind`.
-- [ ] Build, test, README, commit `feat(zones): record zones, counters, values, instants, flows and lanes`.
+- [x] Build, test, README, commit `feat(zones): record zones, counters, values, instants, flows and lanes`.
 
 ### Task 7: `lock_wait` (capture)
 
@@ -261,9 +261,9 @@ depends on `zones`.
 guard: `try_lock` first; on failure opens a zone at a `SiteRole::LockWait` site in group
 `"Lock wait"`, then `lock`); `SP_LOCK_WAIT_AT(compiled, name, mutex)` and `SP_LOCK_WAIT(name, mutex)`.
 
-- [ ] Tests: `Small_ContendedLock.AnUncontendedLockWritesNothing`;
+- [x] Tests: `Small_ContendedLock.AnUncontendedLockWritesNothing`;
       `Medium_ContendedLock.AContendedLockWritesOneWaitZone` (a second thread holds the mutex for 20 ms).
-- [ ] Build, test, README, commit `feat(lock_wait): record the time a contended lock waits`.
+- [x] Build, test, README, commit `feat(lock_wait): record the time a contended lock waits`.
 
 ### Task 8: `periods` (capture)
 
@@ -278,10 +278,10 @@ while the collector is closed, so sources and periods agree); `std::uint64_t cur
 (relaxed load); `void tag(std::string_view key, std::string_view value)` (interns both, pushes a
 `PeriodTag`; not for a real-time thread); `NameID id() const noexcept`; `std::string_view name() const`.
 
-- [ ] Tests: `Small_PeriodTimeline.MarksCountFromZero`; `Small_PeriodTimeline.AMarkCarriesItsBudget`;
+- [x] Tests: `Small_PeriodTimeline.MarksCountFromZero`; `Small_PeriodTimeline.AMarkCarriesItsBudget`;
       `Small_PeriodTimeline.TheIndexAdvancesWhileTheCollectorIsClosed`; `Small_PeriodTimeline.ATagCarriesKeyAndValue`;
       `Small_PeriodTimeline.TwoTimelinesKeepTheirOwnIndex`.
-- [ ] Build, test, README, commit `feat(periods): mark periods on named timelines`.
+- [x] Build, test, README, commit `feat(periods): mark periods on named timelines`.
 
 ### Task 9: Benchmarks, the allocation test and `sp bench`
 
@@ -292,25 +292,25 @@ ctest); `cli/sushiprofiler/` (`build --benchmarks/--no-benchmarks`, `bench` runn
 `sp_bench_*` in name order, as SushiBLAS's CLI) with its tests; create
 `tests/capture/zones/benchmark_zones.cpp` and `tests/capture/zones/test_zone_allocations.cpp`.
 
-- [ ] Benchmark prints one line per case, `<name> <value> <unit>`, median of 31 runs of 1,000,000
+- [x] Benchmark prints one line per case, `<name> <value> <unit>`, median of 31 runs of 1,000,000
       iterations after 3 warm-up runs: `zone_compiled_out ns`, `zone_gate_closed ns`,
       `zone_site_disabled ns`, `zone_recording ns`, `counter_recording ns`, `clock_now ns`,
       `steady_now ns`. Recording cases drain between runs.
-- [ ] `Medium_ZoneAllocations.TheRecordingThreadNeverAllocates`: the test program replaces global
+- [x] `Medium_ZoneAllocations.TheRecordingThreadNeverAllocates`: the test program replaces global
       `operator new` to count per thread; after `register_this_thread` and first use of each site,
       100,000 zones, counters, values, instants, flows and lane scopes allocate 0 times.
-- [ ] `sp build --benchmarks --type release`, `sp bench`; record the numbers in this folder's
+- [x] `sp build --benchmarks --type release`, `sp bench`; record the numbers in this folder's
       REPORT.md against the budget (gate closed under 2 ns; recording under 25 ns). A miss is
       reported, not hidden; the owner decides.
-- [ ] CLI tests pass; commit `build(bench): build and run the benchmark programs` and
+- [x] CLI tests pass; commit `build(bench): build and run the benchmark programs` and
       `test(zones): measure the hot path and prove it never allocates`.
 
 ### Task 10: Close P1
 
-- [ ] `docs/architecture/ARCHITECTURE.md` describes the two tiers and their modules as built;
+- [x] `docs/architecture/ARCHITECTURE.md` describes the two tiers and their modules as built;
       `docs/reference/GLOSSARY.md` gains Collector, Gate, Lane, Flow; `docs/reference/CHANGELOG.md` one
       line per commit; module READMEs complete; `ENGINE_CHANGES.md` gains the MSVC TSC row and the
       polling consumer row; design status P1 `built`; `REMAINING_WORK.md` drops RW-1.
-- [ ] `write_license_block.py --report` 0 pending; `check_all` clean; full `sp test` green.
-- [ ] REPORT.md: commits, test counts, benchmark table, every SOLID breach met or "none".
-- [ ] Commit `docs(profiler): close the capture layer`.
+- [x] `write_license_block.py --report` 0 pending; `check_all` clean; full `sp test` green.
+- [x] REPORT.md: commits, test counts, benchmark table, every SOLID breach met or "none".
+- [x] Commit `docs(profiler): close the capture layer`.
