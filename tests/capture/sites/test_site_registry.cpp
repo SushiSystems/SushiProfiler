@@ -153,8 +153,8 @@ TEST(Small_SiteRegistry, InfoCopiesTheStrings)
     SiteHandle handle{&site};
     SiteRegistry registry;
     const SiteID id = registry.id_of(handle);
-    std::strcpy(name, "overwritten");
-    std::strcpy(group, "Other");
+    std::memcpy(name, "overwritten", sizeof("overwritten"));
+    std::memcpy(group, "Other", sizeof("Other"));
 
     const SiteInfo info = registry.info(id);
 

@@ -200,10 +200,11 @@ namespace SushiProfiler
         const auto candidate_groups = by_tags(candidate, grouped);
         for (const auto& [label, periods] : by_tags(baseline, grouped))
         {
+            const auto& wanted = label;
             const auto match = std::find_if(candidate_groups.begin(), candidate_groups.end(),
-                                            [&label](const auto& group)
+                                            [&wanted](const auto& group)
                                             {
-                                                return group.first == label;
+                                                return group.first == wanted;
                                             });
             if (match == candidate_groups.end())
                 continue;
