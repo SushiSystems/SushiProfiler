@@ -117,3 +117,47 @@ TEST_F(Small_SpanSink, RefusesAttributesOnABadRowKeyValueOrKind)
     EXPECT_EQ(sink_.refused(), 5U);
     EXPECT_EQ(table_.attributes().size(), 1U);
 }
+
+TEST_F(Small_SpanSink, SetsAFactOnThePeriod)
+{
+    std::vector<SushiProfiler::Fact> facts;
+    SpanSink sink(table_, facts, names_, tracks_);
+
+    EXPECT_TRUE(sink.set_fact("execution.layer", "graph"));
+    EXPECT_TRUE(sink.set_fact("queue.depth", "3"));
+
+    ASSERT_EQ(facts.size(), 2U);
+    EXPECT_EQ(facts[0].name, "execution.layer");
+    EXPECT_EQ(facts[0].value, "graph");
+    EXPECT_EQ(sink.refused(), 0U);
+}
+
+TEST_F(Small_SpanSink, ReplacesAFactOfTheSameName)
+{
+    std::vector<SushiProfiler::Fact> facts;
+    SpanSink sink(table_, facts, names_, tracks_);
+    static_cast<void>(sink.set_fact("queue.depth", "3"));
+
+    EXPECT_TRUE(sink.set_fact("queue.depth", "4"));
+
+    ASSERT_EQ(facts.size(), 1U);
+    EXPECT_EQ(facts[0].value, "4");
+}
+
+TEST_F(Small_SpanSink, RefusesAnEmptyFactName)
+{
+    std::vector<SushiProfiler::Fact> facts;
+    SpanSink sink(table_, facts, names_, tracks_);
+
+    EXPECT_FALSE(sink.set_fact("", "x"));
+
+    EXPECT_TRUE(facts.empty());
+    EXPECT_EQ(sink.refused(), 1U);
+}
+
+TEST_F(Small_SpanSink, RefusesAFactOnASinkBuiltWithoutFacts)
+{
+    EXPECT_FALSE(sink_.set_fact("queue.depth", "3"));
+
+    EXPECT_EQ(sink_.refused(), 1U);
+}

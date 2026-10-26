@@ -60,7 +60,13 @@ namespace SushiProfiler
             /// @brief Builds a window over @p schedule; `schedule.active` is at least 1.
             explicit Window(const WindowSchedule& schedule) noexcept;
 
-            /// @brief Returns the phase of period @p index.
+            /**
+             * @brief Returns the phase of period @p index.
+             *
+             * With `WindowSchedule::active_all` the first `wait` periods after the skipped ones are
+             * `Waiting`, the next `warmup` are `Warmup` and every later one is `Active`; the
+             * phase is never `Done`.
+             */
             [[nodiscard]] WindowPhase phase_of(std::uint64_t index) const noexcept;
 
             /// @brief Returns whether period @p index is recorded.

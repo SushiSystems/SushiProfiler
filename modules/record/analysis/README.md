@@ -23,6 +23,12 @@ on `record` and `statistics`, and privately on `events` and `sites`.
 - `SushiProfiler/analysis/sample_summary.hpp`: `summarise` gives the `SampleSummary` every
   timing row reports: count, median, its bootstrap interval, minimum, p95 and coefficient of
   variation. `add_summary_columns` and `append_summary` lay it out as columns and cells.
+- `SushiProfiler/analysis/period_breakdown.hpp`: `break_down_period(period, sites)` splits one
+  period's time the way `breakdown` does: the marking thread's self time per group, largest first,
+  the time no zone covered, and every thread's root and self totals with lanes summed. A live tool
+  that holds a period but no run record calls it with the site table of its names.
+  `group_of_node` gives one node's group, and `K_UNGROUPED_GROUP` is the label of a zone with no
+  group on its path. `breakdown` calls the same function.
 - `SushiProfiler/analysis/subject_samples.hpp`: `subject_samples(record)` returns every subject
   with samples as a `SubjectSamples`: its name, its unit and its samples in period order. The
   names are the ones checks and comparisons use: `timeline:<t>` period times;

@@ -94,4 +94,9 @@ void collect(const PeriodSpan& period, SpanSink& sink) override
 
 Source: `tests/session/registry/test_registry.cpp`
 
-How long a closed period waits for late work is the configuration's `consumer.linger_ms`.
+How long a closed period waits for late work is the configuration's `buffers.linger_ms`. A source
+whose work arrives later than that states it in `Source::max_delay_ns()`, and every period then
+waits for the largest delay; the session refuses a delay above 60 000 ms. A source sets a fact on
+the period it fills with `SpanSink::set_fact(name, value)`, and reads `Collector::sources_wanted()`
+to pay for device timing only while a session is recording: it is true from the session's start of
+its sources until their end, except while the session is paused.

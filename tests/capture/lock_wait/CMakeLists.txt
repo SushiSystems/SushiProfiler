@@ -7,4 +7,5 @@
 sushiprofiler_add_module_tests(
     MODULE lock_wait
     SOURCES
-        test_contended_lock.cpp)
+        test_contended_lock.cpp
+        test_named_lock_wait.cpp)

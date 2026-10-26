@@ -12,6 +12,7 @@ nanoseconds.
   timeline, and a `PeriodBudget` event when the period has a budget, so a source that stamps its
   own data with the index agrees with the record even when marks were closed out or a full ring
   dropped one. `mark(budget_ns)` gives this period its own budget; 0 gives it none.
+- `reset()` makes the next mark open period 0 again; a session restart calls it.
 - `current()` returns the open period's index, one relaxed load, or `K_NO_PERIOD` before the first
   mark. Several threads may mark one timeline.
 - `tag(key, value)` interns both strings and writes a `PeriodTag` the fold attaches to the open
@@ -23,5 +24,6 @@ then `after_mark`. `observe(observer)` installs one, or removes it with null. A 
 opens the gate in `before_mark` and closes it in `after_mark`, so the last recorded period still
 gets its end mark.
 
-Marks and tags have no site; only the gate turns them off. The tests are in
+Marks are written while `Collector::marking()` holds, so a held gate still writes them; a tag is
+written only while the zone gate is open. Marks and tags have no site. The tests are in
 `tests/capture/periods/`.

@@ -30,11 +30,37 @@
 
 namespace SushiProfiler
 {
-    SpanSink::SpanSink(SpanTable& table, const NameTable& names,
+    SpanSink::SpanSink(SpanTable& table, std::vector<Fact>& facts, const NameTable& names,
                        const std::vector<std::string>& tracks) noexcept
-        : table_(table), names_(names), tracks_(tracks)
+        : table_(table), facts_(&facts), names_(names), tracks_(tracks)
     {
 
+    }
+
+    SpanSink::SpanSink(SpanTable& table, const NameTable& names,
+                       const std::vector<std::string>& tracks) noexcept
+        : table_(table), facts_(nullptr), names_(names), tracks_(tracks)
+    {
+
+    }
+
+    bool SpanSink::set_fact(std::string_view name, std::string_view value)
+    {
+        if (facts_ == nullptr || name.empty())
+        {
+            ++refused_;
+            return false;
+        }
+        for (Fact& fact : *facts_)
+        {
+            if (fact.name == name)
+            {
+                fact.value = std::string(value);
+                return true;
+            }
+        }
+        facts_->push_back(Fact{std::string(name), std::string(value)});
+        return true;
     }
 
     std::optional<std::size_t> SpanSink::append(const Span& span)

@@ -36,6 +36,8 @@ namespace SushiProfiler
 {
     std::atomic<bool> Collector::use_tsc_{false};
     std::atomic<std::uint32_t> Collector::gate_{0U};
+    std::atomic<std::uint32_t> Collector::marking_{0U};
+    std::atomic<bool> Collector::sources_wanted_{false};
 
     namespace
     {
@@ -110,8 +112,10 @@ namespace SushiProfiler
         registrations_ = std::move(kept);
         discard_.clear();
         first_point_ = sample();
+        held_.store(false, std::memory_order_relaxed);
         open_.store(true, std::memory_order_release);
-        gate_.store(1U, std::memory_order_release);
+        marking_.store(1U, std::memory_order_release);
+        apply_gate_locked();
         return true;
     }
 
@@ -119,20 +123,59 @@ namespace SushiProfiler
     {
         std::lock_guard<std::mutex> lock(mutex_);
         open_.store(false, std::memory_order_release);
+        held_.store(false, std::memory_order_relaxed);
+        marking_.store(0U, std::memory_order_release);
         gate_.store(0U, std::memory_order_release);
     }
 
     void Collector::pause()
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        marking_.store(0U, std::memory_order_release);
         gate_.store(0U, std::memory_order_release);
     }
 
     void Collector::resume()
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        if (!open_.load(std::memory_order_relaxed))
+            return;
+        marking_.store(1U, std::memory_order_release);
+        apply_gate_locked();
+    }
+
+    void Collector::hold()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (!open_.load(std::memory_order_relaxed))
+            return;
+        held_.store(true, std::memory_order_relaxed);
+        apply_gate_locked();
+    }
+
+    void Collector::release()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        held_.store(false, std::memory_order_relaxed);
         if (open_.load(std::memory_order_relaxed))
-            gate_.store(1U, std::memory_order_release);
+            apply_gate_locked();
+    }
+
+    bool Collector::is_held() const noexcept
+    {
+        return held_.load(std::memory_order_relaxed);
+    }
+
+    void Collector::want_sources(bool wanted) noexcept
+    {
+        sources_wanted_.store(wanted, std::memory_order_relaxed);
+    }
+
+    void Collector::apply_gate_locked() noexcept
+    {
+        const bool open = marking_.load(std::memory_order_relaxed) != 0U &&
+                          !held_.load(std::memory_order_relaxed);
+        gate_.store(open ? 1U : 0U, std::memory_order_release);
     }
 
     bool Collector::is_open() const noexcept
@@ -209,6 +252,27 @@ namespace SushiProfiler
         if (ring != nullptr)
             return ring;
         if (t_retired || !recording())
+            return nullptr;
+        try
+        {
+            return instance().register_current_thread(0U);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return nullptr;
+        }
+        catch (const std::system_error&)
+        {
+            return nullptr;
+        }
+    }
+
+    ThreadRing* Collector::mark_ring() noexcept
+    {
+        ThreadRing* const ring = t_ring;
+        if (ring != nullptr)
+            return ring;
+        if (t_retired || !marking())
             return nullptr;
         try
         {

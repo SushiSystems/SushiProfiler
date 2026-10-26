@@ -13,3 +13,6 @@
 - `test_collector_settings.cpp`: rings of 65,536 events and a filter that keeps every site by
   default.
 - `test_drain_batch.cpp`: an empty drain holds no thread and no drop.
+  `hold` closes the zone gate and keeps marking; a pause, a hold and a release leave the gate
+  closed until the window resumes; `close` clears a hold; `hold` does nothing while closed;
+  `want_sources` sets `sources_wanted`.

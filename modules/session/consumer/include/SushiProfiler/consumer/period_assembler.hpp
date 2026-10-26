@@ -30,20 +30,23 @@
 
 #include <SushiProfiler/clock/calibration.hpp>
 #include <SushiProfiler/collector/drain_batch.hpp>
+#include <SushiProfiler/consumer/pause_log.hpp>
+#include <SushiProfiler/consumer/stream_writer_set.hpp>
 #include <SushiProfiler/fold/lane_tracker.hpp>
 #include <SushiProfiler/fold/period_fold.hpp>
 #include <SushiProfiler/fold/record_clock.hpp>
+#include <SushiProfiler/live/period_publisher.hpp>
 #include <SushiProfiler/record/run_record.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>
 #include <SushiProfiler/sources/source.hpp>
-#include <SushiProfiler/stream_writers/stream_writer.hpp>
 #include <SushiProfiler/version/export.hpp>
 #include <SushiProfiler/window/window.hpp>
 
 #include <cstdint>
 #include <deque>
 #include <map>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -51,21 +54,28 @@
 SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
-    /// @brief How the assembler places events in periods.
+    /// @brief How the assembler places events in periods; values only.
     struct AssemblySettings
     {
         NameID timeline = 0U;          /**< The followed timeline; 0 makes the run one period. */
         NameID run_timeline = 0U;      /**< The timeline the one period carries when that is 0. */
-        const Window* window = nullptr; /**< Which periods are recorded; null records all. */
         std::uint64_t linger_ns = 100'000'000U; /**< How long a period waits for late events. */
         CalibrationPoint origin;       /**< The collector's first point; record time 0. */
+        std::optional<std::uint32_t> keep_periods; /**< The newest periods kept; absent keeps all. */
     };
 
-    /// @brief A stream writer and the name the configuration gave it.
-    struct NamedStreamWriter
+    /**
+     * @brief The collaborators of an assembler, each a reference that outlives it.
+     *
+     * The window is consulted only when a timeline is followed; a session without one passes a
+     * window of every period.
+     */
+    struct AssemblyParts
     {
-        std::string name;               /**< The writer's name. */
-        StreamWriter* writer = nullptr; /**< The writer; it outlives the assembler. */
+        const Window& window;         /**< Which periods are recorded. */
+        PauseLog& pauses;             /**< When the session was paused. */
+        PeriodPublisher& publisher;   /**< Where each closed period is published. */
+        StreamWriterSet& writers;     /**< The stream writers each closed period goes to. */
     };
 
     /**
@@ -81,7 +91,7 @@ namespace SushiProfiler
             /// @brief Builds an assembler that fills @p record; every reference outlives it.
             PeriodAssembler(const AssemblySettings& settings, RunRecord& record,
                             const NameTable& names, const SiteRegistry& sites,
-                            std::vector<Source*> sources, std::vector<NamedStreamWriter> writers);
+                            std::vector<Source*> sources, const AssemblyParts& parts);
 
             PeriodAssembler(const PeriodAssembler&) = delete;
             PeriodAssembler& operator=(const PeriodAssembler&) = delete;
@@ -97,8 +107,12 @@ namespace SushiProfiler
              *
              * A period of the followed timeline with no end mark is not kept and its events count
              * as outside; the one period of a run without a timeline ends at the last drain.
+             * Trims the record to `keep_periods`.
              */
             void finish();
+
+            /// @brief Ends every stream writer that began, once; call it after finish().
+            void end_writers();
 
             /// @brief Returns what went wrong outside the record, such as a writer that failed.
             [[nodiscard]] const std::vector<std::string>& problems() const noexcept;
@@ -118,10 +132,14 @@ namespace SushiProfiler
                 LaneTracker lanes;               /**< The lanes open on the thread. */
                 std::deque<FoldEvent> waiting;   /**< Events not yet placed, in ring order. */
                 std::uint64_t last_write_ns = 0U; /**< When its last event was written. */
+                bool retired = false;            /**< Whether the thread has exited. */
             };
 
             /// @brief Opens and ends periods on the followed timeline's marks and budgets.
             void read_marks(const DrainBatch& batch, const RecordClock& clock);
+
+            /// @brief Reads the pause ends since the last drain as moments lanes are reset.
+            void read_pause_ends();
 
             /// @brief Ends the open period at @p time_ns and opens period @p index if recorded.
             void mark(std::uint64_t index, std::uint32_t thread, std::uint64_t time_ns);
@@ -138,13 +156,19 @@ namespace SushiProfiler
             /// @brief Closes every ended period whose end is at or before @p horizon_ns.
             void close_ended(std::uint64_t horizon_ns);
 
-            /// @brief Folds @p open, collects its spans, writes it and appends it to the record.
+            /// @brief Folds @p open, collects its spans, writes it, appends and publishes it.
             void close(OpenPeriod& open);
+
+            /// @brief Remembers that [@p begin_ns, @p end_ns) closed, coalescing neighbours.
+            void remember_closed(std::uint64_t begin_ns, std::uint64_t end_ns);
+
+            /// @brief Drops the reopen times and pause intervals no thread can still meet.
+            void prune_lists();
 
             /// @brief Returns @p thread's record, adding it in index order on first use.
             ThreadRecord& thread_record(std::uint32_t thread);
 
-            /// @brief Copies the names and sites into the record.
+            /// @brief Appends the names and sites added since the last call to the record.
             void copy_tables();
 
             AssemblySettings settings_;                 /**< How events are placed. */
@@ -152,12 +176,15 @@ namespace SushiProfiler
             const NameTable& names_;                    /**< The session's names. */
             const SiteRegistry& sites_;                 /**< The session's sites. */
             std::vector<Source*> sources_;              /**< The sources, asked at each close. */
-            std::vector<NamedStreamWriter> writers_;    /**< The writers still writing. */
+            AssemblyParts parts_;                       /**< The collaborators. */
             Calibration calibration_;                   /**< The latest tick calibration. */
             std::map<std::uint32_t, ThreadState> threads_; /**< Per-thread state. */
             std::vector<OpenPeriod> open_;              /**< Periods not closed, in order. */
-            std::vector<std::pair<std::uint64_t, std::uint64_t>> closed_; /**< Closed spans. */
-            std::vector<std::uint64_t> reopened_ns_;    /**< When the window opened the gate. */
+            /// @brief Closed spans, sorted and disjoint, at most K_MAX_CLOSED_SPANS.
+            std::vector<std::pair<std::uint64_t, std::uint64_t>> closed_;
+            /// @brief When the gate reopened: window gaps and pause ends, at most K_MAX_REOPENS.
+            std::vector<std::uint64_t> reopened_ns_;
+            std::uint64_t pause_watermark_steady_ns_ = 0U; /**< The latest pause end read. */
             std::uint64_t now_ns_ = 0U;                 /**< The last drain's time. */
             std::vector<std::string> problems_;         /**< What went wrong outside the record. */
     };

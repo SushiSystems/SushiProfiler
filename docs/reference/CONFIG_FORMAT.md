@@ -21,17 +21,21 @@ refuses an unknown key, a value of the wrong kind and a value out of range, nami
 | `writers` | object | none | Writer name to its settings object, in file order. |
 | `output` | string | none | The folder written outputs go in. |
 | `buffers` | object | below | The capture path's sizes. |
+| `record` | object | below | What the run record keeps. |
+| `live` | object | below | The live view of closed periods. |
 
 `window` follows PyTorch's schedule. `skip` periods are ignored, then each cycle has `wait`
 periods not recorded, `warmup` periods recorded and marked warm-up, and `active` periods
-recorded. There are `repeat` cycles, and `repeat` 0 means until the session stops.
+recorded. There are `repeat` cycles, and `repeat` 0 means until the session stops. `active` may
+also be the string `"all"`: every period after the warm-up is recorded, with no end. Then `skip`,
+`wait` and `warmup` apply once, and `repeat` must be 1 or left out.
 
 | `window` key | Range | Default |
 | --- | --- | --- |
 | `skip` | 0 to 2^32 - 1 | 0 |
 | `wait` | 0 to 2^32 - 1 | 0 |
 | `warmup` | 0 to 2^32 - 1 | 3 |
-| `active` | 1 to 2^32 - 1 | 20 |
+| `active` | 1 to 2^32 - 1, or `"all"` | 20 |
 | `repeat` | 0 to 2^32 - 1 | 1 |
 
 | `buffers` key | Range | Default | Holds |
@@ -40,8 +44,21 @@ recorded. There are `repeat` cycles, and `repeat` 0 means until the session stop
 | `attribute_bytes` | 0 to 2^32 | 1 048 576 | Reserved for a limit on the bytes of span attributes per period; read and range-checked, but nothing applies it yet (RW-6) |
 | `linger_ms` | 0 to 60 000 | 100 | How long a period stays open after its end for late events |
 
+| `record` key | Range | Default | Holds |
+| --- | --- | --- | --- |
+| `keep_periods` | 0 to 2^32 - 1 | all | The newest periods the stopped record keeps; 0 keeps none, and a left-out key keeps every period |
+
+| `live` key | Range | Default | Holds |
+| --- | --- | --- | --- |
+| `history` | 1 to 65 536 | 300 | Closed periods `LiveView::history` can return |
+| `max_runs` | 0 to 2^24 | 2048 | Zone runs kept in each published period; the longest are kept |
+| `min_run_ns` | 0 to 10^9 | 1000 | Zone runs shorter than this are not published |
+| `max_poll_ms` | 1 to 1000 | 4 | The longest the consumer waits between drains while a `LiveView` exists |
+
 A source's or writer's settings object is read by that part, not by the configuration reader;
-the reader only checks that each entry is an object.
+the reader only checks that each entry is an object. A writer's settings object may also hold
+`"enabled": false`; the reader removes that key, and the writer starts switched off until
+`Session::set_writer_enabled` turns it on.
 
 ## Example
 

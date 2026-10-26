@@ -81,6 +81,18 @@ namespace SushiProfiler
             [[nodiscard]] virtual SourceStatus begin(SourceContext& context) = 0;
 
             /**
+             * @brief Returns how long after a period ends this source can still hand over its
+             *        work, in nanoseconds; 0 when it never does.
+             *
+             * A period closes once the larger of the linger and every source's delay has passed
+             * its end. The session reads it after begin() and refuses more than 60 000 ms.
+             */
+            [[nodiscard]] virtual std::uint64_t max_delay_ns() const noexcept
+            {
+                return 0U;
+            }
+
+            /**
              * @brief Adds to @p sink every span whose start lies inside @p period.
              *
              * Work that started before period.start_steady_ns belongs to a period that has

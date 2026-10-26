@@ -30,10 +30,13 @@
 
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/zones/macros.hpp>
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
+#include <thread>
 #include <vector>
 
 using SushiProfiler::Collector;
@@ -82,6 +85,11 @@ namespace
                 DrainBatch discarded;
                 Collector::instance().drain(discarded);
             }
+    };
+
+    /// @brief The tests that start threads.
+    class Medium_PeriodTimeline : public Small_PeriodTimeline
+    {
     };
 } // namespace
 
@@ -169,4 +177,63 @@ TEST_F(Small_PeriodTimeline, TwoTimelinesKeepTheirOwnIndex)
 
     EXPECT_EQ(steps.current(), 0U);
     EXPECT_EQ(batches.current(), 1U);
+}
+
+TEST_F(Small_PeriodTimeline, AMarkWrittenWhileHeldReachesTheDrain)
+{
+    PeriodTimeline timeline("held.step");
+    Collector::instance().hold();
+    timeline.mark();
+    {
+        SP_ZONE("held.zone");
+    }
+    const std::vector<TraceEvent> events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::PeriodMark);
+}
+
+TEST_F(Small_PeriodTimeline, ATagWhileHeldIsDropped)
+{
+    PeriodTimeline timeline("held.step");
+    timeline.mark();
+    Collector::instance().hold();
+    timeline.tag("variant", "fused");
+    const std::vector<TraceEvent> events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::PeriodMark);
+}
+
+TEST_F(Medium_PeriodTimeline, AMarkFromAnUnregisteredThreadWhileHeldRegistersItsRing)
+{
+    PeriodTimeline timeline("held.step");
+    Collector::instance().hold();
+    std::uint32_t marker = Collector::K_NO_THREAD;
+    std::thread([&] {
+        timeline.mark();
+        marker = Collector::thread_index();
+    }).join();
+    DrainBatch batch;
+    Collector::instance().drain(batch);
+
+    ASSERT_NE(marker, Collector::K_NO_THREAD);
+    std::size_t marks = 0U;
+    for (const ThreadDrain& thread : batch.threads)
+    {
+        if (thread.thread_index == marker)
+            marks += thread.events.size();
+    }
+    EXPECT_EQ(marks, 1U);
+}
+
+TEST_F(Small_PeriodTimeline, ResetStartsPeriodZeroAgain)
+{
+    PeriodTimeline timeline("reset.step");
+    timeline.mark();
+    timeline.mark();
+    timeline.reset();
+
+    EXPECT_EQ(timeline.current(), PeriodTimeline::K_NO_PERIOD);
+    EXPECT_EQ(timeline.mark(), 0U);
 }

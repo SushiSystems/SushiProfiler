@@ -21,6 +21,9 @@ and privately on `json` and `sites`.
 | A timeline | 1; named `timeline <name>` | Each period as an `X` event `<timeline> #<index>`, with `warmup` in its arguments |
 | A device track | 2, `devices`; row id the TrackID, named by the track | Spans as `X` events, with `queued_us` and the span's attributes in their arguments |
 
+A writer may start disabled in the configuration (`"enabled": false`); the session then does not
+call `begin` until the writer is first switched on, so no file exists before that.
+
 A path that cannot be opened is `PathUnwritable` from `begin`; every later call then returns
 `StreamFailed`.
 

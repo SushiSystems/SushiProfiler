@@ -32,6 +32,13 @@
 
 #include <SushiProfiler/zones/macros.hpp>
 
+#include <chrono>
+#include <memory>
+#include <thread>
+#include <vector>
+
+#include "assembly_rig.hpp"
+
 using SushiProfiler::AssemblySettings;
 using SushiProfiler::Collector;
 using SushiProfiler::CollectorSettings;
@@ -63,7 +70,9 @@ TEST(Medium_Consumer, DrainsWhileRunningAndFinishesOnStop)
     settings.origin = collector.first_point();
     settings.run_timeline = collector.names().intern("run");
     settings.linger_ns = 0U;
-    PeriodAssembler assembler(settings, record, collector.names(), collector.sites(), {}, {});
+    SushiProfilerTests::AssemblyRig rig;
+    PeriodAssembler assembler(settings, record, collector.names(), collector.sites(), {},
+                              rig.parts());
     Consumer consumer(collector, assembler);
 
     consumer.start();
@@ -88,4 +97,97 @@ TEST(Medium_Consumer, DrainsWhileRunningAndFinishesOnStop)
     EXPECT_EQ(calls, 3U);
     EXPECT_FALSE(record.threads.empty());
     EXPECT_GE(consumer.drains(), 1U);
+}
+
+TEST(Small_NextPoll, CeilingLimitsTheDoubling)
+{
+    EXPECT_EQ(SushiProfiler::next_poll(milliseconds(1), 0.0, milliseconds(4)), milliseconds(2));
+    EXPECT_EQ(SushiProfiler::next_poll(milliseconds(3), 0.0, milliseconds(4)), milliseconds(4));
+    EXPECT_EQ(SushiProfiler::next_poll(milliseconds(400), 0.3, milliseconds(4)), milliseconds(4));
+    EXPECT_EQ(SushiProfiler::next_poll(milliseconds(400), 0.0, milliseconds(4)), milliseconds(4));
+}
+
+TEST(Small_NextPoll, TheFastestPollStillWinsWhenARingIsFull)
+{
+    EXPECT_EQ(SushiProfiler::next_poll(milliseconds(4), 0.9, milliseconds(4)), milliseconds(1));
+}
+
+namespace
+{
+    /// @brief Opens the collector and builds the record and assembler a live consumer test needs.
+    class LiveConsumerRig
+    {
+        public:
+            LiveConsumerRig()
+            {
+                Collector& collector = Collector::instance();
+                collector.close();
+                DrainBatch leftover;
+                collector.drain(leftover);
+                opened = collector.open(CollectorSettings{});
+                settings.origin = collector.first_point();
+                settings.run_timeline = collector.names().intern("run");
+                settings.linger_ns = 0U;
+                assembler = std::make_unique<PeriodAssembler>(
+                    settings, record, collector.names(), collector.sites(),
+                    std::vector<SushiProfiler::Source*>{}, rig.parts());
+            }
+
+            bool opened = false;                           /**< Whether the collector opened. */
+            RunRecord record;                              /**< The record filled. */
+            AssemblySettings settings;                     /**< The assembler's settings. */
+            SushiProfilerTests::AssemblyRig rig;           /**< The assembler's collaborators. */
+            std::unique_ptr<PeriodAssembler> assembler;    /**< The assembler. */
+    };
+
+    /// @brief Waits up to @p limit for @p condition; returns whether it held.
+    template <class Condition>
+    bool wait_for_condition(milliseconds limit, Condition condition)
+    {
+        const auto end = std::chrono::steady_clock::now() + limit;
+        while (std::chrono::steady_clock::now() < end)
+        {
+            if (condition())
+                return true;
+            std::this_thread::sleep_for(milliseconds(1));
+        }
+        return condition();
+    }
+} // namespace
+
+TEST(Medium_Consumer, AWatchedConsumerDrainsAtTheLiveCeiling)
+{
+    LiveConsumerRig rig;
+    ASSERT_TRUE(rig.opened);
+    rig.rig.channel().attach();
+    Consumer consumer(Collector::instance(), *rig.assembler, rig.rig.channel(), milliseconds(4));
+
+    consumer.start();
+    const bool drained =
+        wait_for_condition(milliseconds(5'000), [&] { return consumer.drains() >= 25U; });
+    Collector::instance().close();
+    consumer.stop();
+    rig.rig.channel().detach();
+
+    EXPECT_TRUE(drained);
+}
+
+TEST(Medium_Consumer, WakeShortensAnIdleSleep)
+{
+    LiveConsumerRig rig;
+    ASSERT_TRUE(rig.opened);
+    Consumer consumer(Collector::instance(), *rig.assembler, rig.rig.channel(), milliseconds(4));
+    consumer.start();
+    std::this_thread::sleep_for(milliseconds(2'500));
+    const std::uint64_t before = consumer.drains();
+
+    rig.rig.channel().attach();
+    consumer.wake();
+    const bool served =
+        wait_for_condition(milliseconds(400), [&] { return consumer.drains() > before; });
+    Collector::instance().close();
+    consumer.stop();
+    rig.rig.channel().detach();
+
+    EXPECT_TRUE(served);
 }

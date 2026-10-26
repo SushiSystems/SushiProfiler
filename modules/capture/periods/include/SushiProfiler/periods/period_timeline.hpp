@@ -68,6 +68,9 @@ namespace SushiProfiler
             /// @brief Opens the next period with @p budget_ns, 0 for none; returns its index.
             std::uint64_t mark(std::uint64_t budget_ns) noexcept;
 
+            /// @brief Makes the next mark open period 0 again; a session restart calls it.
+            void reset() noexcept;
+
             /// @brief Returns the index of the open period, or K_NO_PERIOD before the first mark.
             [[nodiscard]] std::uint64_t current() const noexcept;
 

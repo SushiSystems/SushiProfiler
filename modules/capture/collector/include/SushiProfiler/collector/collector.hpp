@@ -94,11 +94,41 @@ namespace SushiProfiler
             /// @brief Ends the session and closes the gate; the rings keep their events to drain.
             void close();
 
-            /// @brief Closes the gate inside an open session, keeping what the rings hold.
+            /// @brief Closes the gate and period marks inside an open session, keeping the rings.
             void pause();
 
-            /// @brief Opens the gate again inside an open session; does nothing while closed.
+            /// @brief Opens marks again, and the gate unless held; does nothing while closed.
             void resume();
+
+            /**
+             * @brief Closes the zone gate inside an open session until release(), the way a
+             *        caller pauses recording; period marks are still written.
+             *
+             * It is a second reason to close the gate beside pause(), so the window's next
+             * resume() cannot undo it. Does nothing while the collector is closed.
+             */
+            void hold();
+
+            /// @brief Ends hold(); the gate opens again where the window records.
+            void release();
+
+            /// @brief Returns whether hold() is in effect.
+            [[nodiscard]] bool is_held() const noexcept;
+
+            /// @brief Returns whether period marks are written; one relaxed load.
+            [[nodiscard]] static bool marking() noexcept
+            {
+                return marking_.load(std::memory_order_relaxed) != 0U;
+            }
+
+            /// @brief Returns whether a session wants its sources to measure; one relaxed load.
+            [[nodiscard]] static bool sources_wanted() noexcept
+            {
+                return sources_wanted_.load(std::memory_order_relaxed);
+            }
+
+            /// @brief Sets what sources_wanted() returns; the session calls it around its sources.
+            static void want_sources(bool wanted) noexcept;
 
             /// @brief Returns whether a session is open, paused or not.
             [[nodiscard]] bool is_open() const noexcept;
@@ -124,6 +154,12 @@ namespace SushiProfiler
              *         when the ring or its lock cannot be had.
              */
             [[nodiscard]] static ThreadRing* ring() noexcept;
+
+            /**
+             * @brief Returns the calling thread's ring for a period mark, registering it on first
+             *        use while marks are written, even when the gate is held.
+             */
+            [[nodiscard]] static ThreadRing* mark_ring() noexcept;
 
             /**
              * @brief Registers the calling thread now, open or closed, so its first record
@@ -162,8 +198,20 @@ namespace SushiProfiler
             /// @brief Whether events are stamped with the TSC; set once by the constructor.
             static std::atomic<bool> use_tsc_;
 
-            /// @brief Non-zero while the collector records.
+            /// @brief Non-zero while the collector records zones: marking and not held.
             static std::atomic<std::uint32_t> gate_;
+
+            /// @brief Non-zero while period marks are written: open and not paused by the window.
+            static std::atomic<std::uint32_t> marking_;
+
+            /// @brief Whether a session wants its sources to measure.
+            static std::atomic<bool> sources_wanted_;
+
+            /// @brief Whether hold() is in effect.
+            std::atomic<bool> held_{false};
+
+            /// @brief Sets the gate from marking_ and held_; the caller holds mutex_.
+            void apply_gate_locked() noexcept;
 
             /// @brief Whether a session is open, between `open` and `close`.
             std::atomic<bool> open_{false};

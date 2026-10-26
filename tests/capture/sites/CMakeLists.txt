@@ -7,6 +7,7 @@
 sushiprofiler_add_module_tests(
     MODULE sites
     SOURCES
+        test_dynamic_site_table.cpp
         test_name_table.cpp
         test_site.cpp
         test_site_registry.cpp)

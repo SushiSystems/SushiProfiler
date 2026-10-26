@@ -15,7 +15,7 @@ Modules sit in tiers, lowest first. `cmake/SushiProfilerTiers.cmake` states the 
 | `foundation` | `version`, `clock`, `events`, `json` |
 | `capture` | `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods` |
 | `record` | `record`, `record_json`, `statistics`, `analysis`, `record_writers`, `compare`, `checks` |
-| `session` | `config`, `window`, `sources`, `environment`, `fold`, `stream_writers`, `registry`, `consumer`, `session` |
+| `session` | `config`, `window`, `sources`, `environment`, `fold`, `live`, `stream_writers`, `registry`, `consumer`, `session` |
 | `tools` | `umbrella`, `record_tool` |
 
 A tier is the folder `modules/<tier>/`; it appears with its first module.
@@ -74,10 +74,16 @@ and starts a `Consumer`.
 2. The consumer drains the collector and hands each batch to a `PeriodAssembler`, which places
    events in periods by their begin time.
 3. When a period closes, `fold_period` in `fold` turns its events into zone trees and sample
-   series, each source adds its spans through a `SpanSink`, the period joins the `RunRecord`, and
-   each `StreamWriter` writes it.
-4. `Session::stop` closes the collector, drains once more and returns the record;
-   `Session::report` runs the configured analyses and record writers over it.
+   series, each source adds its spans and facts through a `SpanSink`, and the `StreamWriterSet`
+   writes the period to each enabled `StreamWriter`. The period joins the `RunRecord`, the
+   `PeriodPublisher` of `live` publishes it to a `LiveChannel` while a `LiveView` exists, and the
+   record is then trimmed to `record.keep_periods`.
+4. `Session::pause` closes the zone gate through `Collector::hold` and logs the interval in a
+   `PauseLog`, so period marks keep their boundaries and the periods that crossed the pause carry
+   the fact `paused`.
+5. `Session::stop` closes the collector, drains once more and returns the record;
+   `Session::restart` starts the next run on the same object; `Session::report` runs the
+   configured analyses and record writers over a record.
 
 ## The record path
 

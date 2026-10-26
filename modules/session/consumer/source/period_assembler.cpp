@@ -28,7 +28,11 @@
 
 #include <SushiProfiler/consumer/period_assembler.hpp>
 
+#include <SushiProfiler/consumer/period_retention.hpp>
+
 #include <algorithm>
+#include <cstddef>
+#include <iterator>
 #include <limits>
 #include <tuple>
 
@@ -36,6 +40,12 @@ namespace SushiProfiler
 {
     namespace
     {
+        /// @brief The most closed spans the assembler remembers for counting late events.
+        constexpr std::size_t K_MAX_CLOSED_SPANS = 4096U;
+
+        /// @brief The most reopen times the assembler remembers.
+        constexpr std::size_t K_MAX_REOPENS = 4096U;
+
         /// @brief A mark or budget of the followed timeline, with where it came from.
         struct PeriodEvent
         {
@@ -58,14 +68,27 @@ namespace SushiProfiler
             return kind == EventKind::PeriodMark || kind == EventKind::PeriodBudget ||
                    kind == EventKind::LaneBegin || kind == EventKind::LaneEnd;
         }
+
+        /// @brief Sets fact @p name of @p facts to @p value, replacing one of that name.
+        void put_fact(std::vector<Fact>& facts, const char* name, const char* value)
+        {
+            for (Fact& fact : facts)
+            {
+                if (fact.name == name)
+                {
+                    fact.value = value;
+                    return;
+                }
+            }
+            facts.push_back(Fact{name, value});
+        }
     } // namespace
 
     PeriodAssembler::PeriodAssembler(const AssemblySettings& settings, RunRecord& record,
                                      const NameTable& names, const SiteRegistry& sites,
-                                     std::vector<Source*> sources,
-                                     std::vector<NamedStreamWriter> writers)
+                                     std::vector<Source*> sources, const AssemblyParts& parts)
         : settings_(settings), record_(record), names_(names), sites_(sites),
-          sources_(std::move(sources)), writers_(std::move(writers)),
+          sources_(std::move(sources)), parts_(parts),
           calibration_(settings.origin, settings.origin)
     {
         if (settings_.timeline != 0U)
@@ -91,6 +114,7 @@ namespace SushiProfiler
                 thread.name = drain.name;
             thread.dropped += drain.dropped;
         }
+        read_pause_ends();
         read_marks(batch, clock);
         for (const ThreadDrain& drain : batch.threads)
             queue(drain, clock);
@@ -128,11 +152,28 @@ namespace SushiProfiler
             thread_record(thread).unmatched += state.lanes.unmatched();
         }
         copy_tables();
+        trim_periods(record_.periods, settings_.keep_periods, true);
+    }
+
+    void PeriodAssembler::end_writers()
+    {
+        parts_.writers.end_all(record_, problems_);
     }
 
     const std::vector<std::string>& PeriodAssembler::problems() const noexcept
     {
         return problems_;
+    }
+
+    void PeriodAssembler::read_pause_ends()
+    {
+        for (const std::uint64_t end_steady_ns : parts_.pauses.ends_after(pause_watermark_steady_ns_))
+        {
+            pause_watermark_steady_ns_ = std::max(pause_watermark_steady_ns_, end_steady_ns);
+            reopened_ns_.push_back(end_steady_ns > settings_.origin.steady_ns
+                                       ? end_steady_ns - settings_.origin.steady_ns
+                                       : 0U);
+        }
     }
 
     void PeriodAssembler::read_marks(const DrainBatch& batch, const RecordClock& clock)
@@ -180,7 +221,7 @@ namespace SushiProfiler
                 was_open = true;
             }
         }
-        if (settings_.window != nullptr && !settings_.window->records(index))
+        if (!parts_.window.records(index))
             return;
         if (!was_open)
             reopened_ns_.push_back(time_ns);
@@ -189,14 +230,14 @@ namespace SushiProfiler
         next.period.timeline = settings_.timeline;
         next.period.thread = thread;
         next.period.begin_ns = time_ns;
-        next.period.warmup = settings_.window != nullptr &&
-                             settings_.window->phase_of(index) == WindowPhase::Warmup;
+        next.period.warmup = parts_.window.phase_of(index) == WindowPhase::Warmup;
         open_.push_back(std::move(next));
     }
 
     void PeriodAssembler::queue(const ThreadDrain& drain, const RecordClock& clock)
     {
         ThreadState& state = threads_[drain.thread_index];
+        state.retired = drain.retired;
         for (const TraceEvent& raw : drain.events)
         {
             const TraceEvent event = clock.to_record(raw);
@@ -239,13 +280,16 @@ namespace SushiProfiler
             }
             return;
         }
-        for (const auto& [begin_ns, end_ns] : closed_)
-        {
-            if (time_ns >= begin_ns && time_ns < end_ns)
+        const auto after = std::upper_bound(
+            closed_.begin(), closed_.end(), time_ns,
+            [](std::uint64_t time, const std::pair<std::uint64_t, std::uint64_t>& span)
             {
-                ++thread_record(thread).late;
-                return;
-            }
+                return time < span.first;
+            });
+        if (after != closed_.begin() && time_ns < std::prev(after)->second)
+        {
+            ++thread_record(thread).late;
+            return;
         }
         ++record_.drops.outside_periods;
     }
@@ -268,11 +312,13 @@ namespace SushiProfiler
         {
             close(open_.front());
             open_.erase(open_.begin());
+            prune_lists();
         }
     }
 
     void PeriodAssembler::close(OpenPeriod& open)
     {
+        parts_.writers.apply_requests(record_, problems_);
         std::vector<ThreadEvents> threads;
         for (auto& [thread, events] : open.events)
             threads.push_back(ThreadEvents{thread, std::move(events)});
@@ -284,29 +330,62 @@ namespace SushiProfiler
             thread_record(count.thread).unmatched += count.count;
         for (Source* const source : sources_)
         {
-            SpanSink sink(period.spans, names_, record_.tracks);
+            SpanSink sink(period.spans, period.facts, names_, record_.tracks);
             const PeriodSpan span{period.index, settings_.origin.steady_ns + period.begin_ns,
                                   settings_.origin.steady_ns + period.end_ns};
             source->collect(span, sink);
             record_.drops.spans_dropped += sink.refused() + sink.late();
         }
         copy_tables();
-        for (auto writer = writers_.begin(); writer != writers_.end();)
-        {
-            if (writer->writer->write_period(record_, period, fold.instances) ==
-                WriteStatus::Written)
-            {
-                ++writer;
-                continue;
-            }
-            problems_.push_back("writer \"" + writer->name + "\" failed on period " +
-                                std::to_string(period.index) + " and was stopped");
-            writer = writers_.erase(writer);
-        }
+        if (parts_.pauses.overlaps(settings_.origin.steady_ns + period.begin_ns,
+                                   settings_.origin.steady_ns + period.end_ns))
+            put_fact(period.facts, K_PAUSED_FACT, "true");
+        parts_.writers.write_period(record_, period, fold.instances, problems_);
         if (!period.warmup)
             period.runs = std::move(fold.instances);
-        closed_.emplace_back(period.begin_ns, period.end_ns);
+        remember_closed(period.begin_ns, period.end_ns);
         record_.periods.push_back(std::move(period));
+        parts_.publisher.closed(record_.periods.back(), record_);
+        trim_periods(record_.periods, settings_.keep_periods, false);
+    }
+
+    void PeriodAssembler::remember_closed(std::uint64_t begin_ns, std::uint64_t end_ns)
+    {
+        if (!closed_.empty() && closed_.back().second == begin_ns)
+            closed_.back().second = end_ns;
+        else
+            closed_.emplace_back(begin_ns, end_ns);
+        if (closed_.size() > K_MAX_CLOSED_SPANS)
+            closed_.erase(closed_.begin());
+    }
+
+    void PeriodAssembler::prune_lists()
+    {
+        std::uint64_t floor_ns = now_ns_;
+        bool any = false;
+        for (const auto& entry : threads_)
+        {
+            if (entry.second.retired)
+                continue;
+            floor_ns = any ? std::min(floor_ns, entry.second.last_write_ns)
+                           : entry.second.last_write_ns;
+            any = true;
+        }
+        reopened_ns_.erase(std::remove_if(reopened_ns_.begin(), reopened_ns_.end(),
+                                          [floor_ns](std::uint64_t reopened)
+                                          {
+                                              return reopened <= floor_ns;
+                                          }),
+                           reopened_ns_.end());
+        if (reopened_ns_.size() > K_MAX_REOPENS)
+        {
+            reopened_ns_.erase(reopened_ns_.begin(),
+                               reopened_ns_.begin() +
+                                   static_cast<std::ptrdiff_t>(reopened_ns_.size() - K_MAX_REOPENS));
+        }
+        const std::uint64_t oldest_open_ns = open_.empty() ? now_ns_ : open_.front().period.begin_ns;
+        parts_.pauses.forget_before(settings_.origin.steady_ns +
+                                    std::min(floor_ns, oldest_open_ns));
     }
 
     ThreadRecord& PeriodAssembler::thread_record(std::uint32_t thread)
@@ -326,11 +405,13 @@ namespace SushiProfiler
 
     void PeriodAssembler::copy_tables()
     {
-        record_.names.assign(1U, std::string());
-        for (std::size_t id = 1U; id <= names_.size(); ++id)
+        if (record_.names.empty())
+            record_.names.assign(1U, std::string());
+        for (std::size_t id = record_.names.size(); id <= names_.size(); ++id)
             record_.names.push_back(names_.text(static_cast<NameID>(id)));
-        record_.sites.assign(1U, SiteRecord{});
-        for (std::size_t id = 1U; id <= sites_.size(); ++id)
+        if (record_.sites.empty())
+            record_.sites.assign(1U, SiteRecord{});
+        for (std::size_t id = record_.sites.size(); id <= sites_.size(); ++id)
         {
             const SiteInfo info = sites_.info(static_cast<SiteID>(id));
             record_.sites.push_back(SiteRecord{info.name, info.group, info.file, info.unit,

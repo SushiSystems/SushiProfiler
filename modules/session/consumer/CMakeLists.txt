@@ -8,5 +8,8 @@ sushiprofiler_add_module(
     NAME consumer TIER session
     SOURCES
         consumer.cpp
+        pause_log.cpp
         period_assembler.cpp
-    DEPENDS version clock collector fold record sites sources stream_writers window)
+        period_retention.cpp
+        stream_writer_set.cpp
+    DEPENDS version clock collector fold live record sites sources stream_writers window)

@@ -59,9 +59,9 @@ namespace SushiProfiler
 
     void PeriodTimeline::write_mark(std::uint64_t index, std::uint64_t budget_ns) const noexcept
     {
-        if (!Collector::recording())
+        if (!Collector::marking())
             return;
-        ThreadRing* const ring = Collector::ring();
+        ThreadRing* const ring = Collector::mark_ring();
         if (ring == nullptr)
             return;
         const std::uint64_t now = Collector::now();
@@ -77,6 +77,11 @@ namespace SushiProfiler
     void PeriodTimeline::observe(PeriodObserver* observer) noexcept
     {
         observer_.store(observer, std::memory_order_release);
+    }
+
+    void PeriodTimeline::reset() noexcept
+    {
+        marks_.store(0U, std::memory_order_relaxed);
     }
 
     std::uint64_t PeriodTimeline::current() const noexcept

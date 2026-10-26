@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/record/period_record.hpp>
 #include <SushiProfiler/record/span_table.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/version/export.hpp>
@@ -37,6 +38,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 SUSHIPROFILER_DLL_WARNINGS_PUSH
@@ -52,7 +54,14 @@ namespace SushiProfiler
     class SUSHIPROFILER_API SpanSink final
     {
         public:
-            /// @brief Builds a sink over @p table that checks ids against @p names and @p tracks.
+            /**
+             * @brief Builds a sink over @p table that checks ids against @p names and @p tracks
+             *        and sets facts on @p facts, the period's.
+             */
+            SpanSink(SpanTable& table, std::vector<Fact>& facts, const NameTable& names,
+                     const std::vector<std::string>& tracks) noexcept;
+
+            /// @brief Builds a sink with no facts: set_fact() refuses every call.
             SpanSink(SpanTable& table, const NameTable& names,
                      const std::vector<std::string>& tracks) noexcept;
 
@@ -79,7 +88,13 @@ namespace SushiProfiler
             /// @brief Sets name attribute @p key of @p row; returns whether it was accepted.
             bool set_name(std::size_t row, NameID key, NameID value);
 
-            /// @brief Returns how many spans and attributes were refused.
+            /**
+             * @brief Sets fact @p name of the period to @p value, replacing one of that name.
+             * @return false, counted as a refusal, for an empty name or a sink with no facts.
+             */
+            [[nodiscard]] bool set_fact(std::string_view name, std::string_view value);
+
+            /// @brief Returns how many spans, attributes and facts were refused.
             [[nodiscard]] std::uint64_t refused() const noexcept;
 
             /// @brief Counts @p count spans the source dropped because their period had closed.
@@ -97,6 +112,9 @@ namespace SushiProfiler
 
             /// @brief The period's spans.
             SpanTable& table_;
+
+            /// @brief The period's facts, or null for a sink built without them.
+            std::vector<Fact>* facts_;
 
             /// @brief The session's names.
             const NameTable& names_;

@@ -41,6 +41,15 @@ namespace SushiProfiler
     {
         if (index < schedule_.skip)
             return WindowPhase::Skipped;
+        if (schedule_.active_all)
+        {
+            const std::uint64_t since_skip = index - schedule_.skip;
+            if (since_skip < schedule_.wait)
+                return WindowPhase::Waiting;
+            if (since_skip < static_cast<std::uint64_t>(schedule_.wait) + schedule_.warmup)
+                return WindowPhase::Warmup;
+            return WindowPhase::Active;
+        }
         const std::uint64_t cycle = static_cast<std::uint64_t>(schedule_.wait) +
                                     schedule_.warmup + schedule_.active;
         const std::uint64_t offset = index - schedule_.skip;

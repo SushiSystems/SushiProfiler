@@ -50,6 +50,13 @@ namespace SushiProfiler
         std::uint32_t warmup = 3U; /**< Periods recorded and marked warm-up. */
         std::uint32_t active = 20U; /**< Periods recorded; at least 1. */
         std::uint32_t repeat = 1U; /**< Cycles; 0 repeats until the session stops. */
+
+        /**
+         * @brief Whether every period after the warm-up is active, with no end.
+         *
+         * `skip`, `wait` and `warmup` apply once; `repeat` must be 1; `active` is ignored.
+         */
+        bool active_all = false;
     };
 
     /// @brief A part the configuration names, such as a source or a writer, and its settings.
@@ -57,6 +64,22 @@ namespace SushiProfiler
     {
         std::string name;   /**< The name the registry knows it by. */
         JsonValue settings; /**< Its settings, an object the part reads itself. */
+        bool enabled = true; /**< A writer's `enabled` flag, taken out of its settings. */
+    };
+
+    /// @brief What the run record keeps.
+    struct RecordSettings
+    {
+        std::optional<std::uint32_t> keep_periods; /**< The newest periods kept; absent keeps all. */
+    };
+
+    /// @brief What the live view of closed periods holds and how fast it is served.
+    struct LiveSettings
+    {
+        std::uint32_t history = 300U;     /**< Closed periods the view remembers, 1 to 65 536. */
+        std::uint32_t max_runs = 2048U;   /**< Zone runs kept per published period, to 2^24. */
+        std::uint64_t min_run_ns = 1000U; /**< The shortest zone run published, to 10^9. */
+        std::uint32_t max_poll_ms = 4U;   /**< The slowest consumer wait while a view exists. */
     };
 
     /// @brief How much the capture path may hold.
@@ -80,6 +103,8 @@ namespace SushiProfiler
         std::vector<NamedSettings> writers;   /**< The writers, in file order. */
         std::string output;                   /**< The folder outputs go in, or empty. */
         BufferSettings buffers;               /**< The capture path's sizes. */
+        RecordSettings record;                /**< What the run record keeps. */
+        LiveSettings live;                    /**< The live view of closed periods. */
     };
 
     /// @brief A configuration read from text, or why it was refused.

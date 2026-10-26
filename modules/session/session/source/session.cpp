@@ -28,6 +28,7 @@
 
 #include <SushiProfiler/session/session.hpp>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -43,6 +44,9 @@ namespace SushiProfiler
 {
     namespace
     {
+        /// @brief The longest delay a source may state, the longest linger the configuration allows.
+        constexpr std::uint64_t K_MAX_SOURCE_DELAY_MS = 60'000U;
+
         /// @brief The one session a process may run, described for a refused second start.
         struct RunningSession
         {
@@ -62,6 +66,14 @@ namespace SushiProfiler
         {
             return config.timeline.empty() ? std::string("a session without a timeline")
                                            : "the session following \"" + config.timeline + "\"";
+        }
+
+        /// @brief Returns the steady clock in nanoseconds, the clock the pause log keeps.
+        std::uint64_t steady_now_ns() noexcept
+        {
+            const auto since_epoch = std::chrono::steady_clock::now().time_since_epoch();
+            return static_cast<std::uint64_t>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(since_epoch).count());
         }
 
         /// @brief Returns the mean cost of one read of the collector's clock, in nanoseconds.
@@ -94,7 +106,8 @@ namespace SushiProfiler
     }
 
     Session::Session(const ProfilerConfig& config, const Registry& registry)
-        : config_(config), registry_(registry)
+        : config_(config), registry_(registry),
+          channel_(std::make_shared<LiveChannel>(config.live.history))
     {
 
     }
@@ -119,6 +132,7 @@ namespace SushiProfiler
 
     SessionStop Session::stop()
     {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
         if (stopped_)
             return SessionStop{RunRecord{}, {"the session was already stopped"}};
         std::vector<std::string> problems = shut_down();
@@ -126,8 +140,30 @@ namespace SushiProfiler
         return SessionStop{std::move(record_), std::move(problems)};
     }
 
+    std::string Session::restart()
+    {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
+        if (!stopped_)
+            return "the session is still running; stop it before restarting";
+        reset_run();
+        {
+            const std::lock_guard<std::mutex> timelines_lock(timelines_mutex_);
+            for (const auto& entry : timelines_)
+                entry.second->reset();
+        }
+        stopped_ = false;
+        std::string error = open();
+        if (!error.empty())
+        {
+            static_cast<void>(shut_down());
+            stopped_ = true;
+        }
+        return error;
+    }
+
     SessionReport Session::report(const RunRecord& record) const
     {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
         AnalysisCatalog catalog;
         register_builtin_analyses(catalog);
         const AnalysisRun run =
@@ -136,14 +172,87 @@ namespace SushiProfiler
         report.tables = run.tables;
         if (!run.error.empty())
             report.problems.push_back(run.error);
-        for (const auto& [name, writer] : records_)
+        for (const RecordPart& part : records_)
         {
-            const WriteStatus status = writer->write(record, report.tables);
+            if (!part.enabled)
+                continue;
+            const WriteStatus status = part.writer->write(record, report.tables);
             if (status != WriteStatus::Written)
-                report.problems.push_back("writer \"" + name + "\" failed: " +
+                report.problems.push_back("writer \"" + part.name + "\" failed: " +
                                           status_words(status));
         }
         return report;
+    }
+
+    LiveView Session::live()
+    {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
+        LiveView view(channel_);
+        if (running_locked())
+            consumer_->wake();
+        return view;
+    }
+
+    bool Session::pause()
+    {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
+        if (!running_locked() || paused_)
+            return false;
+        pauses_->begin(steady_now_ns());
+        Collector::instance().hold();
+        Collector::want_sources(false);
+        paused_ = true;
+        return true;
+    }
+
+    bool Session::resume()
+    {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
+        if (!running_locked() || !paused_)
+            return false;
+        pauses_->end(steady_now_ns());
+        Collector::instance().release();
+        Collector::want_sources(true);
+        paused_ = false;
+        return true;
+    }
+
+    WriterSwitch Session::set_writer_enabled(std::string_view name, bool enabled)
+    {
+        const std::lock_guard<std::mutex> lock(control_mutex_);
+        if (!running_locked())
+            return WriterSwitch::NotRecording;
+        if (writer_set_->request(name, enabled))
+            return WriterSwitch::Queued;
+        for (const RecordPart& part : records_)
+        {
+            if (part.name == name)
+                return WriterSwitch::NotStreaming;
+        }
+        return WriterSwitch::UnknownWriter;
+    }
+
+    bool Session::running_locked() const noexcept
+    {
+        return consumer_ != nullptr && !stopped_;
+    }
+
+    void Session::reset_run()
+    {
+        consumer_.reset();
+        assembler_.reset();
+        publisher_.reset();
+        writer_set_.reset();
+        pauses_.reset();
+        window_.reset();
+        followed_ = nullptr;
+        sources_.clear();
+        sources_begun_ = 0U;
+        streams_.clear();
+        records_.clear();
+        record_ = RunRecord{};
+        opened_collector_ = false;
+        paused_ = false;
     }
 
     std::string Session::open()
@@ -156,6 +265,7 @@ namespace SushiProfiler
             slot.description = describe(config_);
             holds_slot_ = true;
         }
+        static_cast<void>(channel_->begin_run());
         AnalysisCatalog catalog;
         register_builtin_analyses(catalog);
         for (const std::string& name : config_.analyses)
@@ -193,14 +303,14 @@ namespace SushiProfiler
                     registry_.make_stream_writer(writer.name, writer.settings, config_.output);
                 if (made.part == nullptr)
                     return made.error;
-                streams_.emplace_back(writer.name, std::move(made.part));
+                streams_.push_back(StreamPart{writer.name, std::move(made.part), writer.enabled});
                 continue;
             }
             Made<RecordWriter> made =
                 registry_.make_record_writer(writer.name, writer.settings, config_.output);
             if (made.part == nullptr)
                 return made.error;
-            records_.emplace_back(writer.name, std::move(made.part));
+            records_.push_back(RecordPart{writer.name, std::move(made.part), writer.enabled});
         }
         for (const NamedSettings& source : config_.sources)
         {
@@ -228,6 +338,7 @@ namespace SushiProfiler
         opened_collector_ = true;
         SourceContext context(collector.names(), record_.tracks,
                               collector.first_point().steady_ns);
+        std::uint64_t delay_ns = 0U;
         for (const std::unique_ptr<Source>& source : sources_)
         {
             const SourceStatus status = source->begin(context);
@@ -235,37 +346,55 @@ namespace SushiProfiler
                 return "source \"" + std::string(source->name()) + "\" did not start: " +
                        status.error;
             ++sources_begun_;
+            const std::uint64_t source_delay_ns = source->max_delay_ns();
+            if (source_delay_ns > K_MAX_SOURCE_DELAY_MS * 1'000'000U)
+                return "source \"" + std::string(source->name()) + "\" states a delay of " +
+                       std::to_string(source_delay_ns / 1'000'000U) + " ms; the limit is " +
+                       std::to_string(K_MAX_SOURCE_DELAY_MS) + " ms";
+            delay_ns = std::max(delay_ns, source_delay_ns);
         }
-        for (const auto& [name, writer] : streams_)
-        {
-            const WriteStatus status = writer->begin(record_);
-            if (status != WriteStatus::Written)
-                return "writer \"" + name + "\" did not start: " + status_words(status);
-            ++streams_begun_;
-        }
+        Collector::want_sources(true);
+        std::vector<StreamWriterSet::Entry> entries;
+        for (const StreamPart& part : streams_)
+            entries.push_back(StreamWriterSet::Entry{part.name, part.writer.get(), part.enabled});
+        writer_set_ = std::make_unique<StreamWriterSet>(std::move(entries));
+        const std::string writer_error = writer_set_->begin_enabled(record_);
+        if (!writer_error.empty())
+            return writer_error;
         AssemblySettings assembly;
         assembly.run_timeline = collector.names().intern("run");
-        assembly.linger_ns = std::uint64_t{config_.buffers.linger_ms} * 1'000'000U;
+        assembly.linger_ns =
+            std::max(std::uint64_t{config_.buffers.linger_ms} * 1'000'000U, delay_ns);
         assembly.origin = collector.first_point();
+        assembly.keep_periods = config_.record.keep_periods;
+        WindowSchedule schedule = config_.window;
+        if (config_.timeline.empty())
+        {
+            schedule = WindowSchedule{};
+            schedule.warmup = 0U;
+            schedule.active_all = true;
+        }
+        window_ = std::make_unique<Window>(schedule);
+        pauses_ = std::make_unique<PauseLog>();
+        publisher_ = std::make_unique<PeriodPublisher>(
+            *channel_, RunCap{config_.live.max_runs, config_.live.min_run_ns},
+            assembly.origin.steady_ns);
         if (!config_.timeline.empty())
         {
-            window_ = std::make_unique<Window>(config_.window);
             collector.pause();
             followed_ = &timeline(config_.timeline);
             followed_->observe(window_.get());
             assembly.timeline = followed_->id();
-            assembly.window = window_.get();
         }
         std::vector<Source*> sources;
         for (const std::unique_ptr<Source>& source : sources_)
             sources.push_back(source.get());
-        std::vector<NamedStreamWriter> writers;
-        for (const auto& [name, writer] : streams_)
-            writers.push_back(NamedStreamWriter{name, writer.get()});
-        assembler_ = std::make_unique<PeriodAssembler>(assembly, record_, collector.names(),
-                                                       collector.sites(), std::move(sources),
-                                                       std::move(writers));
-        consumer_ = std::make_unique<Consumer>(collector, *assembler_);
+        assembler_ = std::make_unique<PeriodAssembler>(
+            assembly, record_, collector.names(), collector.sites(), std::move(sources),
+            AssemblyParts{*window_, *pauses_, *publisher_, *writer_set_});
+        consumer_ = std::make_unique<Consumer>(
+            collector, *assembler_, *channel_,
+            std::chrono::milliseconds(config_.live.max_poll_ms));
         consumer_->start();
         return std::string();
     }
@@ -281,29 +410,40 @@ namespace SushiProfiler
         set_fact(record_.environment, "config.window",
                  "skip " + std::to_string(window.skip) + ", wait " + std::to_string(window.wait) +
                      ", warmup " + std::to_string(window.warmup) + ", active " +
-                     std::to_string(window.active) + ", repeat " + std::to_string(window.repeat));
+                     (window.active_all ? std::string("all") : std::to_string(window.active)) +
+                     ", repeat " + std::to_string(window.repeat));
+        set_fact(record_.environment, "config.record.keep_periods",
+                 config_.record.keep_periods.has_value()
+                     ? std::to_string(*config_.record.keep_periods)
+                     : std::string("all"));
         record_.clock.read_cost_ns = read_cost_ns;
     }
 
     std::vector<std::string> Session::shut_down()
     {
+        Collector::want_sources(false);
         if (followed_ != nullptr)
             followed_->observe(nullptr);
+        if (paused_ && pauses_ != nullptr)
+            pauses_->end(steady_now_ns());
+        paused_ = false;
         if (opened_collector_)
             Collector::instance().close();
+        opened_collector_ = false;
         if (consumer_ != nullptr)
             consumer_->stop();
         for (std::size_t index = sources_begun_; index > 0U; --index)
             sources_[index - 1U]->end();
+        sources_begun_ = 0U;
         std::vector<std::string> problems;
         if (assembler_ != nullptr)
-            problems = assembler_->problems();
-        for (std::size_t index = 0U; index < streams_begun_; ++index)
         {
-            const WriteStatus status = streams_[index].second->end(record_);
-            if (status != WriteStatus::Written)
-                problems.push_back("writer \"" + streams_[index].first + "\" did not finish: " +
-                                   status_words(status));
+            assembler_->end_writers();
+            problems = assembler_->problems();
+        }
+        else if (writer_set_ != nullptr)
+        {
+            writer_set_->end_all(record_, problems);
         }
         if (holds_slot_)
         {

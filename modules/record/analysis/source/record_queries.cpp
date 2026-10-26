@@ -28,6 +28,8 @@
 
 #include "record_queries.hpp"
 
+#include <SushiProfiler/analysis/period_breakdown.hpp>
+
 #include <algorithm>
 #include <map>
 
@@ -132,16 +134,7 @@ namespace SushiProfiler::Detail
 
     std::string group_of(const RunRecord& record, const ZoneTree& tree, std::size_t node)
     {
-        std::int32_t at = static_cast<std::int32_t>(node);
-        while (at >= 0)
-        {
-            const ZoneNode& current = tree.nodes[static_cast<std::size_t>(at)];
-            const SiteRecord* const site = record.site(current.site);
-            if (site != nullptr && !site->group.empty())
-                return site->group;
-            at = current.parent;
-        }
-        return K_UNGROUPED;
+        return group_of_node(record.sites, tree, node);
     }
 
     bool runs_site(const PeriodRecord& period, SiteID site) noexcept
@@ -212,24 +205,14 @@ namespace SushiProfiler::Detail
         GroupSeries series;
         for (std::size_t slot = 0U; slot < periods.size(); ++slot)
         {
-            const PeriodRecord& period = *periods[slot];
-            double covered = 0.0;
-            for (const ZoneTree& tree : period.zones)
+            const PeriodBreakdown breakdown = break_down_period(*periods[slot], record.sites);
+            for (const GroupSelfTime& entry : breakdown.groups)
             {
-                if (tree.thread != period.thread)
-                    continue;
-                for (std::size_t index = 0U; index < tree.nodes.size(); ++index)
-                {
-                    const ZoneNode& node = tree.nodes[index];
-                    std::vector<double>& group = series.groups[group_of(record, tree, index)];
-                    group.resize(periods.size(), 0.0);
-                    group[slot] += static_cast<double>(node.self_ns);
-                    if (node.parent < 0)
-                        covered += static_cast<double>(node.inclusive_ns);
-                }
+                std::vector<double>& group = series.groups[entry.group];
+                group.resize(periods.size(), 0.0);
+                group[slot] = static_cast<double>(entry.self_ns);
             }
-            const auto duration = static_cast<double>(period.duration_ns());
-            series.uncovered.push_back(std::max(0.0, duration - covered));
+            series.uncovered.push_back(static_cast<double>(breakdown.uncovered_ns));
         }
         return series;
     }

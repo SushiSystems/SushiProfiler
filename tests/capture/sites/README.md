@@ -7,3 +7,6 @@
   the registry keeps copies of the site's strings; eight threads registering one handle at once
   get one id.
 - `test_name_table.cpp`: one id per text, 0 for empty text, empty text for an unknown id.
+- `test_dynamic_site_table.cpp`: one stable handle per name; the first unit and operation win;
+  the name is copied; the 4097th name is refused and counted; eight threads get one handle per
+  name.
