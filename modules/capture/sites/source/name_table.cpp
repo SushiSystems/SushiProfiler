@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* SushiProfiler.hpp                                                      */
+/* name_table.cpp                                                         */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -20,16 +20,42 @@
 /**************************************************************************/
 
 /**
- * @file SushiProfiler.hpp
- * @brief Includes every public header of SushiProfiler.
+ * @file name_table.cpp
+ * @brief Interns run-time strings into ids under one lock.
  * @author Mustafa Garip
- * @see modules/foundation/umbrella/README.md
+ * @see modules/capture/sites/README.md
  */
 
-#pragma once
+#include <SushiProfiler/sites/name_table.hpp>
 
-#include <SushiProfiler/clock/calibration.hpp>
-#include <SushiProfiler/clock/trace_clock.hpp>
-#include <SushiProfiler/events/ids.hpp>
-#include <SushiProfiler/events/trace_event.hpp>
-#include <SushiProfiler/version/version.hpp>
+namespace SushiProfiler
+{
+    NameID NameTable::intern(std::string_view text)
+    {
+        if (text.empty())
+            return 0U;
+        std::lock_guard<std::mutex> lock(mutex_);
+        std::string key(text);
+        const auto found = ids_.find(key);
+        if (found != ids_.end())
+            return found->second;
+        texts_.push_back(key);
+        const auto id = static_cast<NameID>(texts_.size());
+        ids_.emplace(std::move(key), id);
+        return id;
+    }
+
+    std::string NameTable::text(NameID id) const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (id == 0U || id > texts_.size())
+            return std::string();
+        return texts_[id - 1U];
+    }
+
+    std::size_t NameTable::size() const
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        return texts_.size();
+    }
+} // namespace SushiProfiler

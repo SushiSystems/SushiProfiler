@@ -25,5 +25,5 @@ the pages below describe it as it is.
 - [`DOCUMENTATION_STYLE_GUIDE.md`](DOCUMENTATION_STYLE_GUIDE.md)
 - [`design/README.md`](design/README.md) and [`design/REMAINING_WORK.md`](design/REMAINING_WORK.md)
 - The modules: [`version`](../modules/foundation/version/README.md) and
-  [`umbrella`](../modules/foundation/umbrella/README.md); the tests: [`tests`](../tests/README.md);
+  [`umbrella`](../modules/tools/umbrella/README.md); the tests: [`tests`](../tests/README.md);
   the CLI: [`cli`](../cli/README.md); the checkers: [`tools`](../tools/README.md).

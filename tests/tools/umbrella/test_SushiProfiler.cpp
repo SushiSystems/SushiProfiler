@@ -23,7 +23,7 @@
  * @file test_SushiProfiler.cpp
  * @brief Tests that the umbrella header gives the public names of the library.
  * @author Mustafa Garip
- * @see tests/foundation/umbrella/README.md
+ * @see tests/tools/umbrella/README.md
  */
 
 #include <SushiProfiler/SushiProfiler.hpp>

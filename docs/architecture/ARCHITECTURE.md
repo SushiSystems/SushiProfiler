@@ -12,11 +12,11 @@ Modules sit in tiers, lowest first. `cmake/SushiProfilerTiers.cmake` states the 
 
 | Tier | Modules today |
 | --- | --- |
-| `foundation` | `version`, `umbrella` |
-| `capture` | none |
+| `foundation` | `version`, `clock`, `events` |
+| `capture` | `sites` |
 | `record` | none |
 | `session` | none |
-| `tools` | none |
+| `tools` | `umbrella` |
 
 A tier is the folder `modules/<tier>/`; it appears with its first module.
 
@@ -33,7 +33,8 @@ tier never includes a higher one. Two layers hold it.
 - The checker. `tools/layering/check_layering.py` reads the same order and fails an upward
   include, an include of another module's `source/`, and an include the module did not declare.
 
-The module `umbrella` is the exception: it includes every public header of its scope.
+The module `umbrella` sits in the top tier, so every module is below it, and it includes every
+public header of the library.
 
 ## Adding a module
 

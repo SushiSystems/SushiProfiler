@@ -1,3 +1,3 @@
-# tests/foundation/umbrella
+# tests/tools/umbrella
 
 The test of `SushiProfiler/SushiProfiler.hpp`: it reaches the version through the umbrella alone.

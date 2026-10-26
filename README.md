@@ -24,8 +24,9 @@ through `sp`.
 
 ## Status
 
-Only the repository skeleton exists: the tier table, the CLI, the `version` and `umbrella`
-modules and the documentation tree. The profiler modules are not written. The open work is in
+The capture layer (design phase P1) is being built: the clock, the event types and the site
+registry exist; the rings, the hub, zones, lock waits and periods do not yet, and nothing above
+the capture tier is written. The open work is in
 [`docs/design/REMAINING_WORK.md`](docs/design/REMAINING_WORK.md).
 
 ## Documentation

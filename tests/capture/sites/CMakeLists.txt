@@ -4,9 +4,9 @@
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
 
-# CMakeLists.txt
-
-sushiprofiler_add_module(
-    NAME umbrella TIER foundation
-    HEADER_ONLY
-    DEPENDS version clock events)
+sushiprofiler_add_module_tests(
+    MODULE sites
+    SOURCES
+        test_name_table.cpp
+        test_site.cpp
+        test_site_registry.cpp)
