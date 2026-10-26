@@ -93,8 +93,14 @@ namespace SushiProfiler
         assembler_.finish();
     }
 
+    std::uint64_t Consumer::drains() const noexcept
+    {
+        return drains_.load(std::memory_order_relaxed);
+    }
+
     double Consumer::drain_once()
     {
+        drains_.fetch_add(1U, std::memory_order_relaxed);
         collector_.drain(batch_);
         assembler_.add(batch_);
         double fullest = 0.0;

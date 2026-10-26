@@ -2,7 +2,11 @@
 
 - `test_consumer.cpp`: the poll speeds up over half full, holds between a quarter and a half and
   doubles up to 1 s when quiet; a consumer over the real collector records three zones of the
-  test thread into the run's one period, and a second `stop` does nothing.
+  test thread into the run's one period, counts at least its final drain, and a second `stop`
+  does nothing.
+- `benchmark_consumer.cpp`: the program `sp_bench_consumer` lets a consumer idle for 2 s, then
+  prints its drains per second over the next 8 s as `drainer_idle_wakeups`, the design's
+  idle-drainer budget.
 - `test_period_assembler.cpp`: drained batches in steady ticks, by hand.
   - A run without a timeline is one period from 0 to the last drain, with the names and sites
     copied.

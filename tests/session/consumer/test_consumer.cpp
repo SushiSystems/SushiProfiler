@@ -87,4 +87,5 @@ TEST(Medium_Consumer, DrainsWhileRunningAndFinishesOnStop)
     }
     EXPECT_EQ(calls, 3U);
     EXPECT_FALSE(record.threads.empty());
+    EXPECT_GE(consumer.drains(), 1U);
 }

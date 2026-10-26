@@ -8,4 +8,6 @@ sushiprofiler_add_module_tests(
     MODULE consumer
     SOURCES
         test_consumer.cpp
-        test_period_assembler.cpp)
+        test_period_assembler.cpp
+    BENCHMARKS
+        benchmark_consumer.cpp)

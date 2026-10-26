@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — consumer: Added `Consumer::drains()` and the benchmark `sp_bench_consumer`, which measures the drains per second of an idle consumer (`tests/session/consumer/`).
 - 2026-10-26 — record_tool: Added `run_record_tool`, the `sp_record` program and the `sp record` group, which show, compare, check and validate run records (`modules/tools/record_tool/`, `applications/sp_record/`).
 - 2026-10-26 — analysis: Fixed `flows` and the `flow:` check subjects, which kept each call site of a flow apart and so found no item with both a begin and an end; the call sites of one flow name now count as one flow.
 - 2026-10-26 — session: Added `Session`, which checks the configuration's names at start, records the window's periods and returns the run at stop; `report` runs the analyses and record writers (`modules/session/session/`).

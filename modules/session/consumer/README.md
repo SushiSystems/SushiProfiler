@@ -13,7 +13,8 @@ namespace `SushiProfiler`. The module depends on `clock`, `collector`, `fold`, `
   its own thread. `stop()` drains once more, finishes the assembler and joins; the session closes
   the collector first, so that drain is the last. `next_poll` sets the wait between drains: 1 ms
   while a ring is over half full, the same wait while the fullest ring is between a quarter and
-  a half, and double the wait, up to 1 s, while every ring is under a quarter.
+  a half, and double the wait, up to 1 s, while every ring is under a quarter. `drains()`
+  counts the drains done, the final one included, so an idle consumer settles at one a second.
 
 ## How events become periods
 

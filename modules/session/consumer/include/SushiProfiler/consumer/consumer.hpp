@@ -32,7 +32,9 @@
 #include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/consumer/period_assembler.hpp>
 
+#include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
@@ -75,6 +77,9 @@ namespace SushiProfiler
             /// @brief Drains once more, finishes the assembler and joins; does nothing if idle.
             void stop();
 
+            /// @brief Returns how many drains the thread has done, the final one included.
+            [[nodiscard]] std::uint64_t drains() const noexcept;
+
         private:
             /// @brief Polls until stopped.
             void run();
@@ -102,5 +107,8 @@ namespace SushiProfiler
 
             /// @brief Whether stop() was called.
             bool stopping_ = false;
+
+            /// @brief Drains done; read from other threads.
+            std::atomic<std::uint64_t> drains_{0U};
     };
 } // namespace SushiProfiler
