@@ -30,17 +30,21 @@
 
 #include <SushiProfiler/clock/calibration.hpp>
 #include <SushiProfiler/clock/trace_clock.hpp>
-#include <SushiProfiler/events/ids.hpp>
-#include <SushiProfiler/events/trace_event.hpp>
-#include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/collector/collector_settings.hpp>
+#include <SushiProfiler/collector/drain_batch.hpp>
+#include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/events/trace_event.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 #include <SushiProfiler/json/json_value.hpp>
 #include <SushiProfiler/json/json_writer.hpp>
 #include <SushiProfiler/lock_wait/contended_lock.hpp>
 #include <SushiProfiler/periods/period_observer.hpp>
 #include <SushiProfiler/periods/period_timeline.hpp>
+#include <SushiProfiler/record/period_record.hpp>
+#include <SushiProfiler/record/run_record.hpp>
+#include <SushiProfiler/record/sample_series.hpp>
+#include <SushiProfiler/record/span_table.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>

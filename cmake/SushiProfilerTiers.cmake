@@ -26,6 +26,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     zones       capture
     lock_wait   capture
     periods     capture
+    record      record
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.

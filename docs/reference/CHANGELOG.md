@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — record: Added the run record: periods with zone trees, span columns with attributes, and sample series, keyed by the collector's ids (`modules/record/record/`).
 - 2026-10-26 — periods: Added `PeriodObserver`, called around each mark, and `pause` and `resume` on the collector, so a capture window opens and closes the gate at period boundaries (`modules/capture/periods/`).
 - 2026-10-26 — json: Added a JSON reader and writer that keep 64-bit integers exact and name the line and column of an error (`modules/foundation/json/`).
 - 2026-10-26 — docs: Closed the capture layer, design phase P1, and described its record path (`docs/architecture/ARCHITECTURE.md`).
