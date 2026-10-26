@@ -48,8 +48,8 @@ Every analysis reads active periods only, the ones the window did not mark as wa
 | `overhead` | Events and bytes recorded, dropped, late and unmatched events, the record's drops and the clock's read cost; with a baseline record, per timeline the two median period times and the cost as their relative difference. Without one, a note says the cost is not measured. |
 
 The design attributes a device gap to the host zone open on the submitting thread during it.
-The record keeps zone trees, not zone instants, so `device_idle` splits gaps into `launch` and
-`host` only.
+The record keeps zone trees, not zone runs, so `device_idle` splits gaps into `launch` and
+`host` only; `docs/design/REMAINING_WORK.md` holds the decision as RW-4.
 
 Inside `source/`, `record_queries.hpp` holds the lookups several analyses share: active periods
 and timelines, site and node labels, group inheritance, a site's inclusive time and a counter's

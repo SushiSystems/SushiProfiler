@@ -56,6 +56,9 @@
 #include <SushiProfiler/environment/record_facts.hpp>
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/fold/lane_tracker.hpp>
+#include <SushiProfiler/fold/period_fold.hpp>
+#include <SushiProfiler/fold/record_clock.hpp>
 #include <SushiProfiler/json/json_field_reader.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 #include <SushiProfiler/json/json_value.hpp>

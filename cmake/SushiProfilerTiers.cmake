@@ -37,6 +37,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     window      session
     sources     session
     environment session
+    fold        session
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.

@@ -1,10 +1,22 @@
 # Remaining work
 
-Next id: RW-4
+Next id: RW-5
 
 ## Next
 
 - RW-2 Every later phase reads the record, and the libraries above wait on its release
+
+## Decisions waiting for the owner
+
+### RW-4 Decide where `device_idle` finds the host zone open during a device gap
+- State: decision
+- Done when: a gap is attributed to the host zone open on the submitting thread, as
+  `RECORD_AND_ANALYSES.md` says, or the design drops that attribution. The record holds zone
+  trees, not runs, so the analysis splits gaps into `launch` and `host` only. The choices are to
+  keep the zone runs of active periods in the record, which `fold_period` already produces, or to
+  attribute gaps in the session when a period closes and store the result per period. Both change
+  the record format
+- Source: `docs/design/PROFILER/RECORD_AND_ANALYSES.md`
 
 ## Session and record
 
