@@ -30,4 +30,6 @@
 
 #include <SushiProfiler/clock/calibration.hpp>
 #include <SushiProfiler/clock/trace_clock.hpp>
+#include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/events/trace_event.hpp>
 #include <SushiProfiler/version/version.hpp>

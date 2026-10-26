@@ -18,6 +18,7 @@ set(SUSHIPROFILER_TIER_ORDER
 set(SUSHIPROFILER_MODULE_TIERS
     version     foundation
     clock       foundation
+    events      foundation
     umbrella    foundation)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
