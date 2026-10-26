@@ -18,6 +18,7 @@ the pages below describe it as it is.
 - [`reference/CHANGELOG.md`](reference/CHANGELOG.md)
 - [`reference/KNOWN_ISSUES.md`](reference/KNOWN_ISSUES.md)
 - [`reference/GLOSSARY.md`](reference/GLOSSARY.md)
+- [`reference/RECORD_FORMAT.md`](reference/RECORD_FORMAT.md): the run record's JSON form, key by key
 
 ## Working on SushiProfiler
 

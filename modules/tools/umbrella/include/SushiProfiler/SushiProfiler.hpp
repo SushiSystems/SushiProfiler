@@ -45,6 +45,7 @@
 #include <SushiProfiler/record/run_record.hpp>
 #include <SushiProfiler/record/sample_series.hpp>
 #include <SushiProfiler/record/span_table.hpp>
+#include <SushiProfiler/record_json/record_json.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
