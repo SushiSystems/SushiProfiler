@@ -24,7 +24,7 @@ and two active periods of 1000 ns. Times are queued, start and end:
 
 - `test_table.cpp`: a cell holds one kind; cells of different kinds differ; columns by name.
 - `test_analysis.cpp`: the options' defaults; an analysis runs through the interface.
-- `test_analysis_catalog.cpp`: made by name; a taken name refused; the built-ins in order.
+- `test_analysis_catalog.cpp`: made by name; a taken name refused; the built-ins in order, `roofline` among them.
 - `test_analysis_runner.cpp`: tables in the order asked; an unknown name refuses the run and
   lists the known names.
 - `test_sample_summary.cpp`: the summary of fixed samples; zeros for none; columns and cells line
@@ -45,6 +45,11 @@ and two active periods of 1000 ns. Times are queued, start and end:
   span's gap is `launch`; no spans, no rows.
 - `test_top_spans_analysis.cpp`: `gemm` 1200 ns over three spans before `copy` 13 over two; by
   `batch` and cut at two, `gemm` 4 and `gemm` 8 with one group not shown.
+- `test_roofline_analysis.cpp`: two `gemm` spans of 100 us at 5e7 FLOP and 2e6 B reach 5e11 FLOP/s
+  and 2e10 B/s at intensity 25, half of the 1e12 compute roof; a `copy` span reaches 1e10 FLOP/s at
+  intensity 0.125, 0.8 of the 1.25e10 memory bound; a track without ceiling facts has empty
+  ceiling cells; two spans without both attributes are counted and warm-up periods are skipped; a
+  ceiling fact that is not a number counts as missing.
 - `test_short_spans_analysis.cpp`: two of five spans under 10 ns, 13 ns of 1213; priced at a
   20 ns floor, 40 ns.
 - `test_overhead_analysis.cpp`: 33 events and 792 bytes, every drop, the note without a

@@ -37,6 +37,7 @@
 #include <SushiProfiler/analysis/distribution_analysis.hpp>
 #include <SushiProfiler/analysis/flows_analysis.hpp>
 #include <SushiProfiler/analysis/overhead_analysis.hpp>
+#include <SushiProfiler/analysis/roofline_analysis.hpp>
 #include <SushiProfiler/analysis/short_spans_analysis.hpp>
 #include <SushiProfiler/analysis/top_spans_analysis.hpp>
 
@@ -68,6 +69,7 @@ namespace SushiProfiler
         add<DistributionAnalysis>(catalog);
         add<FlowsAnalysis>(catalog);
         add<OverheadAnalysis>(catalog);
+        add<RooflineAnalysis>(catalog);
         add<ShortSpansAnalysis>(catalog);
         add<TopSpansAnalysis>(catalog);
     }

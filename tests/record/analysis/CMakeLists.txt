@@ -18,6 +18,7 @@ sushiprofiler_add_module_tests(
         test_distribution_analysis.cpp
         test_flows_analysis.cpp
         test_overhead_analysis.cpp
+        test_roofline_analysis.cpp
         test_sample_summary.cpp
         test_short_spans_analysis.cpp
         test_subject_samples.cpp

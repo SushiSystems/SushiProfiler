@@ -21,7 +21,10 @@
   uncosted, as SushiAI's autograd table proves backward rules.
 - `device_ceilings`, a benchmark `sb bench` runs: FMA loops per precision, a streaming copy, an
   empty kernel. It writes `<device>.ceilings.json`.
-- `roofline`, the analysis in [RECORD_AND_ANALYSES.md](RECORD_AND_ANALYSES.md).
+- The ceilings as environment facts, `device.<track>.peak_flops` and
+  `device.<track>.peak_bytes_per_s`, read from `<device>.ceilings.json` by a contributor. With the
+  cost attributes, they are all `roofline` needs; the analysis is SushiProfiler's generic one in
+  [RECORD_AND_ANALYSES.md](RECORD_AND_ANALYSES.md).
 - The benchmark harness marks iterations on the timeline `bench.iteration`, so every benchmark
   writes a record.
 

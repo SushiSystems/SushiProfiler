@@ -37,9 +37,11 @@ Generic, in SushiProfiler:
 | `distribution` | Per period time, zone, counter and value: p50, p90, p99, maximum, a log-bucketed histogram, and jitter as the median absolute difference between successive periods |
 | `counters` | Per counter site, its operation applied per period (sum, last, maximum, minimum), then the distribution over periods |
 | `flows` | Per flow name, across every call site of it, the latency from begin to end and between steps, as a distribution |
+| `roofline` | Per period, span name and track, over spans that carry the integer attributes `flops` and `bytes` (others are skipped and counted): achieved FLOP/s and bytes/s, and arithmetic intensity. When the environment holds `device.<track>.peak_flops` and `device.<track>.peak_bytes_per_s` for the track, also the bound min(peak_flops, intensity x peak_bytes_per_s), the share achieved and the limiting roof, compute or memory |
 
-In SushiBLAS, `roofline`: per span with `flops` and bytes, achieved FLOP/s and bytes/s, arithmetic
-intensity, and the fraction of the bound ceiling from a ceilings file.
+A client states the two inputs `roofline` reads: the cost attributes on its spans, and the ceiling
+facts of each device track in the environment (facts are name and value strings, so the value is
+a number written as text).
 
 Every timing is reported as median, bootstrap 95% interval (2,000 resamples, fixed seed, so the
 same record gives the same text), minimum, p95 and coefficient of variation over the active

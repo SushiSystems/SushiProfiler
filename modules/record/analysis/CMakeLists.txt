@@ -18,6 +18,7 @@ sushiprofiler_add_module(
         flows_analysis.cpp
         overhead_analysis.cpp
         record_queries.cpp
+        roofline_analysis.cpp
         sample_summary.cpp
         subject_samples.cpp
         short_spans_analysis.cpp

@@ -63,10 +63,10 @@ TEST(Small_AnalysisRunner, AnUnknownNameRefusesTheWholeRun)
 {
     const AnalysisCatalog catalog = builtins();
     const AnalysisRun run = AnalysisRunner(catalog).run(SushiProfilerTests::analysis_record(),
-                                                        {"flows", "roofline"}, {});
+                                                        {"flows", "report"}, {});
 
     EXPECT_FALSE(run.ok());
     EXPECT_TRUE(run.tables.empty());
-    EXPECT_EQ(run.error, "unknown analysis \"roofline\"; known: breakdown budget counters "
-                         "device_idle distribution flows overhead short_spans top_spans");
+    EXPECT_EQ(run.error, "unknown analysis \"report\"; known: breakdown budget counters "
+                         "device_idle distribution flows overhead roofline short_spans top_spans");
 }

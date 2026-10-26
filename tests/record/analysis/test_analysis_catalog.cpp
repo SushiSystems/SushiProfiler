@@ -71,7 +71,7 @@ TEST(Small_AnalysisCatalog, TheBuiltinsAreListedInOrder)
     SushiProfiler::register_builtin_analyses(catalog);
 
     const std::vector<std::string> expected = {
-        "breakdown", "budget",   "counters",    "device_idle", "distribution",
-        "flows",     "overhead", "short_spans", "top_spans"};
+        "breakdown", "budget",   "counters", "device_idle", "distribution",
+        "flows",     "overhead", "roofline", "short_spans", "top_spans"};
     EXPECT_EQ(catalog.names(), expected);
 }

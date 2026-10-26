@@ -98,7 +98,7 @@ P2b set the row to that bound. The YOLOv5n row is P5's to measure.
 | P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp record show / compare / check / validate` | built |
 | P2b | SushiProfiler v0.2.0: the shared library, the source contract (period span, context lifetime, late work), the registration pattern, zone runs for `device_idle` | planned |
 | P3 | SushiRuntime: the device source, the node table, the runtime's own zones | planned |
-| P4 | SushiBLAS: cost rules, `device_ceilings`, `roofline`, the benchmark harness on a timeline | planned |
+| P4 | SushiBLAS: cost rules stated as span attributes, `device_ceilings` stated as facts, the benchmark harness on a timeline | planned |
 | P5 | SushiAI: stage zones, timelines, attribution, the run-file section, `sa profile` | planned |
 | P6 | SushiAI: where a YOLOv5n step goes, written up from records | planned |
 | P7 | SushiDSP: the benchmark harness on a budget timeline, solver counters, checks in place of hand-timed tests | planned |
