@@ -97,6 +97,7 @@ P2b set the row to that bound. The YOLOv5n row is P5's to measure.
 | P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | built |
 | P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp record show / compare / check / validate` | built |
 | P2b | SushiProfiler v0.2.0: the shared library, the source contract (period span, context lifetime, late work), the registration pattern, zone runs for `device_idle` | planned |
+| P2c | SushiProfiler v0.3.0: a live view of closed periods, retention, writers toggled in a session, pause, every period, per-period facts from sources, per-source delays | planned |
 | P3 | SushiRuntime: the device source, the node table, the runtime's own zones | planned |
 | P4 | SushiBLAS: cost rules stated as span attributes, `device_ceilings` stated as facts, the benchmark harness on a timeline | planned |
 | P5 | SushiAI: stage zones, timelines, attribution, the run-file section, `sa profile` | planned |
