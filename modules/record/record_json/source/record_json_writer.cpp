@@ -193,6 +193,8 @@ namespace SushiProfiler
                         out_.unsigned_integer(thread.dropped);
                         out_.key("late");
                         out_.unsigned_integer(thread.late);
+                        out_.key("unmatched");
+                        out_.unsigned_integer(thread.unmatched);
                         out_.end_object();
                     }
                     out_.end_array();

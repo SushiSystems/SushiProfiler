@@ -45,7 +45,7 @@ Every analysis reads active periods only, the ones the window did not mark as wa
 | `device_idle` | Per track: the idle time per period, summarised, and its share of the period time. Each gap between busy segments is `launch` when the span that ends it was queued before the gap began, else `host`; the time after the last span is `host`. The row gives the share of idle time of each cause. |
 | `top_spans` | Spans grouped by name and by the attribute keys in `group_by` (`-` where a span lacks one): count, total, median and share of all span time, ranked by total and cut at `top`, with a note on how many groups were cut. |
 | `short_spans` | One row: the spans under `short_span_ns`, their count and time and the shares of each, and their cost at `launch_floor_ns`. A note says when the floor is unknown. |
-| `overhead` | Events and bytes recorded, dropped and late events, the record's drops and the clock's read cost; with a baseline record, per timeline the two median period times and the cost as their relative difference. Without one, a note says the cost is not measured. |
+| `overhead` | Events and bytes recorded, dropped, late and unmatched events, the record's drops and the clock's read cost; with a baseline record, per timeline the two median period times and the cost as their relative difference. Without one, a note says the cost is not measured. |
 
 The design attributes a device gap to the host zone open on the submitting thread during it.
 The record keeps zone trees, not zone instants, so `device_idle` splits gaps into `launch` and

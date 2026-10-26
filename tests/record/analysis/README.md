@@ -12,7 +12,7 @@ reals within 1e-9 relative. Its timeline `step` runs on thread 0:
 
 `forward` is in group `Model`, `conv` has no group and inherits it, and `load` is in `Data`.
 `bytes` is a sum and `peak` a maximum, both in `B`. Active periods have a 105 ns budget. The
-thread dropped 2 events and was late with 1; the record's drops are 1, 2 and 3.
+thread dropped 2 events, was late with 1 and had 4 unmatched; the record's drops are 1, 2 and 3.
 
 `span_record()` holds one timeline on track `queue 0`, a warm-up period with one `gemm` span,
 and two active periods of 1000 ns. Times are queued, start and end:

@@ -89,16 +89,19 @@ namespace SushiProfiler
         table.add_column("value");
         std::uint64_t dropped = 0U;
         std::uint64_t late = 0U;
+        std::uint64_t unmatched = 0U;
         for (const ThreadRecord& thread : record.threads)
         {
             dropped += thread.dropped;
             late += thread.late;
+            unmatched += thread.unmatched;
         }
         const std::uint64_t events = events_of(record);
         add_row(table, "events", static_cast<double>(events));
         add_row(table, "bytes", static_cast<double>(events * sizeof(TraceEvent)));
         add_row(table, "dropped", static_cast<double>(dropped));
         add_row(table, "late", static_cast<double>(late));
+        add_row(table, "unmatched", static_cast<double>(unmatched));
         add_row(table, "outside_periods", static_cast<double>(record.drops.outside_periods));
         add_row(table, "open_at_stop", static_cast<double>(record.drops.open_at_stop));
         add_row(table, "spans_dropped", static_cast<double>(record.drops.spans_dropped));

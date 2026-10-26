@@ -36,7 +36,7 @@ its line and column.
 | `names` | strings | Interned names; position is the NameID. |
 | `sites` | objects | One per SiteID; see below. |
 | `tracks` | strings | Track names; position is the TrackID. |
-| `threads` | objects | `index`, `name`, `dropped` and `late`; an index appears once. |
+| `threads` | objects | `index`, `name`, `dropped`, `late` and `unmatched`; an index appears once. |
 | `drops` | object | `outside_periods`, `open_at_stop` and `spans_dropped`, whole numbers. |
 | `periods` | objects | The recorded periods, in order; see below. |
 
@@ -92,7 +92,7 @@ per time; `items`, empty or one per time; and `points`, one of `begin`, `step` a
   ],
   "tracks": [""],
   "threads": [
-    {"index": 0, "name": "main", "dropped": 0, "late": 0}
+    {"index": 0, "name": "main", "dropped": 0, "late": 0, "unmatched": 0}
   ],
   "drops": {"outside_periods": 0, "open_at_stop": 0, "spans_dropped": 0},
   "periods": [

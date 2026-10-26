@@ -41,8 +41,8 @@ namespace SushiProfiler
 
     bool ThreadRecord::operator==(const ThreadRecord& other) const
     {
-        return std::tie(index, name, dropped, late) ==
-               std::tie(other.index, other.name, other.dropped, other.late);
+        return std::tie(index, name, dropped, late, unmatched) ==
+               std::tie(other.index, other.name, other.dropped, other.late, other.unmatched);
     }
 
     bool ClockRecord::operator==(const ClockRecord& other) const

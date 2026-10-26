@@ -120,7 +120,7 @@ namespace SushiProfilerTests
                         site("peak", "", SiteRole::Counter, CounterOp::Max, "B"),
                         site("loss", "", SiteRole::Value),
                         site("item", "", SiteRole::Flow)};
-        record.threads = {ThreadRecord{0U, "main", 2U, 1U}};
+        record.threads = {ThreadRecord{0U, "main", 2U, 1U, 4U}};
         record.drops = {1U, 2U, 3U};
 
         PeriodRecord warmup = period(0U, 0U, 100U);

@@ -8,9 +8,11 @@ are the same value.
 - `SushiProfiler/record/run_record.hpp`: `RunRecord`. Its tables are indexed by the collector's
   ids: `names[i]` is NameID `i`, `sites[i]` (a `SiteRecord`) is SiteID `i`, `tracks[i]` is
   TrackID `i`, and index 0 of each is empty. It holds the environment, build and tag facts, the
-  `ClockRecord`, one `ThreadRecord` per thread with its dropped and late events, the periods in
-  order and the `RecordDrops` outside any thread. `name_of`, `site` and `find_name` look entries
-  up. Times are nanoseconds since the session's first calibration point.
+  `ClockRecord`, one `ThreadRecord` per thread with its dropped, late and unmatched events, the
+  periods in order and the `RecordDrops` outside any thread. `name_of`, `site` and `find_name`
+  look entries up. Times are nanoseconds since the session's first calibration point. An
+  unmatched event is a zone that ends after the zone open around it, or a lane end with no lane
+  open.
 - `SushiProfiler/record/period_record.hpp`: `PeriodRecord`, one period of a timeline: index,
   timeline, marking thread, begin and end, warm-up flag, budget, `Tag`s, `Fact`s, one `ZoneTree`
   per thread and lane, a `SpanTable` and the `SampleSeries`. A `ZoneTree` lists `ZoneNode`s, each

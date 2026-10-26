@@ -62,6 +62,7 @@ namespace SushiProfiler
         std::string name;          /**< Its name, or empty. */
         std::uint64_t dropped = 0U; /**< Events its full ring dropped. */
         std::uint64_t late = 0U;   /**< Events that began in a period already closed. */
+        std::uint64_t unmatched = 0U; /**< Zones that did not nest, lane ends with none open. */
 
         /// @brief Returns whether every field is equal.
         [[nodiscard]] bool operator==(const ThreadRecord& other) const;

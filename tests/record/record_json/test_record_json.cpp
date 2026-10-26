@@ -81,7 +81,8 @@ namespace
                         site("item", SiteRole::Flow)};
         record.sites[3].unit = "B";
         record.tracks = {"", "queue 0"};
-        record.threads = {ThreadRecord{7U, "main", 2U, 1U}, ThreadRecord{3U, "worker", 0U, 0U}};
+        record.threads = {ThreadRecord{7U, "main", 2U, 1U, 5U},
+                          ThreadRecord{3U, "worker", 0U, 0U, 0U}};
         record.drops = {1U, 2U, 3U};
 
         PeriodRecord busy;

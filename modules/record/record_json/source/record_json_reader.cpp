@@ -166,11 +166,13 @@ namespace SushiProfiler
                 bool thread(const JsonValue& value)
                 {
                     ThreadRecord thread;
-                    if (!decoder_.object(value, {"index", "name", "dropped", "late"}) ||
+                    if (!decoder_.object(value,
+                                         {"index", "name", "dropped", "late", "unmatched"}) ||
                         !decoder_.whole(value, "index", thread.index) ||
                         !decoder_.text(value, "name", thread.name) ||
                         !decoder_.whole(value, "dropped", thread.dropped) ||
-                        !decoder_.whole(value, "late", thread.late))
+                        !decoder_.whole(value, "late", thread.late) ||
+                        !decoder_.whole(value, "unmatched", thread.unmatched))
                         return false;
                     if (std::binary_search(thread_ids_.begin(), thread_ids_.end(), thread.index))
                     {

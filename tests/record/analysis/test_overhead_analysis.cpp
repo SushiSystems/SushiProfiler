@@ -46,15 +46,16 @@ TEST(Small_OverheadAnalysis, CountsEventsAndDropsAndNotesAMissingBaseline)
 {
     const Table table = SushiProfiler::OverheadAnalysis().run(analysis_record(), {});
 
-    ASSERT_EQ(table.rows.size(), 8U);
+    ASSERT_EQ(table.rows.size(), 9U);
     expect_row(table.rows[0], {text("events"), real(33.0)});
     expect_row(table.rows[1], {text("bytes"), real(33.0 * 24.0)});
     expect_row(table.rows[2], {text("dropped"), real(2.0)});
     expect_row(table.rows[3], {text("late"), real(1.0)});
-    expect_row(table.rows[4], {text("outside_periods"), real(1.0)});
-    expect_row(table.rows[5], {text("open_at_stop"), real(2.0)});
-    expect_row(table.rows[6], {text("spans_dropped"), real(3.0)});
-    expect_row(table.rows[7], {text("clock_read_ns"), real(6.5)});
+    expect_row(table.rows[4], {text("unmatched"), real(4.0)});
+    expect_row(table.rows[5], {text("outside_periods"), real(1.0)});
+    expect_row(table.rows[6], {text("open_at_stop"), real(2.0)});
+    expect_row(table.rows[7], {text("spans_dropped"), real(3.0)});
+    expect_row(table.rows[8], {text("clock_read_ns"), real(6.5)});
     EXPECT_EQ(table.notes.size(), 1U);
 }
 
