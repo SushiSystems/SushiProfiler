@@ -28,10 +28,12 @@
 
 #include <SushiProfiler/zones/macros.hpp>
 
+#include "allocation_counter.hpp"
 #include "recording_fixture.hpp"
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <vector>
 
 using SushiProfiler::Collector;
@@ -77,4 +79,28 @@ TEST_F(Small_Macros, EachDirectMacroWritesItsKind)
         EventKind::Counter,   EventKind::Value,    EventKind::Instant,  EventKind::FlowBegin,
         EventKind::FlowStep,  EventKind::FlowEnd,  EventKind::LaneEnd};
     EXPECT_EQ(kinds, expected);
+}
+
+TEST_F(Small_Macros, TheRecordingThreadNeverAllocates)
+{
+    const SushiProfiler::NameID lane = Collector::instance().names().intern("allocations");
+    const auto record_every_kind = [lane](std::uint64_t item) {
+        SP_LANE(lane);
+        {
+            SP_ZONE("stage");
+        }
+        SP_COUNTER("bytes", "B", Add, 1.0);
+        SP_VALUE("level", "dB", -6.0);
+        SP_INSTANT("tick");
+        SP_FLOW_BEGIN("item", item);
+        SP_FLOW_END("item", item);
+    };
+    // The first pass registers every site, which allocates once per site.
+    record_every_kind(0U);
+    const std::uint64_t before = SushiProfilerTests::allocations_on_this_thread();
+
+    for (std::uint64_t item = 1U; item <= 100'000U; ++item)
+        record_every_kind(item);
+
+    EXPECT_EQ(SushiProfilerTests::allocations_on_this_thread() - before, 0U);
 }

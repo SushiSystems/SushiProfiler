@@ -7,7 +7,10 @@
 sushiprofiler_add_module_tests(
     MODULE zones
     SOURCES
+        allocation_counter.cpp
         test_admission.cpp
         test_macros.cpp
         test_records.cpp
-        test_zone.cpp)
+        test_zone.cpp
+    BENCHMARKS
+        benchmark_zones.cpp)
