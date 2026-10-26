@@ -40,3 +40,7 @@
 #include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>
 #include <SushiProfiler/version/version.hpp>
+#include <SushiProfiler/zones/admission.hpp>
+#include <SushiProfiler/zones/macros.hpp>
+#include <SushiProfiler/zones/records.hpp>
+#include <SushiProfiler/zones/zone.hpp>

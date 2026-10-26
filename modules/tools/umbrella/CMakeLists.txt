@@ -9,4 +9,4 @@
 sushiprofiler_add_module(
     NAME umbrella TIER tools
     HEADER_ONLY
-    DEPENDS version clock events sites rings collector)
+    DEPENDS version clock events sites rings collector zones)
