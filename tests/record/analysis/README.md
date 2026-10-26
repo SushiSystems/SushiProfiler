@@ -49,7 +49,10 @@ and two active periods of 1000 ns. Times are queued, start and end:
   and 2e10 B/s at intensity 25, half of the 1e12 compute roof; a `copy` span reaches 1e10 FLOP/s at
   intensity 0.125, 0.8 of the 1.25e10 memory bound; a track without ceiling facts has empty
   ceiling cells; two spans without both attributes are counted and warm-up periods are skipped; a
-  ceiling fact that is not a number counts as missing.
+  ceiling fact that is not a number counts as missing. With `node` and `dtype` attributes, node 7
+  merges two `f16` spans against the 4e12 `f16` ceiling (0.25), node 8 splits into an `f16` row
+  (0.125) and an `f32` row on the type-less 1e12 ceiling (1.0), and a span with no FLOPs and 8e6 B
+  is `memory` at 0.8 of the memory ceiling.
 - `test_short_spans_analysis.cpp`: two of five spans under 10 ns, 13 ns of 1213; priced at a
   20 ns floor, 40 ns.
 - `test_overhead_analysis.cpp`: 33 events and 792 bytes, every drop, the note without a

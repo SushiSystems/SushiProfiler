@@ -32,7 +32,10 @@
 #include <cstdlib>
 #include <map>
 #include <string>
+#include <tuple>
 #include <utility>
+
+#include <SushiProfiler/record/device_span_keys.hpp>
 
 #include "record_queries.hpp"
 
@@ -40,13 +43,24 @@ namespace SushiProfiler
 {
     namespace
     {
-        /// @brief The key of a track's compute ceiling is `device.<track>.` plus this.
-        constexpr const char* K_PEAK_FLOPS = "peak_flops";
+        /// @brief What one row sums over: a name on a track, per node and element type.
+        struct GroupKey
+        {
+            std::string name;          /**< The span name. */
+            TrackID track = 0U;        /**< The track. */
+            bool has_node = false;     /**< Whether the spans carry the `node` attribute. */
+            std::int64_t node = 0;     /**< The node, when they do. */
+            std::string dtype;         /**< The element type, or empty. */
 
-        /// @brief The key of a track's memory ceiling is `device.<track>.` plus this.
-        constexpr const char* K_PEAK_BYTES = "peak_bytes_per_s";
+            /// @brief Orders keys by name, track, node and element type.
+            [[nodiscard]] bool operator<(const GroupKey& other) const
+            {
+                return std::tie(name, track, has_node, node, dtype) <
+                       std::tie(other.name, other.track, other.has_node, other.node, other.dtype);
+            }
+        };
 
-        /// @brief The spans of one name on one track in one period, summed.
+        /// @brief The spans of one group, summed.
         struct Totals
         {
             std::int64_t spans = 0;       /**< Spans that carry both attributes. */
@@ -62,6 +76,15 @@ namespace SushiProfiler
                 return nullptr;
             const AttributeColumn* const column = period.spans.attribute(key);
             return column != nullptr && column->kind == AttributeKind::Integer ? column : nullptr;
+        }
+
+        /// @brief Returns attribute column @p key of @p period when it holds names, or null.
+        const AttributeColumn* name_column(const PeriodRecord& period, NameID key)
+        {
+            if (key == 0U)
+                return nullptr;
+            const AttributeColumn* const column = period.spans.attribute(key);
+            return column != nullptr && column->kind == AttributeKind::Name ? column : nullptr;
         }
 
         /// @brief Returns whether row @p row of @p column holds a value that is not negative.
@@ -108,6 +131,8 @@ namespace SushiProfiler
         table.add_column("period", Unit::Count);
         table.add_column("name");
         table.add_column("track");
+        table.add_column("node", Unit::Count);
+        table.add_column("dtype");
         table.add_column("spans", Unit::Count);
         table.add_column("time", Unit::Nanoseconds);
         table.add_column("flops", Unit::Count);
@@ -120,14 +145,18 @@ namespace SushiProfiler
         table.add_column("bound_flops_per_s");
         table.add_column("bound_share", Unit::Ratio);
         table.add_column("limit");
-        const NameID flops_key = record.find_name("flops");
-        const NameID bytes_key = record.find_name("bytes");
+        const NameID flops_key = record.find_name(DeviceSpanKeys::K_FLOPS);
+        const NameID bytes_key = record.find_name(DeviceSpanKeys::K_BYTES);
+        const NameID node_key = record.find_name(DeviceSpanKeys::K_NODE);
+        const NameID dtype_key = record.find_name(DeviceSpanKeys::K_DTYPE);
         std::int64_t skipped = 0;
         for (const PeriodRecord* const period : Detail::active_periods(record))
         {
             const AttributeColumn* const flops = integer_column(*period, flops_key);
             const AttributeColumn* const bytes = integer_column(*period, bytes_key);
-            std::map<std::pair<std::string, TrackID>, Totals> groups;
+            const AttributeColumn* const nodes = integer_column(*period, node_key);
+            const AttributeColumn* const dtypes = name_column(*period, dtype_key);
+            std::map<GroupKey, Totals> groups;
             for (std::size_t row = 0U; row < period->spans.size(); ++row)
             {
                 if (!has_count(flops, row) || !has_count(bytes, row))
@@ -136,8 +165,20 @@ namespace SushiProfiler
                     continue;
                 }
                 const Span span = period->spans.span(row);
-                Totals& totals =
-                    groups[{std::string(record.name_of(span.name)), span.track}];
+                GroupKey key;
+                key.name = std::string(record.name_of(span.name));
+                key.track = span.track;
+                if (nodes != nullptr && nodes->present[row] == 1U)
+                {
+                    key.has_node = true;
+                    key.node = nodes->integers[row];
+                }
+                if (dtypes != nullptr && dtypes->present[row] == 1U)
+                {
+                    key.dtype = std::string(
+                        record.name_of(static_cast<NameID>(dtypes->integers[row])));
+                }
+                Totals& totals = groups[key];
                 ++totals.spans;
                 totals.time_ns += span.end_ns - span.start_ns;
                 totals.flops += static_cast<std::uint64_t>(flops->integers[row]);
@@ -145,32 +186,45 @@ namespace SushiProfiler
             }
             for (const auto& [key, totals] : groups)
             {
-                const std::string track = track_label(record, key.second);
+                const std::string track = track_label(record, key.track);
                 const auto flops_total = static_cast<double>(totals.flops);
                 const auto bytes_total = static_cast<double>(totals.bytes);
                 const double seconds = static_cast<double>(totals.time_ns) / 1e9;
                 const double flops_rate = seconds > 0.0 ? flops_total / seconds : 0.0;
                 const double bytes_rate = seconds > 0.0 ? bytes_total / seconds : 0.0;
                 Row row{Cell::whole(static_cast<std::int64_t>(period->index)),
-                        Cell::text(key.first), Cell::text(track), Cell::whole(totals.spans),
+                        Cell::text(key.name), Cell::text(track),
+                        key.has_node ? Cell::whole(key.node) : Cell(),
+                        key.dtype.empty() ? Cell() : Cell::text(key.dtype),
+                        Cell::whole(totals.spans),
                         Cell::whole(static_cast<std::int64_t>(totals.time_ns)),
                         Cell::whole(static_cast<std::int64_t>(totals.flops)),
                         Cell::whole(static_cast<std::int64_t>(totals.bytes)),
                         Cell::real(flops_rate), Cell::real(bytes_rate)};
                 const bool has_bytes = totals.bytes > 0U;
                 row.push_back(has_bytes ? Cell::real(flops_total / bytes_total) : Cell());
-                const double peak_flops = ceiling(record, "device." + track + "." + K_PEAK_FLOPS);
-                const double peak_bytes = ceiling(record, "device." + track + "." + K_PEAK_BYTES);
+                double peak_flops = 0.0;
+                if (!key.dtype.empty())
+                {
+                    peak_flops =
+                        ceiling(record, DeviceSpanKeys::peak_flops_fact(track, key.dtype));
+                }
+                if (peak_flops == 0.0)
+                    peak_flops = ceiling(record, DeviceSpanKeys::peak_flops_fact(track));
+                const double peak_bytes =
+                    ceiling(record, DeviceSpanKeys::peak_bytes_per_s_fact(track));
                 if (peak_flops > 0.0 && peak_bytes > 0.0)
                 {
                     const double memory_roof =
                         has_bytes ? flops_total / bytes_total * peak_bytes : peak_flops;
                     const bool memory_bound = memory_roof < peak_flops;
                     const double bound = memory_bound ? memory_roof : peak_flops;
+                    const bool traffic_only = totals.flops == 0U && has_bytes;
                     row.push_back(Cell::real(peak_flops));
                     row.push_back(Cell::real(peak_bytes));
                     row.push_back(Cell::real(bound));
-                    row.push_back(Cell::real(flops_rate / bound));
+                    row.push_back(Cell::real(traffic_only ? bytes_rate / peak_bytes
+                                                          : flops_rate / bound));
                     row.push_back(Cell::text(memory_bound ? "memory" : "compute"));
                 }
                 else

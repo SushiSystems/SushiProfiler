@@ -80,9 +80,11 @@ pairing's `uncertainty_ns` into each span. `device_idle` treats a gap shorter th
 of its two spans as unattributed rather than guessing.
 
 An attribute block is a run of `(KeyID, kind, value)` triples in a per-period arena: integers,
-doubles and interned strings. SushiBLAS writes `flops`, `bytes_read`, `bytes_written`, `dtype`;
-SushiRuntime writes `node`, `operation`, `launched_width`, `live_width`; SushiAI writes `ir_node`
-and `op`. SushiProfiler reads no key by name except in the analyses that say so.
+doubles and interned strings. A device source writes the keys of `DeviceSpanKeys`
+(`SushiProfiler/record/device_span_keys.hpp`, listed in `CLIENTS.md`): `node`, `invocation`,
+`operation`, `launched_width`, `live_width`, and `flops`, `bytes` and `dtype` when the library that
+recorded the node stated its cost. SushiAI writes `ir_node` and `op`. SushiProfiler reads no key by
+name except in the analyses that say so.
 
 ## The hot path
 

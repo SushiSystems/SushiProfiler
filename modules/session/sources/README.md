@@ -27,6 +27,9 @@ the record, in the namespace `SushiProfiler`. The module depends on `events`, `r
   dropped because their period had closed. The session adds `refused()` and `late()` to the
   record's `drops.spans_dropped`, which counts the whole run; a period has no count of its own.
 
+A device source writes the span attributes named in `SushiProfiler/record/device_span_keys.hpp`,
+and never its own copy of those words; `docs/design/PROFILER/CLIENTS.md` has the table.
+
 A source that receives its data on another thread, as SushiRuntime's does after each run, queues
 it and hands it over in `collect`. A span's period is the one whose steady span holds the work's
 start time. `consumer.linger_ms` is how long a closed period waits for late work.

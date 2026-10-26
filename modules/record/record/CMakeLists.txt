@@ -7,6 +7,7 @@
 sushiprofiler_add_module(
     NAME record TIER record
     SOURCES
+        device_span_keys.cpp
         period_record.cpp
         run_record.cpp
         sample_series.cpp

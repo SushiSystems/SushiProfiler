@@ -37,7 +37,7 @@ Generic, in SushiProfiler:
 | `distribution` | Per period time, zone, counter and value: p50, p90, p99, maximum, a log-bucketed histogram, and jitter as the median absolute difference between successive periods |
 | `counters` | Per counter site, its operation applied per period (sum, last, maximum, minimum), then the distribution over periods |
 | `flows` | Per flow name, across every call site of it, the latency from begin to end and between steps, as a distribution |
-| `roofline` | Per period, span name and track, over spans that carry the integer attributes `flops` and `bytes` (others are skipped and counted): achieved FLOP/s and bytes/s, and arithmetic intensity. When the environment holds `device.<track>.peak_flops` and `device.<track>.peak_bytes_per_s` for the track, also the bound min(peak_flops, intensity x peak_bytes_per_s), the share achieved and the limiting roof, compute or memory |
+| `roofline` | Per period, span name, track, node and element type, over spans that carry the integer attributes `flops` and `bytes` (others are skipped and counted): achieved FLOP/s and bytes/s, and arithmetic intensity. When the environment holds `device.<track>.peak_bytes_per_s` and a compute ceiling, `device.<track>.peak_flops.<dtype>` for the span's `dtype` else `device.<track>.peak_flops`, also the bound min(peak_flops, intensity x peak_bytes_per_s), the share achieved and the limiting roof, compute or memory. A row with no FLOPs and some bytes is memory-bound, and its share is its bytes per second over the memory ceiling |
 
 A client states the two inputs `roofline` reads: the cost attributes on its spans, and the ceiling
 facts of each device track in the environment (facts are name and value strings, so the value is

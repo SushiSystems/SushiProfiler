@@ -35,8 +35,8 @@ SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
-     * @brief Reports, per period, span name and track, the achieved FLOP/s and bytes/s of spans
-     * that carry the integer attributes `flops` and `bytes`.
+     * @brief Reports, per period, span name, track, node and dtype, the achieved FLOP/s and bytes/s
+     * of spans that carry the integer attributes `flops` and `bytes`.
      *
      * With the environment facts `device.<track>.peak_flops` and `device.<track>.peak_bytes_per_s`
      * it also gives the bound min(peak_flops, intensity * peak_bytes_per_s) and the share achieved.

@@ -1,5 +1,26 @@
 # The libraries that use SushiProfiler
 
+## Device span keys
+
+Every device source writes the same attributes and facts, so a record from SushiRuntime's
+`sushiruntime.device` and one from SushiEngine's `sushiengine.native` read the same way. The
+constants are in `SushiProfiler/record/device_span_keys.hpp`, in `SushiProfiler::DeviceSpanKeys`;
+a source and an analysis use them and never write the word again.
+
+| Key | Kind | Meaning | Constant |
+| --- | --- | --- | --- |
+| `node` | integer span attribute | The index of the graph node that ran | `K_NODE` |
+| `invocation` | integer span attribute | Which invocation of the graph the span belongs to | `K_INVOCATION` |
+| `operation` | integer span attribute | The id of the operation the node performs | `K_OPERATION` |
+| `launched_width` | integer span attribute | The work items the launch started | `K_LAUNCHED_WIDTH` |
+| `live_width` | integer span attribute | The work items that did useful work | `K_LIVE_WIDTH` |
+| `dtype` | name span attribute | The element type the span computed in, such as `f32`; selects the compute ceiling | `K_DTYPE` |
+| `flops` | integer span attribute | The floating-point operations the span performed; read by `roofline` | `K_FLOPS` |
+| `bytes` | integer span attribute | The bytes the span moved to and from memory; read by `roofline` | `K_BYTES` |
+| `device.<track>.peak_flops` | environment fact, a number as text | The track's compute ceiling in FLOP/s, for spans without a type or without a ceiling of their own; read by `roofline` | `peak_flops_fact(track)` |
+| `device.<track>.peak_flops.<dtype>` | environment fact, a number as text | The track's compute ceiling in FLOP/s for one element type; read by `roofline` before the type-less fact | `peak_flops_fact(track, dtype)` |
+| `device.<track>.peak_bytes_per_s` | environment fact, a number as text | The track's memory ceiling in bytes per second; read by `roofline` | `peak_bytes_per_s_fact(track)` |
+
 ## SushiRuntime
 
 - `sushiruntime.device`: a source that converts each run's `node_events` through `ClockPairing`

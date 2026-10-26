@@ -20,6 +20,14 @@ are the same value.
   inclusive time, self time and call count. `runs` holds every zone run of an active period as
   a `ZoneRun`, its thread, lane, site, name, begin, end and depth, by thread, lane and begin;
   a warm-up period keeps none.
+- `SushiProfiler/record/device_span_keys.hpp`: the keys a device source writes and `roofline`
+  reads, in the namespace `SushiProfiler::DeviceSpanKeys`: the span attribute names `K_NODE`,
+  `K_INVOCATION`, `K_OPERATION`, `K_LAUNCHED_WIDTH`, `K_LIVE_WIDTH`, `K_DTYPE`, `K_FLOPS` and
+  `K_BYTES`, and `peak_flops_fact(track)`, `peak_flops_fact(track, dtype)` and
+  `peak_bytes_per_s_fact(track)`, which build the environment fact names `device.<track>.peak_flops`,
+  `device.<track>.peak_flops.<dtype>` and `device.<track>.peak_bytes_per_s`. Each key's kind and
+  meaning is in the table of `docs/design/PROFILER/CLIENTS.md`. The header is in `record`, below
+  both the sources that write the keys and the analyses that read them.
 - `SushiProfiler/record/span_table.hpp`: `SpanTable`, a period's `Span`s as columns, plus one
   `AttributeColumn` per attribute key holding integers, reals or interned names. Every column has
   one entry per span: a column added late marks earlier spans absent, and a span added late is

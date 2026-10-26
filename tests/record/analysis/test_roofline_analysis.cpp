@@ -34,6 +34,7 @@
 
 #include "analysis_record.hpp"
 
+using SushiProfiler::Cell;
 using SushiProfiler::PeriodRecord;
 using SushiProfiler::RunRecord;
 using SushiProfiler::Span;
@@ -92,17 +93,106 @@ namespace
     }
 } // namespace
 
+namespace
+{
+    /// @brief Appends a `gemm` span of 100 us on `queue 0` with its cost, @p node when not
+    /// negative and @p dtype when not 0.
+    void add_typed(PeriodRecord& period, std::int64_t node, SushiProfiler::NameID dtype,
+                   std::int64_t flops, std::int64_t bytes)
+    {
+        const std::size_t row = period.spans.append(Span{0U, 0U, 100'000U, 1U, 1U, 0U, 0U});
+        period.spans.set_integer(row, 2U, flops);
+        period.spans.set_integer(row, 3U, bytes);
+        if (node >= 0)
+            period.spans.set_integer(row, 4U, node);
+        if (dtype != 0U)
+            period.spans.set_name(row, 5U, dtype);
+    }
+
+    /// @brief Returns a record of one period on `queue 0`, whose ceilings are 1e11 B/s, 1e12 FLOP/s
+    /// and, for `f16`, 4e12 FLOP/s.
+    ///
+    /// The spans, each of 100 us: two on node 7 in `f16` with 1e8 FLOP and 1e6 B each; one on node
+    /// 8 in `f16` with 5e7 FLOP and 1e6 B; one on node 8 in `f32` with 1e8 FLOP and 1e6 B; one
+    /// with no node and no type, with no FLOP and 8e6 B.
+    RunRecord typed_record()
+    {
+        RunRecord record;
+        record.names = {"", "gemm", "flops", "bytes", "node", "dtype", "f16", "f32"};
+        record.tracks = {"", "queue 0"};
+        record.environment = {{"device.queue 0.peak_flops", "1e12"},
+                              {"device.queue 0.peak_flops.f16", "4e12"},
+                              {"device.queue 0.peak_bytes_per_s", "1e11"}};
+        PeriodRecord period;
+        period.index = 1U;
+        period.timeline = 1U;
+        period.end_ns = 1'000'000U;
+        add_typed(period, 7, 6U, 100'000'000, 1'000'000);
+        add_typed(period, 7, 6U, 100'000'000, 1'000'000);
+        add_typed(period, 8, 6U, 50'000'000, 1'000'000);
+        add_typed(period, 8, 7U, 100'000'000, 1'000'000);
+        add_typed(period, -1, 0U, 0, 8'000'000);
+        record.periods = {period};
+        return record;
+    }
+} // namespace
+
+TEST(Small_RooflineAnalysis, GivesEachNodeItsRowAndSplitsAMixedTypeAndMergesTheSameOne)
+{
+    const Table table = SushiProfiler::RooflineAnalysis().run(typed_record(), {});
+
+    ASSERT_EQ(table.rows.size(), 4U);
+    EXPECT_TRUE(table.rows[0][3].empty());
+    EXPECT_EQ(*table.rows[1][3].as_whole(), 7);
+    EXPECT_EQ(*table.rows[1][4].as_text(), "f16");
+    EXPECT_EQ(*table.rows[1][5].as_whole(), 2);
+    EXPECT_EQ(*table.rows[2][3].as_whole(), 8);
+    EXPECT_EQ(*table.rows[2][4].as_text(), "f16");
+    EXPECT_EQ(*table.rows[3][3].as_whole(), 8);
+    EXPECT_EQ(*table.rows[3][4].as_text(), "f32");
+}
+
+TEST(Small_RooflineAnalysis, PicksTheCeilingOfTheSpansTypeAndFallsBackToTheTypelessOne)
+{
+    const Table table = SushiProfiler::RooflineAnalysis().run(typed_record(), {});
+
+    ASSERT_EQ(table.rows.size(), 4U);
+    expect_row(table.rows[1],
+               {whole(1), text("gemm"), text("queue 0"), whole(7), text("f16"), whole(2),
+                whole(200'000), whole(200'000'000), whole(2'000'000), real(1e12), real(1e10),
+                real(100.0), real(4e12), real(1e11), real(4e12), real(0.25), text("compute")});
+    expect_row(table.rows[2],
+               {whole(1), text("gemm"), text("queue 0"), whole(8), text("f16"), whole(1),
+                whole(100'000), whole(50'000'000), whole(1'000'000), real(5e11), real(1e10),
+                real(50.0), real(4e12), real(1e11), real(4e12), real(0.125), text("compute")});
+    expect_row(table.rows[3],
+               {whole(1), text("gemm"), text("queue 0"), whole(8), text("f32"), whole(1),
+                whole(100'000), whole(100'000'000), whole(1'000'000), real(1e12), real(1e10),
+                real(100.0), real(1e12), real(1e11), real(1e12), real(1.0), text("compute")});
+}
+
+TEST(Small_RooflineAnalysis, ARowWithNoFlopsButBytesIsMeasuredAgainstTheMemoryCeiling)
+{
+    const Table table = SushiProfiler::RooflineAnalysis().run(typed_record(), {});
+
+    ASSERT_EQ(table.rows.size(), 4U);
+    expect_row(table.rows[0],
+               {whole(1), text("gemm"), text("queue 0"), Cell(), Cell(), whole(1),
+                whole(100'000), whole(0), whole(8'000'000), real(0.0), real(8e10), real(0.0),
+                real(1e12), real(1e11), real(0.0), real(0.8), text("memory")});
+}
+
 TEST(Small_RooflineAnalysis, ReportsAchievedRatesAndIntensityPerPeriodNameAndTrack)
 {
     const Table table = SushiProfiler::RooflineAnalysis().run(roofline_record(), {});
 
     ASSERT_EQ(table.rows.size(), 3U);
     expect_row(table.rows[0],
-               {whole(1), text("copy"), text("queue 0"), whole(1), whole(100'000),
+               {whole(1), text("copy"), text("queue 0"), Cell(), Cell(), whole(1), whole(100'000),
                 whole(1'000'000), whole(8'000'000), real(1e10), real(8e10), real(0.125),
                 real(1e12), real(1e11), real(1.25e10), real(0.8), text("memory")});
     expect_row(table.rows[1],
-               {whole(1), text("gemm"), text("queue 0"), whole(2), whole(200'000),
+               {whole(1), text("gemm"), text("queue 0"), Cell(), Cell(), whole(2), whole(200'000),
                 whole(100'000'000), whole(4'000'000), real(5e11), real(2e10), real(25.0),
                 real(1e12), real(1e11), real(1e12), real(0.5), text("compute")});
 }
@@ -115,9 +205,9 @@ TEST(Small_RooflineAnalysis, LeavesTheCeilingCellsEmptyWhenTheTrackHasNoFacts)
     const SushiProfiler::Row& row = table.rows[2];
     EXPECT_EQ(*row[0].as_whole(), 2);
     EXPECT_EQ(*row[2].as_text(), "queue 1");
-    EXPECT_NEAR(*row[7].as_real(), 1e11, 1.0);
-    EXPECT_NEAR(*row[9].as_real(), 20.0, 1e-9);
-    for (std::size_t column = 10U; column < row.size(); ++column)
+    EXPECT_NEAR(*row[9].as_real(), 1e11, 1.0);
+    EXPECT_NEAR(*row[11].as_real(), 20.0, 1e-9);
+    for (std::size_t column = 12U; column < row.size(); ++column)
         EXPECT_TRUE(row[column].empty()) << "column " << column;
 }
 
@@ -149,5 +239,5 @@ TEST(Small_RooflineAnalysis, AnUnreadableCeilingFactIsTreatedAsMissing)
     const Table table = SushiProfiler::RooflineAnalysis().run(record, {});
 
     ASSERT_EQ(table.rows.size(), 3U);
-    EXPECT_TRUE(table.rows[0][14].empty());
+    EXPECT_TRUE(table.rows[0][16].empty());
 }

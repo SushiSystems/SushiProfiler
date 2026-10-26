@@ -7,6 +7,7 @@
 sushiprofiler_add_module_tests(
     MODULE record
     SOURCES
+        test_device_span_keys.cpp
         test_period_record.cpp
         test_run_record.cpp
         test_sample_series.cpp
