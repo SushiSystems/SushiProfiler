@@ -1,6 +1,6 @@
 # SushiProfiler
 
-**Status:** Open — approved by the owner on 2026-10-26; P1 built 2026-10-26, P2 built 2026-10-26, P3 is next.
+**Status:** Open — approved by the owner on 2026-10-26; P1 built 2026-10-26, P2 built 2026-10-26, P2b is next.
 **About:** A general-purpose profiler for any C++17 program: zones, counters, values, flows and device spans over marked periods, kept as a run record that is analysed, compared and checked.
 **Modules:** `modules/foundation/clock`, `modules/foundation/events`, `modules/capture/sites`, `modules/capture/rings`, `modules/capture/collector`, `modules/capture/zones`, `modules/capture/lock_wait`, `modules/capture/periods`, `modules/foundation/json`, `modules/record/record`, `modules/record/record_json`, `modules/record/statistics`, `modules/record/analysis`, `modules/record/record_writers`, `modules/record/compare`, `modules/record/checks`, `modules/session/config`, `modules/session/window`, `modules/session/sources`, `modules/session/environment`, `modules/session/fold`, `modules/session/stream_writers`, `modules/session/registry`, `modules/session/consumer`, `modules/session/session`, `modules/tools/record_tool`
 
@@ -88,7 +88,7 @@ Performance budget, measured by benchmarks in this repository before P2 closes:
 | SushiAI YOLOv5n step with stage zones on | Under 1% slower than with the profiler off |
 
 P1 met the zone rows. P2 measured the idle drainer at one wake-up a second, the bound itself;
-RW-5 asks whether the budget reads "at most one". The YOLOv5n row is P5's to measure.
+P2b writes the row as "at most one" (RW-5). The YOLOv5n row is P5's to measure.
 
 ## Phases
 
@@ -96,6 +96,7 @@ RW-5 asks whether the budget reads "at most one". The YOLOv5n row is P5's to mea
 | --- | --- | --- |
 | P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | built |
 | P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp record show / compare / check / validate` | built |
+| P2b | SushiProfiler v0.2.0: the shared library, the source contract (period span, context lifetime, late work), the registration pattern, zone runs for `device_idle` | planned |
 | P3 | SushiRuntime: the device source, the node table, the runtime's own zones | planned |
 | P4 | SushiBLAS: cost rules, `device_ceilings`, `roofline`, the benchmark harness on a timeline | planned |
 | P5 | SushiAI: stage zones, timelines, attribution, the run-file section, `sa profile` | planned |
