@@ -32,6 +32,7 @@
 #include <SushiProfiler/clock/trace_clock.hpp>
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>

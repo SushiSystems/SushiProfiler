@@ -20,6 +20,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     clock       foundation
     events      foundation
     sites       capture
+    rings       capture
     umbrella    tools)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.

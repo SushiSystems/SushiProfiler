@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — rings: Added each thread's lock-free event ring, which drops and counts an event when full instead of blocking (`modules/capture/rings/`).
 - 2026-10-26 — umbrella: Moved the umbrella module to the top tier, so it includes every module without an upward include (`modules/tools/umbrella/`).
 - 2026-10-26 — sites: Added the site registry, which gives each recording site one id on first use and turns sites on and off by level and group at run time, and the name table (`modules/capture/sites/`).
 - 2026-10-26 — events: Added the 24-byte trace event and its 13 kinds, with 64-bit times and value bits kept exactly (`modules/foundation/events/`).
