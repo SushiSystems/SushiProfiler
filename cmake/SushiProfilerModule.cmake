@@ -10,7 +10,8 @@
 
 include("${CMAKE_CURRENT_LIST_DIR}/SushiProfilerTiers.cmake")
 
-# Refuses a dependency the tier table does not allow. An umbrella module includes its scope.
+# Refuses a dependency the tier table does not allow: one above its consumer, or one beside it
+# that SUSHIPROFILER_SAME_TIER_EDGES does not list. An umbrella module includes its scope.
 function(sushiprofiler_check_module_edge consumer dependency)
     sushiprofiler_module_tier("${dependency}" dependency_tier)
     if(dependency_tier STREQUAL "")
@@ -29,10 +30,20 @@ function(sushiprofiler_check_module_edge consumer dependency)
     sushiprofiler_module_tier("${consumer}" consumer_tier)
     list(FIND SUSHIPROFILER_TIER_ORDER "${consumer_tier}" consumer_index)
     list(FIND SUSHIPROFILER_TIER_ORDER "${dependency_tier}" dependency_index)
-    if(dependency_index GREATER_EQUAL consumer_index)
+    if(dependency_index GREATER consumer_index)
         message(FATAL_ERROR
-            "sushiprofiler_add_module(${consumer}): ${dependency} (${dependency_tier}) is not below "
+            "sushiprofiler_add_module(${consumer}): ${dependency} (${dependency_tier}) is above "
             "${consumer} (${consumer_tier}) in SUSHIPROFILER_TIER_ORDER.")
+    endif()
+    if(dependency_index EQUAL consumer_index)
+        sushiprofiler_same_tier_edge_allowed("${consumer}" "${dependency}" allowed)
+        if(NOT allowed)
+            message(FATAL_ERROR
+                "sushiprofiler_add_module(${consumer}): undeclared edge ${consumer} -> "
+                "${dependency} inside the ${consumer_tier} tier. List it in "
+                "SUSHIPROFILER_SAME_TIER_EDGES (cmake/SushiProfilerTiers.cmake) or move the "
+                "shared code down a tier.")
+        endif()
     endif()
 endfunction()
 

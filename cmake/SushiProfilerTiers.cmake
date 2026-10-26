@@ -21,7 +21,13 @@ set(SUSHIPROFILER_MODULE_TIERS
     events      foundation
     sites       capture
     rings       capture
+    collector   capture
     umbrella    tools)
+
+# Consumer, then dependency: the edges allowed between two modules of one tier.
+set(SUSHIPROFILER_SAME_TIER_EDGES
+    collector   sites
+    collector   rings)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
 function(sushiprofiler_module_tier module out)
@@ -51,4 +57,23 @@ function(sushiprofiler_module_folders out)
         list(APPEND folders "${tier}/${name}")
     endforeach()
     set(${out} "${folders}" PARENT_SCOPE)
+endfunction()
+
+# Sets <out> to TRUE when SUSHIPROFILER_SAME_TIER_EDGES lists <consumer> -> <dependency>.
+function(sushiprofiler_same_tier_edge_allowed consumer dependency out)
+    set(result FALSE)
+    list(LENGTH SUSHIPROFILER_SAME_TIER_EDGES length)
+    if(length GREATER 0)
+        math(EXPR last "${length} - 2")
+        foreach(position RANGE 0 ${last} 2)
+            math(EXPR dependency_position "${position} + 1")
+            list(GET SUSHIPROFILER_SAME_TIER_EDGES ${position} edge_consumer)
+            list(GET SUSHIPROFILER_SAME_TIER_EDGES ${dependency_position} edge_dependency)
+            if(edge_consumer STREQUAL "${consumer}" AND edge_dependency STREQUAL "${dependency}")
+                set(result TRUE)
+                break()
+            endif()
+        endforeach()
+    endif()
+    set(${out} ${result} PARENT_SCOPE)
 endfunction()

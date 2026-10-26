@@ -12,7 +12,7 @@
   likewise in SushiBLAS and SushiAI) defaults to on; off, the zone macros expand to nothing and the
   sources are not built, and the library builds without SushiProfiler present.
 - `SR_ZONE` in plan build, submit, wait and poll, under the group `Runtime`.
-- The graph asks for node events only while the hub wants device spans.
+- The graph asks for node events only while the collector wants device spans.
 
 ## SushiBLAS
 

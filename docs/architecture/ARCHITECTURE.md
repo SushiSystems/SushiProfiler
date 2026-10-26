@@ -13,7 +13,7 @@ Modules sit in tiers, lowest first. `cmake/SushiProfilerTiers.cmake` states the 
 | Tier | Modules today |
 | --- | --- |
 | `foundation` | `version`, `clock`, `events` |
-| `capture` | `sites`, `rings` |
+| `capture` | `sites`, `rings`, `collector` |
 | `record` | none |
 | `session` | none |
 | `tools` | `umbrella` |
@@ -23,7 +23,8 @@ A tier is the folder `modules/<tier>/`; it appears with its first module.
 ## The dependency rule
 
 A module includes only modules of a lower tier, and only those it lists in its `DEPENDS`. A lower
-tier never includes a higher one. Two layers hold it.
+tier never includes a higher one. Inside one tier, a module includes another only along an edge
+`SUSHIPROFILER_SAME_TIER_EDGES` in `cmake/SushiProfilerTiers.cmake` lists. Two layers hold it.
 
 - The build. `sushiprofiler_add_module` in `cmake/SushiProfilerModule.cmake` refuses a dependency
   that is not declared before its consumer, that the tier table does not list, or that is not

@@ -7,13 +7,13 @@
 > (`- [ ]`) syntax for tracking.
 
 **Goal:** The foundation and capture tiers of SushiProfiler: a clock, the event types, site and
-name registries, per-thread rings, the process-wide hub, zones and the other event kinds, a lock
+name registries, per-thread rings, the process-wide collector, zones and the other event kinds, a lock
 that records its waits, period timelines, and the benchmarks that prove the budget.
 
 **Architecture:** Eight modules in two tiers, composed into the one static library. The hot path
-is inline: a gate load, a site enable byte, two clock reads and one 24-byte ring store. The hub is
+is inline: a gate load, a site enable byte, two clock reads and one 24-byte ring store. The collector is
 the only process-wide state. Draining and folding belong to P2's consumer; P1 exposes
-`Hub::drain` and tests read it directly.
+`Collector::drain` and tests read it directly.
 
 **Tech stack:** C++17, CMake through `sp`, GoogleTest, MSVC 2022 and clang.
 
@@ -39,12 +39,12 @@ the only process-wide state. Draining and folding belong to P2's consumer; P1 ex
 
 ## Review focus
 
-1. A thread that exits while the hub is open: its ring's events are still drained once, then the
-   ring is freed, with no crash at process exit (Task 5, `Medium_Hub.AnExitedThreadIsDrainedThenFreed`).
+1. A thread that exits while the collector is open: its ring's events are still drained once, then the
+   ring is freed, with no crash at process exit (Task 5, `Medium_Collector.AnExitedThreadIsDrainedThenFreed`).
 2. A full ring: the push fails without blocking and the drop is counted and reported by the next
-   drain (Task 4, `Small_ThreadRing.AFullRingDropsAndCounts`; Task 5, `Small_Hub.DropsReachTheDrain`).
-3. A zone opened while the hub is open and closed after `close()`: nothing is written, nothing
-   crashes (Task 6, `Small_Zone.AZoneClosedAfterTheHubClosesWritesNothing`).
+   drain (Task 4, `Small_ThreadRing.AFullRingDropsAndCounts`; Task 5, `Small_Collector.DropsReachTheDrain`).
+3. A zone opened while the collector is open and closed after `close()`: nothing is written, nothing
+   crashes (Task 6, `Small_Zone.AZoneClosedAfterTheCollectorClosesWritesNothing`).
 4. More sites than the registry holds: the extra site gets id 0, is never recorded, and is counted
    (Task 3, `Small_SiteRegistry.ASiteBeyondCapacityIsCountedNotRecorded`).
 5. Values that are not ordinary: a NaN counter value and a zone longer than 4.29 s survive the
@@ -78,7 +78,7 @@ modify `cmake/SushiProfilerTiers.cmake` (add `clock foundation` before `umbrella
 - `class Calibration`: `Calibration() noexcept`, `Calibration(const CalibrationPoint& begin, const CalibrationPoint& end) noexcept`,
   `std::uint64_t to_nanoseconds(std::uint64_t ticks) const noexcept`, `double nanoseconds_per_tick() const noexcept`.
 - When ticks are not invariant, callers use `steady_now_ns()` as ticks and an identity calibration;
-  the hub (Task 5) makes that choice once.
+  the collector (Task 5) makes that choice once.
 
 - [ ] Tests: `Small_TraceClock.SteadyTimeNeverGoesBack` (1,000 reads non-decreasing);
       `Small_TraceClock.SampleBracketsTheSteadyReading` (a sample's `steady_ns` lies between two
@@ -173,21 +173,21 @@ depends on `events`.
       or counted as dropped, sum equal to 1,000,000); `Small_ThreadRing.NameIsTruncatedAtSixtyThree`.
 - [ ] Build, test, README, commit `feat(rings): keep each thread's events in a lock-free ring`.
 
-### Task 5: `hub` (capture)
+### Task 5: `collector` (capture)
 
-**Files:** `modules/capture/hub/` with `include/SushiProfiler/hub/{hub.hpp,hub_settings.hpp,drain_batch.hpp}`,
-`source/hub.cpp`; tests `tests/capture/hub/test_hub.cpp`; tier `hub capture`; depends on `clock`,
+**Files:** `modules/capture/collector/` with `include/SushiProfiler/collector/{collector.hpp,collector_settings.hpp,drain_batch.hpp}`,
+`source/collector.cpp`; tests `tests/capture/collector/test_collector.cpp`; tier `collector capture`; depends on `clock`,
 `events`, `sites`, `rings`.
 
 **Interfaces (produces):**
-- `struct HubSettings { std::size_t ring_events = 65536; std::size_t site_capacity = 65536; SiteFilter filter; };`
+- `struct CollectorSettings { std::size_t ring_events = 65536; std::size_t site_capacity = 65536; SiteFilter filter; };`
 - `struct ThreadDrain { std::uint32_t thread_index; std::string name; std::vector<TraceEvent> events; std::uint64_t dropped; double fill; bool retired; };`
 - `struct DrainBatch { CalibrationPoint point; bool ticks_are_tsc; std::vector<ThreadDrain> threads; };`
-- `class Hub` (the one process-wide object; never destroyed):
-  `static Hub& instance()`;
+- `class Collector` (the one process-wide object; never destroyed):
+  `static Collector& instance()`;
   `static bool recording() noexcept` (the gate: `std::atomic<std::uint32_t>`, relaxed, non-zero is open);
   `static std::uint64_t now() noexcept` (TSC ticks when invariant, else steady ns, chosen at first use);
-  `bool open(const HubSettings&)` (false when already open; discards stale ring contents; samples
+  `bool open(const CollectorSettings&)` (false when already open; discards stale ring contents; samples
   the first calibration point; opens the gate); `void close()` (closes the gate; keeps rings for one
   last drain); `bool is_open() const noexcept`;
   `void drain(DrainBatch& out)` (moves every ring's events, drops and fill into `out`, takes a
@@ -203,28 +203,28 @@ depends on `events`.
 - No condition variable and no notification: the consumer of P2 polls with an interval it adapts
   from `ThreadDrain::fill` (1 ms when a ring is over half full, doubling to 1 s when idle).
 
-- [ ] Tests: `Small_Hub.OpensOnceAndRefusesASecondOpen`; `Small_Hub.ClosedHubRecordsNothing`
-      (`recording()` false, `ring()` registers nothing); `Small_Hub.ADrainReturnsWhatThisThreadPushed`;
-      `Small_Hub.DropsReachTheDrain` (ring of 64, 70 pushes, `dropped == 6`);
-      `Small_Hub.OpenDiscardsEventsFromBefore`; `Medium_Hub.EachThreadHasItsOwnRing` (4 threads, 1,000
-      events each, 4 `ThreadDrain`s with 1,000 each); `Medium_Hub.AnExitedThreadIsDrainedThenFreed`
+- [ ] Tests: `Small_Collector.OpensOnceAndRefusesASecondOpen`; `Small_Collector.ClosedCollectorRecordsNothing`
+      (`recording()` false, `ring()` registers nothing); `Small_Collector.ADrainReturnsWhatThisThreadPushed`;
+      `Small_Collector.DropsReachTheDrain` (ring of 64, 70 pushes, `dropped == 6`);
+      `Small_Collector.OpenDiscardsEventsFromBefore`; `Medium_Collector.EachThreadHasItsOwnRing` (4 threads, 1,000
+      events each, 4 `ThreadDrain`s with 1,000 each); `Medium_Collector.AnExitedThreadIsDrainedThenFreed`
       (thread pushes 10, joins; first drain has its 10 with `retired` true, second drain lacks it);
-      `Small_Hub.NamedThreadKeepsItsName`; `Small_Hub.CalibrationPointsAdvance`.
+      `Small_Collector.NamedThreadKeepsItsName`; `Small_Collector.CalibrationPointsAdvance`.
       Each test opens in its fixture and closes plus drains in teardown, so no test sees another's events.
-- [ ] Build, test, README, commit `feat(hub): gate recording and hand every ring to one consumer`.
+- [ ] Build, test, README, commit `feat(collector): gate recording and hand every ring to one consumer`.
 
 ### Task 6: `zones` (capture)
 
 **Files:** `modules/capture/zones/` with `include/SushiProfiler/zones/{zone.hpp,records.hpp,macros.hpp}`,
 header only; tests `tests/capture/zones/{test_zone.cpp,test_records.cpp,test_macros.cpp}`; tier
-`zones capture`; depends on `hub`.
+`zones capture`; depends on `collector`.
 
 **Interfaces (produces):**
 - `template <bool Compiled> class ScopedZone;` The `false` specialisation is empty and its
   constructor takes and ignores the handle, so a compiled-out zone emits no code.
   `ScopedZone<true>(SiteHandle&)` and `ScopedZone<true>(SiteHandle&, NameID dynamic_name)`: if
-  `Hub::recording()` and the site is enabled, read `Hub::now()`; the destructor pushes one `Zone`
-  event if it started and the hub still records.
+  `Collector::recording()` and the site is enabled, read `Collector::now()`; the destructor pushes one `Zone`
+  event if it started and the collector still records.
 - Free functions, each a no-op while the gate is closed or the site disabled:
   `record_counter(SiteHandle&, double)`, `record_value(SiteHandle&, double)`, `record_instant(SiteHandle&)`,
   `record_instant_at(SiteHandle&, std::uint64_t steady_ns)`, `record_zone_at(SiteHandle&, std::uint64_t begin_ns, std::uint64_t end_ns)`,
@@ -244,7 +244,7 @@ header only; tests `tests/capture/zones/{test_zone.cpp,test_records.cpp,test_mac
 
 - [ ] Tests: `Small_Zone.WritesOneCompleteEvent` (kind Zone, begin < end, site's name and line
       read back through `sites().info`); `Small_Zone.NestedZonesNestByTime`; `Small_Zone.ADisabledSiteWritesNothing`;
-      `Small_Zone.AZoneClosedAfterTheHubClosesWritesNothing`; `Small_Zone.ACompiledOutZoneIsEmpty`
+      `Small_Zone.AZoneClosedAfterTheCollectorClosesWritesNothing`; `Small_Zone.ACompiledOutZoneIsEmpty`
       (`std::is_empty_v<ScopedZone<false>>`, and level 3 under compiled level 1 writes nothing);
       `Small_Records.ACounterKeepsItsOperationAndValue`; `Small_Records.AnExternalZoneKeepsTheCallersTimes`
       (begin 1, end 5'000'000'001 steady ns); `Small_Records.FlowsCarryTheirId`;
@@ -269,17 +269,17 @@ guard: `try_lock` first; on failure opens a zone at a `SiteRole::LockWait` site 
 
 **Files:** `modules/capture/periods/` with `include/SushiProfiler/periods/period_timeline.hpp`,
 `source/period_timeline.cpp`; tests `tests/capture/periods/test_period_timeline.cpp`; tier
-`periods capture`; depends on `hub`.
+`periods capture`; depends on `collector`.
 
 **Interfaces (produces):** `class PeriodTimeline`: `explicit PeriodTimeline(std::string_view name, std::uint64_t budget_ns = 0)`;
 `std::uint64_t mark() noexcept` and `std::uint64_t mark(std::uint64_t budget_ns) noexcept` (push a
 `PeriodMark`, return the index of the period that opens: 0, 1, 2 ...; the index advances even
-while the hub is closed, so sources and periods agree); `std::uint64_t current() const noexcept`
+while the collector is closed, so sources and periods agree); `std::uint64_t current() const noexcept`
 (relaxed load); `void tag(std::string_view key, std::string_view value)` (interns both, pushes a
 `PeriodTag`; not for a real-time thread); `NameID id() const noexcept`; `std::string_view name() const`.
 
 - [ ] Tests: `Small_PeriodTimeline.MarksCountFromZero`; `Small_PeriodTimeline.AMarkCarriesItsBudget`;
-      `Small_PeriodTimeline.TheIndexAdvancesWhileTheHubIsClosed`; `Small_PeriodTimeline.ATagCarriesKeyAndValue`;
+      `Small_PeriodTimeline.TheIndexAdvancesWhileTheCollectorIsClosed`; `Small_PeriodTimeline.ATagCarriesKeyAndValue`;
       `Small_PeriodTimeline.TwoTimelinesKeepTheirOwnIndex`.
 - [ ] Build, test, README, commit `feat(periods): mark periods on named timelines`.
 
@@ -308,7 +308,7 @@ ctest); `cli/sushiprofiler/` (`build --benchmarks/--no-benchmarks`, `bench` runn
 ### Task 10: Close P1
 
 - [ ] `docs/architecture/ARCHITECTURE.md` describes the two tiers and their modules as built;
-      `docs/reference/GLOSSARY.md` gains Hub, Gate, Lane, Flow; `docs/reference/CHANGELOG.md` one
+      `docs/reference/GLOSSARY.md` gains Collector, Gate, Lane, Flow; `docs/reference/CHANGELOG.md` one
       line per commit; module READMEs complete; `ENGINE_CHANGES.md` gains the MSVC TSC row and the
       polling consumer row; design status P1 `built`; `REMAINING_WORK.md` drops RW-1.
 - [ ] `write_license_block.py --report` 0 pending; `check_all` clean; full `sp test` green.

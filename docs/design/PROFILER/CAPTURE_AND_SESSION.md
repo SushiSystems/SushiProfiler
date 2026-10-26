@@ -14,7 +14,7 @@ nothing: every failure returns a status, and drops are counted in the record. Na
 | foundation | `events` | `TraceEvent`, `DeviceSpan`, `Counter`, `AttributeBlock`, ids |
 | capture | `sites` | `ZoneSite`, the site registry, the per-site enable bytes, name interning |
 | capture | `rings` | `ThreadRing`, thread registration and retirement |
-| capture | `hub` | The process-wide gate and the drainer handoff (see "The hot path" below) |
+| capture | `collector` | The process-wide gate and the drainer handoff (see "The hot path" below) |
 | capture | `zones` | `Zone`, `SP_ZONE`, `SP_ZONE_NAMED`, `SP_COUNTER`, `SP_THREAD_NAME` |
 | capture | `lock_wait` | `ContendedLock` and `SP_ZONE_LOCK_WAIT`: a lock that opens a zone only when it waits |
 | capture | `periods` | `PeriodTimeline` and `mark_period` |
@@ -170,11 +170,11 @@ path from a file. Stream writers are the only writers that run inside the sessio
   engine's fold arithmetic on 64-bit offsets, asks each source for that period's spans and
   counters, and appends the period to the record. Writers that stream (the Chrome trace) write
   each period as it closes, so memory holds one window, not the run.
-- The consumer polls `Hub::drain` at an interval it adapts from each ring's fill: 1 ms while a
+- The consumer polls `Collector::drain` at an interval it adapts from each ring's fill: 1 ms while a
   ring is over half full, doubling after each quiet drain up to 1 s, so an idle session wakes
   under once a second and a busy one drains before a ring fills.
-- Dependencies arrive through `start`; the only process-wide state is the hub, because a macro at
-  any call site must reach it.
+- Dependencies arrive through `start`; the only process-wide state is the collector, because a
+  macro at any call site must reach it.
 
 ## Sources
 

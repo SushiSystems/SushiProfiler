@@ -58,7 +58,7 @@ The tiers, lowest first, each depending only on those before it:
 | Tier | Holds |
 | --- | --- |
 | foundation | The clock and its calibration; the event types |
-| capture | Sites and their registry; per-thread rings; the process-wide hub; zones and the other event kinds; periods |
+| capture | Sites and their registry; per-thread rings; the process-wide collector; zones and the other event kinds; periods |
 | record | The run record; statistics; analyses and their runner; record writers; comparison |
 | session | Configuration; the registry of parts; the window; sources; environment contributors; the fold; the consumer thread; stream writers; `Session` |
 | tools | The program behind `sp show`, `sp compare`, `sp check` and `sp validate` |
@@ -91,7 +91,7 @@ Performance budget, measured by benchmarks in this repository before P2 closes:
 
 | Id | Phase | State |
 | --- | --- | --- |
-| P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `hub`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | planned |
+| P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | planned |
 | P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp show / compare / check / validate` | planned |
 | P3 | SushiRuntime: the device source, the node table, the runtime's own zones | planned |
 | P4 | SushiBLAS: cost rules, `device_ceilings`, `roofline`, the benchmark harness on a timeline | planned |

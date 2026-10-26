@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-10-26 — collector: Added the collector, which opens and closes recording, gives each thread its ring and hands every ring to one consumer, draining an exited thread's ring once before freeing it (`modules/capture/collector/`).
+- 2026-10-26 — build: Allowed a module to depend on another of its tier along an edge `SUSHIPROFILER_SAME_TIER_EDGES` lists (`cmake/SushiProfilerTiers.cmake`).
 - 2026-10-26 — rings: Added each thread's lock-free event ring, which drops and counts an event when full instead of blocking (`modules/capture/rings/`).
 - 2026-10-26 — umbrella: Moved the umbrella module to the top tier, so it includes every module without an upward include (`modules/tools/umbrella/`).
 - 2026-10-26 — sites: Added the site registry, which gives each recording site one id on first use and turns sites on and off by level and group at run time, and the name table (`modules/capture/sites/`).
