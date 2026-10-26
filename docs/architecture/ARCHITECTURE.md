@@ -12,7 +12,7 @@ Modules sit in tiers, lowest first. `cmake/SushiProfilerTiers.cmake` states the 
 
 | Tier | Modules today |
 | --- | --- |
-| `foundation` | `version`, `clock`, `events` |
+| `foundation` | `version`, `clock`, `events`, `json` |
 | `capture` | `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods` |
 | `record` | none |
 | `session` | none |

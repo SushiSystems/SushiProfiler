@@ -35,6 +35,9 @@
 #include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/collector/collector_settings.hpp>
+#include <SushiProfiler/json/json_reader.hpp>
+#include <SushiProfiler/json/json_value.hpp>
+#include <SushiProfiler/json/json_writer.hpp>
 #include <SushiProfiler/lock_wait/contended_lock.hpp>
 #include <SushiProfiler/periods/period_timeline.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>

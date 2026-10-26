@@ -19,6 +19,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     version     foundation
     clock       foundation
     events      foundation
+    json        foundation
     sites       capture
     rings       capture
     collector   capture
