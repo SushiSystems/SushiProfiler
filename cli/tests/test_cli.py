@@ -25,7 +25,7 @@ _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 def calls(monkeypatch) -> list[tuple[str, tuple, dict]]:
     """Returns the calls the commands make into the project service, which does nothing."""
     recorded: list[tuple[str, tuple, dict]] = []
-    for name in ("build", "test", "check"):
+    for name in ("build", "test", "bench", "check"):
         def record(*args, _name=name, **kwargs):
             recorded.append((_name, args, kwargs))
             return 0
@@ -33,11 +33,11 @@ def calls(monkeypatch) -> list[tuple[str, tuple, dict]]:
     return recorded
 
 
-def test_help_lists_the_three_commands():
+def test_help_lists_the_four_commands():
     result = _RUNNER.invoke(cli.app, ["--help"])
 
     assert result.exit_code == 0
-    for command in ("build", "test", "check"):
+    for command in ("build", "test", "bench", "check"):
         assert command in result.output
 
 
@@ -48,7 +48,23 @@ def test_build_passes_type_sanitizer_and_defines(calls):
     assert result.exit_code == 0
     (name, args, kwargs), = calls
     assert name == "build" and args == (BuildType.RELEASE,)
-    assert kwargs == {"clean": False, "defines": ["A=1"], "sanitizer": Sanitizer.ADDRESS}
+    assert kwargs == {"clean": False, "defines": ["A=1"], "sanitizer": Sanitizer.ADDRESS,
+                      "benchmarks": None}
+
+
+def test_build_passes_benchmarks(calls):
+    result = _RUNNER.invoke(cli.app, ["build", "--benchmarks"])
+
+    assert result.exit_code == 0
+    (name, args, kwargs), = calls
+    assert name == "build" and kwargs["benchmarks"] is True
+
+
+def test_bench_passes_the_type(calls):
+    result = _RUNNER.invoke(cli.app, ["bench", "--type", "release"])
+
+    assert result.exit_code == 0
+    assert calls == [("bench", (BuildType.RELEASE,), {})]
 
 
 def test_test_passes_labels_jobs_filter_and_package(calls):

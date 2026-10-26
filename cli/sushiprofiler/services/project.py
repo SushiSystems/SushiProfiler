@@ -3,10 +3,10 @@
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
 # Commercial use requires a licence from Sushi Systems.
-"""Drives SushiProfiler's build, test and check steps.
+"""Drives SushiProfiler's build, test, bench and check steps.
 
 Holds the build policy: the build tree of each sanitizer, the test sizes and their CTest labels,
-the install the package test builds against, and the checkers. cmake and ctest run through
+the benchmark programs, the install the package test builds against, and the checkers. cmake and ctest run through
 ``sushicore.cmake_driver.CMakeDriver`` under the environment ``sushiprofiler.env`` assembles.
 """
 
@@ -61,6 +61,10 @@ K_BUILD_FOLDER = {None: "build", Sanitizer.ADDRESS: "build-asan", Sanitizer.THRE
 
 K_PACKAGE_SOURCE = Path("tests", "package")
 
+K_BENCHMARKS_VARIABLE = "SP_BUILD_BENCHMARKS"
+K_BENCHMARK_FOLDER = "benchmarks"
+K_BENCHMARK_PREFIX = "sp_bench_"
+
 K_CHECKERS = (
     Path("tools", "documentation", "check_source_comments.py"),
     Path("tools", "documentation", "check_docs_layout.py"),
@@ -100,6 +104,26 @@ def resolve_build_type(requested: BuildType | None, tree: Path) -> BuildType:
     return BuildType.DEBUG
 
 
+def benchmarks_defines(benchmarks: bool | None) -> list[str]:
+    """Returns the cache variable that switches the benchmark programs on or off, as `VAR=VALUE`.
+
+    Args:
+        benchmarks: True builds them, False stops building them, None leaves the cached value.
+    """
+    if benchmarks is None:
+        return []
+    return [f"{K_BENCHMARKS_VARIABLE}={'ON' if benchmarks else 'OFF'}"]
+
+
+def benchmark_programs(folder: Path) -> list[Path]:
+    """Returns the benchmark programs in *folder*, sorted by name."""
+    if not folder.is_dir():
+        return []
+    return sorted(path for path in folder.iterdir()
+                  if path.is_file() and path.name.startswith(K_BENCHMARK_PREFIX)
+                  and path.suffix in ("", ".exe"))
+
+
 def _compiler_arguments(cfg: Config) -> list[str]:
     """Returns the generator and compiler arguments of a configure."""
     arguments: list[str] = []
@@ -130,14 +154,18 @@ def _needs_configure(cfg: Config, tree: Path, build_type: BuildType,
 
 
 def build(build_type: BuildType | None = None, clean: bool = False,
-          defines: Sequence[str] = (), sanitizer: Sanitizer | None = None) -> int:
+          defines: Sequence[str] = (), sanitizer: Sanitizer | None = None,
+          benchmarks: bool | None = None) -> int:
     """Configures the tree of *sanitizer* when it needs it or *defines* are given, then compiles it.
 
     Args:
         clean: Removes the tree first.
         defines: `VAR=VALUE` cache variables; any of them reconfigures a configured tree.
         sanitizer: Builds in that sanitizer's own tree, build-asan/ or build-tsan/.
+        benchmarks: True builds the benchmark programs, False stops building them, None keeps
+            what the tree has.
     """
+    defines = [*defines, *benchmarks_defines(benchmarks)]
     root = find_project_root()
     cfg = load_config()
     tree = build_dir(root, sanitizer)
@@ -209,6 +237,29 @@ def _test_package(root: Path, cfg: Config, tree: Path, env: dict[str, str], conf
     if rc != 0:
         return rc
     return _DRIVER.ctest_run(cfg, consumer, env, config=config)
+
+
+def bench(build_type: BuildType | None = None) -> int:
+    """Runs every built benchmark program of the plain tree in name order.
+
+    Returns:
+        The first non-zero exit code among the programs, or 1 when the tree has none.
+    """
+    root = find_project_root()
+    cfg = load_config()
+    tree = build_dir(root, None)
+    config = K_CMAKE_BUILD_TYPE[resolve_build_type(build_type, tree)]
+    programs = benchmark_programs(tree / K_BENCHMARK_FOLDER / config)
+    if not programs:
+        console.error(f"no benchmark program in {tree / K_BENCHMARK_FOLDER / config}; "
+                      f"run {PROFILE.program} build --benchmarks first")
+        return 1
+    env = load_build_env(cfg, tree)
+    code = 0
+    for program in programs:
+        console.header(program.name)
+        code = code or _RUNNER.run([str(program)], root, env)
+    return code
 
 
 def check(report: bool = False, rule: str | None = None) -> int:

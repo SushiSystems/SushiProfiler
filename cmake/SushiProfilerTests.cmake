@@ -70,13 +70,33 @@ function(sushiprofiler_register_sized_tests program module)
     endforeach()
 endfunction()
 
-# sushiprofiler_add_module_tests(MODULE <module> SOURCES <file>...)
+# Builds the benchmark program of <source>, named sp_bench_<name> for benchmark_<name>.cpp, into
+# benchmarks/<config>/ of the build tree. It carries the label benchmark and is never registered
+# with ctest, because a benchmark measures and decides nothing.
+function(sushiprofiler_add_benchmark source)
+    get_filename_component(file_name "${source}" NAME_WE)
+    if(NOT file_name MATCHES "^benchmark_(.+)$")
+        message(FATAL_ERROR "sushiprofiler_add_benchmark(): '${source}' is not benchmark_<name>.cpp.")
+    endif()
+    set(program "sp_bench_${CMAKE_MATCH_1}")
+    add_executable(${program} "${CMAKE_CURRENT_SOURCE_DIR}/${source}")
+    target_link_libraries(${program} PRIVATE SushiProfiler::SushiProfiler)
+    target_include_directories(${program} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    sushiprofiler_apply_build_policy(${program})
+    sushiprofiler_copy_runtime_files(${program})
+    set_target_properties(${program} PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/benchmarks/$<CONFIG>"
+        LABELS benchmark)
+endfunction()
+
+# sushiprofiler_add_module_tests(MODULE <module> SOURCES <file>... [BENCHMARKS <file>...])
 #
 # Called from tests/<tier>/<module>/CMakeLists.txt, with paths relative to that folder. Builds
 # sp_<module>_tests against SushiProfiler::SushiProfiler, copies the DLL beside it, refuses a suite with
-# no size prefix, and registers every test with its size.
+# no size prefix, and registers every test with its size. With SP_BUILD_BENCHMARKS on, each
+# BENCHMARKS file becomes a benchmark program.
 function(sushiprofiler_add_module_tests)
-    cmake_parse_arguments(ARG "" "MODULE" "SOURCES" ${ARGN})
+    cmake_parse_arguments(ARG "" "MODULE" "SOURCES;BENCHMARKS" ${ARGN})
     if("${ARG_MODULE}" STREQUAL "" OR NOT ARG_SOURCES)
         message(FATAL_ERROR "sushiprofiler_add_module_tests(): MODULE and SOURCES are required.")
     endif()
@@ -106,4 +126,10 @@ function(sushiprofiler_add_module_tests)
     add_dependencies(${program} ${program}_sizes)
 
     sushiprofiler_register_sized_tests(${program} ${ARG_MODULE})
+
+    if(SP_BUILD_BENCHMARKS)
+        foreach(source IN LISTS ARG_BENCHMARKS)
+            sushiprofiler_add_benchmark("${source}")
+        endforeach()
+    endif()
 endfunction()

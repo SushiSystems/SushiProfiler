@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — cli: Added `sp build --benchmarks` and `sp bench`, which build and run the benchmark programs (`cli/sushiprofiler/`).
 - 2026-10-26 — build: Added `PRIVATE_DEPENDS` to `sushiprofiler_add_module`, for a module whose `source/` files alone include a dependency (`cmake/SushiProfilerModule.cmake`).
 - 2026-10-26 — periods: Added named period timelines, whose marks number periods from 0 whether or not the collector records and carry the index, a budget and tags (`modules/capture/periods/`).
 - 2026-10-26 — lock_wait: Added the contended lock guard, which records the time a lock waits only when another thread holds it (`modules/capture/lock_wait/`).

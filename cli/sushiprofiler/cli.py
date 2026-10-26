@@ -37,7 +37,7 @@ _help_group = help_group(console.current)
 app = typer.Typer(
     name=K_PROGRAM,
     cls=_help_group,
-    help="SushiProfiler developer CLI: build, test and check SushiProfiler.",
+    help="SushiProfiler developer CLI: build, test, bench and check SushiProfiler.",
     no_args_is_help=True,
     add_completion=False,
     rich_markup_mode="rich",
@@ -66,6 +66,7 @@ def _clean_option() -> Any:
     rich_help_panel=K_PANEL,
     epilog="sp build\n"
            "sp build --type release\n"
+           "sp build --benchmarks --type release  # Also build the benchmark programs\n"
            "sp build --sanitize address  # ASan and UBSan, in build-asan/",
 )
 def build(
@@ -75,10 +76,14 @@ def build(
         None, "--define", "-D", metavar="VAR=VALUE",
         help="Pass a CMake cache variable; a configured tree reconfigures. Repeatable."),
     sanitize: Optional[Sanitizer] = _sanitize_option(),
+    benchmarks: Optional[bool] = typer.Option(
+        None, "--benchmarks/--no-benchmarks",
+        help="Build the benchmark programs beside the tests, or stop building them. "
+             "When omitted the tree keeps its setting."),
 ) -> None:
     """Configure when needed, then build the library and the tests."""
     raise typer.Exit(project_service.build(type, clean=clean, defines=define or (),
-                                           sanitizer=sanitize))
+                                           sanitizer=sanitize, benchmarks=benchmarks))
 
 
 @app.command(
@@ -108,6 +113,21 @@ def test(
     """Build when needed, then run ctest over the sizes and the filter."""
     raise typer.Exit(project_service.test(type, label or (), clean=clean, filter=filter,
                                           sanitizer=sanitize, jobs=jobs, package=package))
+
+
+@app.command(
+    "bench",
+    rich_help_panel=K_PANEL,
+    epilog="sp build --benchmarks --type release\n"
+           "sp bench --type release  # Every benchmark program, in name order",
+)
+def bench(type: Optional[BuildType] = _type_option()) -> None:
+    """Run every built benchmark program.
+
+    A benchmark measures and does not pass or fail, so it is not a test. Build the programs
+    with sp build --benchmarks first.
+    """
+    raise typer.Exit(project_service.bench(type))
 
 
 @app.command(

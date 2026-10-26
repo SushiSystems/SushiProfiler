@@ -71,6 +71,45 @@ def test_build_with_a_sanitizer_uses_its_own_tree(project):
     assert "-DSP_SANITIZE=thread" in configure
 
 
+def test_build_with_benchmarks_switches_them_on_and_reconfigures(project):
+    project.configure_tree("Release")
+
+    assert project_service.build(benchmarks=True) == 0
+
+    configure = project.runner.commands[0]
+    assert _is_configure(configure) and _value_after(configure, "-D") == "SP_BUILD_BENCHMARKS=ON"
+
+
+def test_build_without_benchmarks_switches_them_off(project):
+    project.configure_tree("Release")
+
+    assert project_service.build(benchmarks=False) == 0
+
+    assert _value_after(project.runner.commands[0], "-D") == "SP_BUILD_BENCHMARKS=OFF"
+
+
+def test_bench_runs_every_benchmark_program_in_name_order(project):
+    project.configure_tree("Release")
+    folder = project.tree / "benchmarks" / "Release"
+    folder.mkdir(parents=True)
+    for name in ("sp_bench_zones.exe", "sp_bench_clock.exe", "sp_zones_tests.exe"):
+        (folder / name).write_text("", encoding="utf-8")
+
+    assert project_service.bench() == 0
+
+    assert [Path(command[0]).name for command in project.runner.commands] == [
+        "sp_bench_clock.exe", "sp_bench_zones.exe"]
+
+
+def test_bench_without_a_benchmark_program_fails_and_says_so(project):
+    project.configure_tree("Debug")
+
+    assert project_service.bench() == 1
+
+    (message,) = project.console.of("error")
+    assert "sp build --benchmarks" in message and project.runner.commands == []
+
+
 def test_test_passes_the_sizes_the_jobs_and_the_filter_to_ctest(project):
     project.configure_tree("Debug")
 
