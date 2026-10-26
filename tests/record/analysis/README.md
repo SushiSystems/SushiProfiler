@@ -59,3 +59,8 @@ and two active periods of 1000 ns. Times are queued, start and end:
   baseline, and a 10% cost against a baseline of 90, 100 and 110 ns.
 
 The bootstrap ends in the expected rows come from a Python reimplementation of the generator.
+
+- `test_period_breakdown.cpp`: a node takes the nearest grouped ancestor's group, else
+  `(ungrouped)`; groups come largest self time first; only the marking thread's roots count as
+  covered; uncovered time is 0 when zones overrun the period; every thread's totals sum its lanes;
+  the groups equal the `breakdown` rows of a one-period record.

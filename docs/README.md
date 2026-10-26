@@ -13,6 +13,8 @@ checks, and the record tool behind `sp record`.
 
 - [`guides/CLIENT_LIBRARY.md`](guides/CLIENT_LIBRARY.md): linking SushiProfiler from a library,
   registering its parts and what a source may rely on.
+- [`guides/LIVE_VIEW.md`](guides/LIVE_VIEW.md): reading the newest closed periods from a frame
+  loop while a session runs.
 
 ## Architecture
 

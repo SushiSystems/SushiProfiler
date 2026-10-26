@@ -129,3 +129,120 @@ TEST(Small_ProfilerConfig, RefusesValuesOfTheWrongKind)
     EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "enabled": "yes"})"),
               "enabled: a bool was expected, found a string");
 }
+
+TEST(Small_ProfilerConfig, ReadsActiveAll)
+{
+    const ConfigReadResult result =
+        read_profiler_config(R"({"sushiprofiler": 1, "window": {"warmup": 2, "active": "all"}})");
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    EXPECT_TRUE(result.config->window.active_all);
+    EXPECT_EQ(result.config->window.warmup, 2U);
+}
+
+TEST(Small_ProfilerConfig, AWholeActiveLeavesActiveAllOff)
+{
+    const ConfigReadResult result =
+        read_profiler_config(R"({"sushiprofiler": 1, "window": {"active": 5}})");
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    EXPECT_FALSE(result.config->window.active_all);
+    EXPECT_EQ(result.config->window.active, 5U);
+}
+
+TEST(Small_ProfilerConfig, RefusesAnActiveStringOtherThanAll)
+{
+    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "window": {"active": "every"}})"),
+              "window.active: a whole number or \"all\" was expected");
+}
+
+TEST(Small_ProfilerConfig, RefusesAllWithARepeatOfTwo)
+{
+    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "window": {"active": "all", "repeat": 2}})"),
+              "window.repeat: must be 1 when active is \"all\"");
+}
+
+TEST(Small_ProfilerConfig, AcceptsAllWithRepeatOne)
+{
+    const ConfigReadResult result = read_profiler_config(
+        R"({"sushiprofiler": 1, "window": {"active": "all", "repeat": 1}})");
+
+    EXPECT_TRUE(result.ok()) << result.error;
+}
+
+TEST(Small_ProfilerConfig, ReadsKeepPeriodsIncludingZeroAndLeavesItAbsentByDefault)
+{
+    const ConfigReadResult none = read_profiler_config(R"({"sushiprofiler": 1})");
+    const ConfigReadResult zero =
+        read_profiler_config(R"({"sushiprofiler": 1, "record": {"keep_periods": 0}})");
+    const ConfigReadResult many =
+        read_profiler_config(R"({"sushiprofiler": 1, "record": {"keep_periods": 300}})");
+
+    ASSERT_TRUE(none.ok() && zero.ok() && many.ok());
+    EXPECT_FALSE(none.config->record.keep_periods.has_value());
+    EXPECT_EQ(zero.config->record.keep_periods, 0U);
+    EXPECT_EQ(many.config->record.keep_periods, 300U);
+}
+
+TEST(Small_ProfilerConfig, ReadsTheLiveKeysAndKeepsTheirDefaults)
+{
+    const ConfigReadResult defaults = read_profiler_config(R"({"sushiprofiler": 1})");
+    const ConfigReadResult set = read_profiler_config(
+        R"({"sushiprofiler": 1, "live": {"history": 60, "max_runs": 0, "min_run_ns": 5,
+            "max_poll_ms": 8}})");
+
+    ASSERT_TRUE(defaults.ok() && set.ok()) << set.error;
+    EXPECT_EQ(defaults.config->live.history, 300U);
+    EXPECT_EQ(defaults.config->live.max_runs, 2048U);
+    EXPECT_EQ(defaults.config->live.min_run_ns, 1000U);
+    EXPECT_EQ(defaults.config->live.max_poll_ms, 4U);
+    EXPECT_EQ(set.config->live.history, 60U);
+    EXPECT_EQ(set.config->live.max_runs, 0U);
+    EXPECT_EQ(set.config->live.min_run_ns, 5U);
+    EXPECT_EQ(set.config->live.max_poll_ms, 8U);
+}
+
+TEST(Small_ProfilerConfig, RefusesALiveKeyOutOfRange)
+{
+    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "live": {"max_poll_ms": 0}})"),
+              "live.max_poll_ms: out of range 1..1000");
+    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "live": {"max_poll_ms": 1001}})"),
+              "live.max_poll_ms: out of range 1..1000");
+    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "live": {"history": 0}})"),
+              "live.history: out of range 1..65536");
+}
+
+TEST(Small_ProfilerConfig, ReadsAWriterEnabledFlagAndHidesItFromTheSettings)
+{
+    const ConfigReadResult result = read_profiler_config(
+        R"({"sushiprofiler": 1, "writers": {"chrome_trace": {"path": "t.json",
+            "enabled": false}, "record": {"path": "r.json"}}})");
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    ASSERT_EQ(result.config->writers.size(), 2U);
+    EXPECT_FALSE(result.config->writers[0].enabled);
+    EXPECT_EQ(result.config->writers[0].settings.find("enabled"), nullptr);
+    EXPECT_NE(result.config->writers[0].settings.find("path"), nullptr);
+    EXPECT_TRUE(result.config->writers[1].enabled);
+}
+
+TEST(Small_ProfilerConfig, RefusesAWriterEnabledFlagThatIsNotABool)
+{
+    EXPECT_FALSE(
+        read_profiler_config(R"({"sushiprofiler": 1, "writers": {"a": {"enabled": 1}}})").ok());
+}
+
+TEST(Small_ProfilerConfig, LeavesASourcesEnabledKeyInItsSettings)
+{
+    const ConfigReadResult result = read_profiler_config(
+        R"({"sushiprofiler": 1, "sources": {"device": {"enabled": false}}})");
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    EXPECT_NE(result.config->sources[0].settings.find("enabled"), nullptr);
+}
+
+TEST(Small_ProfilerConfig, RefusesAnUnknownRecordKey)
+{
+    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "record": {"keep": 3}})"),
+              "record: unknown key \"keep\"");
+}

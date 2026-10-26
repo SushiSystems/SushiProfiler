@@ -162,3 +162,11 @@
 
 /// @brief Puts the rest of the scope in lane @p lane_id.
 #define SP_LANE(lane_id) SP_LANE_AT(SP_PROFILE_LEVEL, lane_id)
+
+#if SP_PROFILE_LEVEL >= 1
+/// @brief Names the calling thread @p name, registering its ring first.
+#define SP_THREAD_NAME(name) ::SushiProfiler::Collector::set_thread_name(name)
+#else
+/// @brief Compiled out: names nothing and does not evaluate @p name.
+#define SP_THREAD_NAME(name) static_cast<void>(sizeof(name))
+#endif

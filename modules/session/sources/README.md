@@ -14,6 +14,11 @@ the record, in the namespace `SushiProfiler`. The module depends on `events`, `r
   once per closed period and `end` once at stop, all on the consumer thread. The
   `SourceContext&` that `begin` receives stays valid until `end` returns, and `collect` may call
   `intern`, `add_track` and `to_record_ns` on it without a lock.
+- `Source::max_delay_ns()` states, in nanoseconds, how long after a period ends the source can
+  still hand over work that started in it; the default is 0. A period closes once the larger of
+  the linger and every started source's delay has passed its end, so a device source that reads
+  back three frames late is collected whole. The session reads it after `begin` succeeds and
+  refuses a delay above 60 000 ms.
 - `SushiProfiler/sources/source_context.hpp`: `SourceContext` is what a starting source may add
   to the record. `intern` returns the record's id for a span name, attribute key or attribute
   value. `add_track` adds a named track, such as one device queue, and returns the same id for a
@@ -23,7 +28,9 @@ the record, in the namespace `SushiProfiler`. The module depends on `events`, `r
   period's `SpanTable`. It refuses and counts a span on an unknown track, with an unknown name or
   with times out of order (`queued_ns <= start_ns <= end_ns`), and an attribute on a missing row,
   on key 0 or an unknown key, with an unknown name value, or of another kind than its column.
-  Whatever it accepts is a record `read_record` accepts. `drop_late(count)` counts spans a source
+  `set_fact(name, value)` sets a named fact on the period the sink fills, replacing one of that
+  name, and returns false for an empty name or for a sink built without a facts vector, which
+  counts as a refusal. Whatever it accepts is a record `read_record` accepts. `drop_late(count)` counts spans a source
   dropped because their period had closed. The session adds `refused()` and `late()` to the
   record's `drops.spans_dropped`, which counts the whole run; a period has no count of its own.
 
@@ -32,6 +39,7 @@ and never its own copy of those words; `docs/design/PROFILER/CLIENTS.md` has the
 
 A source that receives its data on another thread, as SushiRuntime's does after each run, queues
 it and hands it over in `collect`. A span's period is the one whose steady span holds the work's
-start time. `consumer.linger_ms` is how long a closed period waits for late work.
+start time. `buffers.linger_ms` is how long a closed period waits for late work, and a source's
+`max_delay_ns` raises that wait for every period.
 
 The tests are in `tests/session/sources/`.

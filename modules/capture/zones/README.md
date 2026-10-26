@@ -26,6 +26,21 @@ level option:
 | `SP_FLOW_AT(compiled, level, name, kind, item)` | A flow point, `kind` one of `FlowBegin`, `FlowStep`, `FlowEnd` |
 | `SP_LANE_AT(compiled, lane_id)` | LaneBegin and LaneEnd around the rest of the scope |
 
+A counter or value whose name is built at run time takes the forms in
+`SushiProfiler/zones/named_macros.hpp`:
+
+| Macro | Records |
+| --- | --- |
+| `SP_COUNTER_NAMED_AT(compiled, level, name_expression, unit, op, value)` | A counter at the site of that name |
+| `SP_VALUE_NAMED_AT(compiled, level, name_expression, unit, value)` | A value at the site of that name |
+| `SP_COUNTER_NAMED(name_expression, unit, op, value)`, `SP_VALUE_NAMED(name_expression, unit, value)` | The same at `SP_PROFILE_LEVEL`, level 1 |
+
+The name expression is evaluated only while the collector records. Each distinct name becomes one
+site of a `DynamicSiteTable` (4096 names at most per role). A named record costs a shared lock
+and a map lookup beyond a static one, and the first use of a name allocates, so a real-time
+thread uses the static macros. `SP_THREAD_NAME(name)` in `macros.hpp` names the calling thread's
+ring, and is compiled out at level 0.
+
 A record of `level` above `compiled` is compiled out: a zone becomes an empty object whose
 constructor does nothing, and a one-shot record sits in a discarded `if constexpr` branch. A lane
 is compiled in when `compiled` is at least 1.
@@ -44,6 +59,8 @@ it defines it before the include: `SP_ZONE(name)`, `SP_ZONE_GROUP(name, group)`,
   writes LaneBegin and LaneEnd with the lane's interned name; its site is 0, so only the gate
   turns it off. `SiteSlot<bool>` is a `SiteHandle` when compiled in and the empty
   `CompiledOutHandle` when out.
+- `named_records.hpp`: `record_counter_named` and `record_value_named`, which the named macros
+  call; a record that cannot allocate, or that finds its table full, is dropped.
 - `records.hpp`: `record_counter`, `record_value`, `record_instant`, `record_flow`, and two that
   take the caller's steady-clock times, `record_instant_at` and `record_zone_at`, for spans a
   device or another clock measured. `record_zone_at` takes an optional interned name.

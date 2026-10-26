@@ -21,7 +21,7 @@
 
 /**
  * @file benchmark_zones.cpp
- * @brief Measures a zone compiled out, gated off, disabled and recording, a counter and the clocks.
+ * @brief Measures a zone compiled out, gated off, disabled and recording, counters and the clocks.
  * @author Mustafa Garip
  * @see tests/capture/zones/README.md
  */
@@ -29,6 +29,7 @@
 #include <SushiProfiler/clock/trace_clock.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/zones/macros.hpp>
+#include <SushiProfiler/zones/named_macros.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -126,6 +127,10 @@ int main()
     }));
     report("counter_recording", median_nanoseconds([](std::uint64_t iteration) {
         SP_COUNTER_AT(3, 1, "counter", "", Add, static_cast<double>(iteration));
+    }));
+    // Outside the 25 ns recording row: a shared lock and a map lookup per record.
+    report("counter_named_recording", median_nanoseconds([](std::uint64_t iteration) {
+        SP_COUNTER_NAMED_AT(3, 1, "named_counter", "", Add, static_cast<double>(iteration));
     }));
     report("clock_now", median_nanoseconds([](std::uint64_t) {
         g_sink = SushiProfiler::TraceClock::now();

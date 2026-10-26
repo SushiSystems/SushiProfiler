@@ -39,9 +39,6 @@
 
 namespace SushiProfiler::Detail
 {
-    /// @brief The group a zone with no group of its own, under no grouped parent, falls in.
-    inline constexpr const char* K_UNGROUPED = "(ungrouped)";
-
     /// @brief The label of the time no root zone covered.
     inline constexpr const char* K_UNCOVERED_LABEL = "(uncovered)";
 

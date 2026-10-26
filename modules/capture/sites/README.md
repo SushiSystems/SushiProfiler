@@ -18,6 +18,14 @@ depends on `events`.
 - `SushiProfiler/sites/name_table.hpp`: `NameTable` interns run-time strings into `NameID`s,
   from 1, never freed; empty text is 0.
 
+- `SushiProfiler/sites/dynamic_site_table.hpp`: `DynamicSiteTable` gives each counter or value
+  name built at run time one site, so the record format needs no name field on a sample.
+  `handle(name, unit, op, level)` returns one stable `SiteHandle*` per name, made on first use
+  under a unique lock and found afterwards under a shared lock that allocates nothing. The first
+  unit, operation and level of a name win. A table holds `K_MAX_NAMES`, 4096 names; a later name
+  returns null and `refused()` counts it. `dynamic_counter_sites()` and `dynamic_value_sites()`
+  are the process's two tables, one per role.
+
 The filter keeps a site when its level is at most the filter's and either the filter names no
 group, the site has no group, or its group is named. An ungrouped site's group is inherited from
 the zone around it, which only the fold knows, so the group filter does not remove it.

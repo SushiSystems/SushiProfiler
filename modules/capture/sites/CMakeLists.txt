@@ -7,6 +7,7 @@
 sushiprofiler_add_module(
     NAME sites TIER capture
     SOURCES
+        dynamic_site_table.cpp
         name_table.cpp
         site_registry.cpp
     DEPENDS version events)

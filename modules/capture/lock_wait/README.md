@@ -14,4 +14,11 @@ wait alone, not the time the lock is held.
 `LockWait` in the group `Lock wait`, level 1; `compiled` below 1 leaves a plain lock.
 `SP_LOCK_WAIT(name, mutex)` takes `SP_PROFILE_LEVEL`.
 
+`SushiProfiler/lock_wait/named_lock_wait.hpp` declares `SP_LOCK_WAIT_NAMED_AT(compiled, lock, name,
+mutex)` and `SP_LOCK_WAIT_NAMED(lock, name, mutex)`. They declare a non-const
+`std::unique_lock<Mutex> lock` and take it with `lock_with_wait`, which tries first and opens the
+zone only when the try fails, so `std::condition_variable::wait` accepts the lock. The zone
+measures the first acquisition only: a re-lock inside `std::condition_variable::wait` is not
+timed.
+
 The tests are in `tests/capture/lock_wait/`.

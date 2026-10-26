@@ -11,9 +11,19 @@ destroyed, so a thread that exits after `main` returns still retires into it.
   retired rings, takes the first calibration point and opens the gate; a second `open` returns
   false. `close()` closes the gate and leaves the rings for one more drain.
 - The session and the gate. `open` starts a session and `close` ends it; `is_open` says whether
-  one runs. Inside it, `pause` closes the gate and `resume` opens it again without discarding
-  what the rings hold, so a capture window can skip periods; `resume` does nothing while no
-  session is open.
+  one runs. Two reasons close the gate inside it, and the gate is open only while neither holds.
+  The window's reason is `pause` and `resume`: `pause` closes the zone gate and the period marks,
+  `resume` opens them again, without discarding what the rings hold, so a capture window can skip
+  periods. The caller's reason is `hold` and `release`: `hold` closes the zone gate but leaves
+  `marking()` true, so period marks are still written and a paused run keeps its period
+  boundaries; the window's next `resume` cannot undo a hold. `resume`, `hold` and `release` do
+  nothing while no session is open, and `close` clears a hold. `Collector::marking()` is one
+  relaxed load, and `Collector::mark_ring()` is `ring()` for a period mark: it registers the
+  calling thread while marks are written, even when the gate is held.
+- Sources. `Collector::sources_wanted()` is one relaxed load that a source reads to pay for
+  device timing only while a session wants it. The session sets it with `want_sources`: true
+  after its sources began, false while the session is paused, true again on resume, and false
+  before its sources end.
 - The clock. `Collector::now()` stamps events with TSC ticks when the counter is invariant and with
   steady nanoseconds otherwise; the collector chooses once, and `DrainBatch::ticks_are_tsc` says
   which.

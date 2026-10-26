@@ -8,3 +8,6 @@
   with an unknown name, ending before they start or queued after they start are refused and
   counted; spans a source drops as late are counted apart from refused ones; attributes on a missing row, key 0, an unknown key, of the wrong kind or with an
   unknown name value are refused and counted.
+- `Source::max_delay_ns` is 0 unless a source overrides it. `SpanSink::set_fact` sets and
+  replaces a fact on the period, refuses an empty name, and refuses every call on a sink built
+  without facts.

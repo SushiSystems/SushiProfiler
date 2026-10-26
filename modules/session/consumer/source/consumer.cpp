@@ -34,15 +34,28 @@ namespace SushiProfiler
 {
     std::chrono::milliseconds next_poll(std::chrono::milliseconds current, double fullest) noexcept
     {
+        return next_poll(current, fullest, K_SLOWEST_POLL);
+    }
+
+    std::chrono::milliseconds next_poll(std::chrono::milliseconds current, double fullest,
+                                        std::chrono::milliseconds slowest) noexcept
+    {
         if (fullest > 0.5)
             return K_FASTEST_POLL;
         if (fullest >= 0.25)
-            return std::clamp(current, K_FASTEST_POLL, K_SLOWEST_POLL);
-        return std::min(current * 2, K_SLOWEST_POLL);
+            return std::clamp(current, K_FASTEST_POLL, slowest);
+        return std::min(current * 2, slowest);
     }
 
     Consumer::Consumer(Collector& collector, PeriodAssembler& assembler) noexcept
         : collector_(collector), assembler_(assembler)
+    {
+
+    }
+
+    Consumer::Consumer(Collector& collector, PeriodAssembler& assembler, const LiveChannel& live,
+                       std::chrono::milliseconds live_slowest) noexcept
+        : collector_(collector), assembler_(assembler), live_(&live), live_slowest_(live_slowest)
     {
 
     }
@@ -77,16 +90,20 @@ namespace SushiProfiler
     {
         std::chrono::milliseconds wait = K_FASTEST_POLL;
         std::unique_lock<std::mutex> lock(mutex_);
-        const auto stopping = [this]
+        const auto stopping_or_woken = [this]
         {
-            return stopping_;
+            return stopping_ || woken_;
         };
-        while (!wake_.wait_for(lock, wait, stopping))
+        while (true)
         {
+            wake_.wait_for(lock, wait, stopping_or_woken);
+            if (stopping_)
+                break;
+            woken_ = false;
             lock.unlock();
             const double fullest = drain_once();
             lock.lock();
-            wait = next_poll(wait, fullest);
+            wait = next_poll(wait, fullest, slowest_poll());
         }
         lock.unlock();
         static_cast<void>(drain_once());
@@ -96,6 +113,22 @@ namespace SushiProfiler
     std::uint64_t Consumer::drains() const noexcept
     {
         return drains_.load(std::memory_order_relaxed);
+    }
+
+    void Consumer::wake()
+    {
+        {
+            const std::lock_guard<std::mutex> lock(mutex_);
+            woken_ = true;
+        }
+        wake_.notify_all();
+    }
+
+    std::chrono::milliseconds Consumer::slowest_poll() const noexcept
+    {
+        if (live_ != nullptr && live_->watched())
+            return std::min(live_slowest_, K_SLOWEST_POLL);
+        return K_SLOWEST_POLL;
     }
 
     double Consumer::drain_once()

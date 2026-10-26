@@ -10,6 +10,8 @@ sushiprofiler_add_module_tests(
         allocation_counter.cpp
         test_admission.cpp
         test_macros.cpp
+        test_named_macros.cpp
+        test_named_records.cpp
         test_records.cpp
         test_zone.cpp
     BENCHMARKS

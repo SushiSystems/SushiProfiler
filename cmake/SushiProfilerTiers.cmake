@@ -38,6 +38,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     sources     session
     environment session
     fold        session
+    live        session
     stream_writers session
     registry    session
     consumer    session
@@ -76,11 +77,13 @@ set(SUSHIPROFILER_SAME_TIER_EDGES
     registry       sources
     registry       stream_writers
     consumer       fold
+    consumer       live
     consumer       sources
     consumer       stream_writers
     consumer       window
     session        config
     session        consumer
+    session        live
     session        environment
     session        registry
     session        sources

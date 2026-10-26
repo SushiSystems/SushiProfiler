@@ -136,3 +136,45 @@ TEST_F(Small_Window, WritesTheRecordedMarksAndTheOneAfter)
     EXPECT_EQ(drained_marks(), (std::vector<std::uint64_t>{2U, 3U, 4U, 5U}));
     EXPECT_FALSE(Collector::recording());
 }
+
+TEST(Small_WindowPhases, ActiveAllRecordsEveryPeriodAfterWarmup)
+{
+    WindowSchedule schedule;
+    schedule.warmup = 3U;
+    schedule.active_all = true;
+    const Window window(schedule);
+
+    for (std::uint64_t index = 3U; index < 10'000'000U; index += 99'991U)
+        EXPECT_EQ(window.phase_of(index), WindowPhase::Active);
+    EXPECT_EQ(window.phase_of(std::uint64_t{1} << 40U), WindowPhase::Active);
+}
+
+TEST(Small_WindowPhases, ActiveAllAppliesSkipWaitAndWarmupOnce)
+{
+    WindowSchedule schedule;
+    schedule.skip = 1U;
+    schedule.wait = 1U;
+    schedule.warmup = 2U;
+    schedule.active_all = true;
+    const Window window(schedule);
+
+    EXPECT_EQ(window.phase_of(0U), WindowPhase::Skipped);
+    EXPECT_EQ(window.phase_of(1U), WindowPhase::Waiting);
+    EXPECT_EQ(window.phase_of(2U), WindowPhase::Warmup);
+    EXPECT_EQ(window.phase_of(3U), WindowPhase::Warmup);
+    EXPECT_EQ(window.phase_of(4U), WindowPhase::Active);
+    EXPECT_EQ(window.phase_of(5U), WindowPhase::Active);
+    EXPECT_TRUE(window.records(2U));
+    EXPECT_FALSE(window.records(1U));
+}
+
+TEST(Small_WindowPhases, ActiveAllRecordsFromTheFirstPeriodWithNoWarmup)
+{
+    WindowSchedule schedule;
+    schedule.warmup = 0U;
+    schedule.active_all = true;
+    const Window window(schedule);
+
+    EXPECT_EQ(window.phase_of(0U), WindowPhase::Active);
+    EXPECT_TRUE(window.records(0U));
+}

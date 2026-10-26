@@ -137,3 +137,57 @@ TEST(Small_Source, ASourceThatCannotStartSaysWhy)
     EXPECT_EQ(status.error, "no device");
     EXPECT_TRUE(tracks.empty());
 }
+
+TEST(Small_Source, ASourceStatesNoDelayByDefault)
+{
+    QueueSource source(true);
+
+    EXPECT_EQ(static_cast<const Source&>(source).max_delay_ns(), 0U);
+}
+
+namespace
+{
+    /// @brief A source that states a 50 ms delay.
+    class LateSource final : public Source
+    {
+        public:
+            /// @brief Returns `test.late`.
+            [[nodiscard]] std::string_view name() const noexcept override
+            {
+                return "test.late";
+            }
+
+            /// @brief Starts.
+            [[nodiscard]] SourceStatus begin(SourceContext& context) override
+            {
+                static_cast<void>(context);
+                return SourceStatus{};
+            }
+
+            /// @brief Returns 50 ms.
+            [[nodiscard]] std::uint64_t max_delay_ns() const noexcept override
+            {
+                return 50'000'000U;
+            }
+
+            /// @brief Adds nothing.
+            void collect(const PeriodSpan& period, SpanSink& sink) override
+            {
+                static_cast<void>(period);
+                static_cast<void>(sink);
+            }
+
+            /// @brief Ends.
+            void end() override
+            {
+
+            }
+    };
+} // namespace
+
+TEST(Small_Source, AnOverridingSourceStatesItsDelay)
+{
+    LateSource source;
+
+    EXPECT_EQ(static_cast<const Source&>(source).max_delay_ns(), 50'000'000U);
+}

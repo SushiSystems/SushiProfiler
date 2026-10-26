@@ -28,6 +28,8 @@
 
 #include <SushiProfiler/consumer/consumer.hpp>
 
+#include "assembly_rig.hpp"
+
 #include <chrono>
 #include <cstdint>
 #include <cstdio>
@@ -59,8 +61,9 @@ int main()
     SushiProfiler::AssemblySettings settings;
     settings.origin = collector.first_point();
     settings.run_timeline = collector.names().intern("run");
+    SushiProfilerTests::AssemblyRig rig;
     SushiProfiler::PeriodAssembler assembler(settings, record, collector.names(),
-                                             collector.sites(), {}, {});
+                                             collector.sites(), {}, rig.parts());
     SushiProfiler::Consumer consumer(collector, assembler);
 
     consumer.start();

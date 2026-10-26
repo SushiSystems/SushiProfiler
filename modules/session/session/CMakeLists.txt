@@ -8,6 +8,6 @@ sushiprofiler_add_module(
     NAME session TIER session
     SOURCES
         session.cpp
-    DEPENDS version analysis config consumer periods record record_writers registry sources
+    DEPENDS version analysis config consumer live periods record record_writers registry sources
             stream_writers window
     PRIVATE_DEPENDS collector environment sites)

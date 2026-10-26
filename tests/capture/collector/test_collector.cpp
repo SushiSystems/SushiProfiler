@@ -387,3 +387,62 @@ TEST_F(Medium_SecondImage, AClosedCollectorRecordsNothingFromTheSecondImage)
     const ThreadDrain* const mine = find(batch, Collector::thread_index());
     EXPECT_TRUE(mine == nullptr || mine->events.empty());
 }
+
+TEST_F(Small_Collector, HoldClosesTheZoneGateButKeepsMarking)
+{
+    Collector::instance().hold();
+
+    EXPECT_TRUE(Collector::instance().is_held());
+    EXPECT_FALSE(Collector::recording());
+    EXPECT_TRUE(Collector::marking());
+}
+
+TEST_F(Small_Collector, ReleaseReopensTheGateOnlyWhereTheWindowWants)
+{
+    Collector& collector = Collector::instance();
+    collector.pause();
+    collector.hold();
+    collector.release();
+    EXPECT_FALSE(Collector::recording());
+    EXPECT_FALSE(Collector::marking());
+    collector.resume();
+    EXPECT_TRUE(Collector::recording());
+
+    collector.hold();
+    collector.pause();
+    collector.resume();
+    EXPECT_FALSE(Collector::recording());
+    EXPECT_TRUE(Collector::marking());
+    collector.release();
+    EXPECT_TRUE(Collector::recording());
+}
+
+TEST_F(Small_Collector, CloseClearsAHold)
+{
+    Collector& collector = Collector::instance();
+    collector.hold();
+    collector.close();
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
+
+    EXPECT_TRUE(Collector::recording());
+    EXPECT_FALSE(collector.is_held());
+}
+
+TEST_F(Small_Collector, HoldDoesNothingWhileClosed)
+{
+    Collector& collector = Collector::instance();
+    collector.close();
+    collector.hold();
+
+    EXPECT_FALSE(collector.is_held());
+    EXPECT_FALSE(Collector::marking());
+}
+
+TEST_F(Small_Collector, SourcesWantedFollowsWantSources)
+{
+    EXPECT_FALSE(Collector::sources_wanted());
+    Collector::want_sources(true);
+    EXPECT_TRUE(Collector::sources_wanted());
+    Collector::want_sources(false);
+    EXPECT_FALSE(Collector::sources_wanted());
+}
