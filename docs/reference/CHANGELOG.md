@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — registry: Added `Registry`, which makes sources and writers by name and lists the known names on a miss, and the built-in `terminal`, `record` and `chrome_trace` writers (`modules/session/registry/`).
 - 2026-10-26 — stream_writers: Added `StreamWriter` and `ChromeTraceWriter`, which streams each period's zone runs, samples, flows and spans as a Chrome trace (`modules/session/stream_writers/`).
 - 2026-10-26 — fold: Added `fold_period`, which nests a period's zones by time into trees per thread and lane and folds its samples; `RecordClock` and `LaneTracker` place events in time and lane (`modules/session/fold/`).
 - 2026-10-26 — record: Added `unmatched` to each thread of a run record, counting zones that did not nest and lane ends with no lane open; the `overhead` analysis reports it (`modules/record/record/`, `docs/reference/RECORD_FORMAT.md`).
