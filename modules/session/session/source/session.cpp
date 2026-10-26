@@ -336,12 +336,12 @@ namespace SushiProfiler
         if (!collector.open(settings))
             return "the collector could not be opened";
         opened_collector_ = true;
-        SourceContext context(collector.names(), record_.tracks,
-                              collector.first_point().steady_ns);
+        source_context_ = std::make_unique<SourceContext>(collector.names(), record_.tracks,
+                                                          collector.first_point().steady_ns);
         std::uint64_t delay_ns = 0U;
         for (const std::unique_ptr<Source>& source : sources_)
         {
-            const SourceStatus status = source->begin(context);
+            const SourceStatus status = source->begin(*source_context_);
             if (!status.ok())
                 return "source \"" + std::string(source->name()) + "\" did not start: " +
                        status.error;
@@ -435,6 +435,7 @@ namespace SushiProfiler
         for (std::size_t index = sources_begun_; index > 0U; --index)
             sources_[index - 1U]->end();
         sources_begun_ = 0U;
+        source_context_.reset();
         std::vector<std::string> problems;
         if (assembler_ != nullptr)
         {

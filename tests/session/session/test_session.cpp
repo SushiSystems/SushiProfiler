@@ -30,6 +30,7 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -451,6 +452,54 @@ namespace
             SushiProfiler::NameID kernel_ = 0U;    /**< The span name. */
             std::mutex mutex_;                     /**< Guards queue_. */
             std::vector<std::uint64_t> queue_;     /**< Work not yet handed over. */
+    };
+
+    /**
+     * @brief A source that keeps the context begin() received and uses it only in collect(),
+     * adding a track, a name and one span per period, as a device source does.
+     */
+    class LateContextSource final : public Source
+    {
+        public:
+            /// @brief Returns `late`.
+            [[nodiscard]] std::string_view name() const noexcept override
+            {
+                return "late";
+            }
+
+            /// @brief Keeps @p context and touches nothing else.
+            [[nodiscard]] SourceStatus begin(SourceContext& context) override
+            {
+                context_ = &context;
+                return SourceStatus{};
+            }
+
+            /// @brief States no delay.
+            [[nodiscard]] std::uint64_t max_delay_ns() const noexcept override
+            {
+                return 0U;
+            }
+
+            /// @brief Adds the track and the name through the kept context and appends one span.
+            void collect(const PeriodSpan& period, SpanSink& sink) override
+            {
+                Span span;
+                span.track = context_->add_track("late.track");
+                span.name = context_->intern("late.kernel");
+                span.queued_ns = context_->to_record_ns(period.start_steady_ns);
+                span.start_ns = span.queued_ns;
+                span.end_ns = span.start_ns + 1000U;
+                static_cast<void>(sink.append(span));
+            }
+
+            /// @brief Does nothing.
+            void end() override
+            {
+
+            }
+
+        private:
+            SourceContext* context_ = nullptr; /**< The context begin() received. */
     };
 
     /// @brief Returns the steady clock in nanoseconds.
@@ -910,6 +959,40 @@ TEST(Medium_Session, ARestartAfterStopReadsASecondRecord)
     static_cast<void>(session.stop());
     SessionStart third = Session::start(live_config("again.step"), registry);
     EXPECT_TRUE(third.ok()) << third.error;
+}
+
+TEST(Medium_Session, ASourceUsesItsBeginContextInCollect)
+{
+    Registry registry;
+    registry.add_source("late",
+                        [](const JsonValue&)
+                        {
+                            return Made<Source>{std::make_unique<LateContextSource>(),
+                                                std::string()};
+                        });
+    ProfilerConfig config = live_config("late.step");
+    config.sources = {NamedSettings{"late", parsed("{}")}};
+    SessionStart started = Session::start(config, registry);
+    ASSERT_TRUE(started.ok()) << started.error;
+    PeriodTimeline& step = started.session->timeline("late.step");
+    for (int index = 0; index < 4; ++index)
+    {
+        static_cast<void>(step.mark());
+        breathe();
+    }
+    const SessionStop stopped = started.session->stop();
+
+    ASSERT_TRUE(stopped.problems.empty());
+    const auto& tracks = stopped.record.tracks;
+    const auto found = std::find(tracks.begin(), tracks.end(), "late.track");
+    ASSERT_NE(found, tracks.end());
+    const auto track = static_cast<SushiProfiler::TrackID>(found - tracks.begin());
+    ASSERT_FALSE(stopped.record.periods.empty());
+    for (const PeriodRecord& period : stopped.record.periods)
+    {
+        ASSERT_EQ(period.spans.size(), 1U) << "period " << period.index;
+        EXPECT_EQ(period.spans.span(0U).track, track);
+    }
 }
 
 TEST(Medium_Session, ASourceFactReachesTheStoppedRecordAndItsFile)

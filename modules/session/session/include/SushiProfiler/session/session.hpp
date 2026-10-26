@@ -209,6 +209,8 @@ namespace SushiProfiler
             std::shared_ptr<LiveChannel> channel_;      /**< The live channel, for the session's life. */
             std::vector<std::unique_ptr<Source>> sources_; /**< The sources. */
             std::size_t sources_begun_ = 0U;            /**< Sources whose begin succeeded. */
+            /// @brief What the sources' begin() received; lives until the last begun end() returns.
+            std::unique_ptr<SourceContext> source_context_;
             std::vector<StreamPart> streams_;           /**< The stream writers. */
             std::vector<RecordPart> records_;           /**< The record writers. */
             std::unique_ptr<StreamWriterSet> writer_set_; /**< The stream writers' switches. */
