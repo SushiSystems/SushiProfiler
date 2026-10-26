@@ -1,10 +1,6 @@
 # Remaining work
 
-Next id: RW-5
-
-## Next
-
-- RW-2 Every later phase reads the record, and the libraries above wait on its release
+Next id: RW-6
 
 ## Decisions waiting for the owner
 
@@ -18,13 +14,12 @@ Next id: RW-5
   the record format
 - Source: `docs/design/PROFILER/RECORD_AND_ANALYSES.md`
 
-## Session and record
-
-### RW-2 Build the session, the run record and the `sp` tools
-- State: open
-- Done when: a test program's periods, counters, values, instants and flows give a record, a
-  terminal summary and a Chrome trace; two records compare; a check fails when it should; a record
-  round-trips and validates
+### RW-5 Decide whether the idle drainer's budget reads "at most one wake-up a second"
+- State: decision
+- Done when: the design's budget row and the consumer's slowest poll agree. An idle consumer
+  measured 1.000 wake-ups a second with `sp_bench_consumer`, the bound itself, against a budget of
+  "under one". A slowest poll above 1 s meets the row as written, and makes a burst after a quiet
+  stretch wait longer for its first drain
 - Source: `docs/design/PROFILER/README.md`
 
 ## Later

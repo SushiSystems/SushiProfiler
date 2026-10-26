@@ -4,11 +4,14 @@ SushiProfiler is a C++17 profiler for the Sushi libraries and for any other C++1
 records where the time of a marked period of the program goes. It depends on the C++ standard
 library and Threads only.
 
-There is no library API yet. What a developer types today is the `sp` CLI:
+A program starts a `Session` from a configuration, marks its periods and records zones, counters
+and flows; `modules/session/session/README.md` shows the calls. The session leaves a run record,
+a terminal summary and a Chrome trace, and the record is read back with `sp`:
 
 ```bash
-sp --help
-sp check
+sp record show build/profiles/run.sprec.json --analysis breakdown --top 10
+sp record compare before.sprec.json after.sprec.json
+sp record check run.sprec.json budgets.json
 ```
 
 ## Build
@@ -24,10 +27,10 @@ through `sp`.
 
 ## Status
 
-The capture layer, design phase P1, is built: the clock, the event types, the site registry, the
-rings, the collector, the recording macros, lock waits and period timelines, with benchmarks that
-meet the design's budget. Nothing above the capture tier is written yet: no session, record or
-analysis. The open work is in
+Design phases P1 and P2 are built: the capture layer, the session that turns a window of periods
+into a run record, the analyses, comparison and checks over a record, the Chrome trace, and the
+record tool behind `sp record`. No library of the stack records through it yet; SushiRuntime's
+device source is phase P3. The open work is in
 [`docs/design/REMAINING_WORK.md`](docs/design/REMAINING_WORK.md).
 
 ## Documentation

@@ -37,7 +37,7 @@
   lookup. A test lowers a graph whose node emits three tasks and checks all three map back to it.
 - Two runs answer the owner's question together. A run with `level` 1 and runtime profiling off
   measures the true step time and its host groups on the production execution path. A run with
-  runtime profiling on gives the kernel breakdown on the node-by-node path. `sp compare` of the two
+  runtime profiling on gives the kernel breakdown on the node-by-node path. `sp record compare` of the two
   states the cost of the second, so its findings are read with that cost in view.
 - A `profile` section in the training and inference run files holding a `ProfilerConfig`. Absent,
   nothing records and the gate never opens.

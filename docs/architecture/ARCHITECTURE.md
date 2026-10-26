@@ -58,8 +58,34 @@ its library's compiled level is compiled out and costs nothing.
 
 One consumer calls `Collector::drain`, which moves each ring's events, drops and fill into a
 `DrainBatch` with a calibration point and frees the rings of exited threads. The producers never
-signal it; the consumer, which the session tier will hold, chooses its next poll from the fill.
+signal it; the consumer chooses its next poll from the fill.
 `tests/capture/zones/benchmark_zones.cpp` measures the path.
+
+## The session path
+
+`Session::start` in `session` reads nothing itself: the host passes a `ProfilerConfig` and a
+`Registry`. The session makes the named sources and writers from the registry, gathers the
+environment and build facts, opens the collector, installs a `Window` on the configured timeline
+and starts a `Consumer`.
+
+1. The window, a `PeriodObserver`, resumes and pauses the gate at each mark, so only the warm-up
+   and active periods record.
+2. The consumer drains the collector and hands each batch to a `PeriodAssembler`, which places
+   events in periods by their begin time.
+3. When a period closes, `fold_period` in `fold` turns its events into zone trees and sample
+   series, each source adds its spans through a `SpanSink`, the period joins the `RunRecord`, and
+   each `StreamWriter` writes it.
+4. `Session::stop` closes the collector, drains once more and returns the record;
+   `Session::report` runs the configured analyses and record writers over it.
+
+## The record path
+
+The record tier reads a `RunRecord` and nothing live. `record_json` writes and reads it as
+versioned JSON, refusing what it does not know with the path of the value. `subject_samples` in
+`analysis` names every series a record holds; `AnalysisRunner` runs analyses from an
+`AnalysisCatalog`, `compare_records` compares two records subject by subject, and `check` takes
+each check's verdict. `run_record_tool` in `tools/record_tool` puts the four behind one command
+line, which the program `applications/sp_record/` runs for `sp record`.
 
 ## Adding a module
 

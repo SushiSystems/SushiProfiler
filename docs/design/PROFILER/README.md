@@ -1,8 +1,8 @@
 # SushiProfiler
 
-**Status:** Open — approved by the owner on 2026-10-26; P1 built 2026-10-26, P2 is next.
+**Status:** Open — approved by the owner on 2026-10-26; P1 built 2026-10-26, P2 built 2026-10-26, P3 is next.
 **About:** A general-purpose profiler for any C++17 program: zones, counters, values, flows and device spans over marked periods, kept as a run record that is analysed, compared and checked.
-**Modules:** `modules/foundation/clock`, `modules/foundation/events`, `modules/capture/sites`, `modules/capture/rings`, `modules/capture/collector`, `modules/capture/zones`, `modules/capture/lock_wait`, `modules/capture/periods`
+**Modules:** `modules/foundation/clock`, `modules/foundation/events`, `modules/capture/sites`, `modules/capture/rings`, `modules/capture/collector`, `modules/capture/zones`, `modules/capture/lock_wait`, `modules/capture/periods`, `modules/foundation/json`, `modules/record/record`, `modules/record/record_json`, `modules/record/statistics`, `modules/record/analysis`, `modules/record/record_writers`, `modules/record/compare`, `modules/record/checks`, `modules/session/config`, `modules/session/window`, `modules/session/sources`, `modules/session/environment`, `modules/session/fold`, `modules/session/stream_writers`, `modules/session/registry`, `modules/session/consumer`, `modules/session/session`, `modules/tools/record_tool`
 
 ## Problem
 
@@ -57,11 +57,11 @@ The tiers, lowest first, each depending only on those before it:
 
 | Tier | Holds |
 | --- | --- |
-| foundation | The clock and its calibration; the event types |
+| foundation | The clock and its calibration; the event types; JSON |
 | capture | Sites and their registry; per-thread rings; the process-wide collector; zones and the other event kinds; periods |
-| record | The run record; statistics; analyses and their runner; record writers; comparison |
+| record | The run record and its JSON form; statistics; analyses and their runner; record writers; comparison; checks |
 | session | Configuration; the registry of parts; the window; sources; environment contributors; the fold; the consumer thread; stream writers; `Session` |
-| tools | The program behind `sp show`, `sp compare`, `sp check` and `sp validate` |
+| tools | The record tool behind `sp record show`, `compare`, `check` and `validate` |
 
 The record tier does not depend on the session tier, so a record on disk is analysed with no
 session running.
@@ -87,12 +87,15 @@ Performance budget, measured by benchmarks in this repository before P2 closes:
 | Drainer while idle | Under one wake-up a second |
 | SushiAI YOLOv5n step with stage zones on | Under 1% slower than with the profiler off |
 
+P1 met the zone rows. P2 measured the idle drainer at one wake-up a second, the bound itself;
+RW-5 asks whether the budget reads "at most one". The YOLOv5n row is P5's to measure.
+
 ## Phases
 
 | Id | Phase | State |
 | --- | --- | --- |
 | P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | built |
-| P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp show / compare / check / validate` | planned |
+| P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp record show / compare / check / validate` | built |
 | P3 | SushiRuntime: the device source, the node table, the runtime's own zones | planned |
 | P4 | SushiBLAS: cost rules, `device_ceilings`, `roofline`, the benchmark harness on a timeline | planned |
 | P5 | SushiAI: stage zones, timelines, attribution, the run-file section, `sa profile` | planned |

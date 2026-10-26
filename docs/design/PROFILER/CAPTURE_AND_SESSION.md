@@ -12,17 +12,20 @@ nothing: every failure returns a status, and drops are counted in the record. Na
 | --- | --- | --- |
 | foundation | `clock` | `TraceClock`, `CalibrationPoint`, `Calibration` |
 | foundation | `events` | `TraceEvent`, `DeviceSpan`, `Counter`, `AttributeBlock`, ids |
+| foundation | `json` | `JsonValue`, its reader and writer, and `JsonFieldReader`, the strict field reader every file reader shares |
 | capture | `sites` | `ZoneSite`, the site registry, the per-site enable bytes, name interning |
 | capture | `rings` | `ThreadRing`, thread registration and retirement |
 | capture | `collector` | The process-wide gate and the drainer handoff (see "The hot path" below) |
 | capture | `zones` | `Zone`, `SP_ZONE`, `SP_ZONE_NAMED`, `SP_COUNTER`, `SP_THREAD_NAME` |
 | capture | `lock_wait` | `ContendedLock` and `SP_ZONE_LOCK_WAIT`: a lock that opens a zone only when it waits |
 | capture | `periods` | `PeriodTimeline` and `mark_period` |
-| record | `record` | `RunRecord` and its JSON reader and writer |
+| record | `record` | `RunRecord` |
+| record | `record_json` | The record's JSON reader and writer |
 | record | `statistics` | Steady-state check, median, percentiles, bootstrap interval |
 | record | `analysis` | The `Analysis` interface, the generic analyses ([RECORD_AND_ANALYSES.md](RECORD_AND_ANALYSES.md)) and `AnalysisRunner`, which runs the named analyses over a record |
 | record | `record_writers` | The `RecordWriter` interface, given a finished record: `terminal`, `record` |
-| record | `compare` | Two or more records side by side |
+| record | `compare` | Two records side by side, subject by subject |
+| record | `checks` | `Check`, its JSON reader, and the verdicts of checks over a record |
 | session | `config` | `ProfilerConfig` and its JSON reader |
 | session | `registry` | `Registry`: factories for sources, analyses, writers and environment contributors, by name |
 | session | `window` | The capture schedule over one timeline's periods |
@@ -32,9 +35,9 @@ nothing: every failure returns a status, and drops are counted in the record. Na
 | session | `stream_writers` | The `StreamWriter` interface, given each period as it closes: `chrome_trace` |
 | session | `consumer` | The consumer thread: drains, folds, collects from sources, appends to the record, feeds stream writers |
 | session | `session` | `Session`: starts and stops one consumer with the parts the configuration names |
-| tools | `sp_tool` | The program behind `sp show` and `sp compare` |
+| tools | `record_tool` | `run_record_tool`, which the program `sp_record` runs for `sp record show`, `compare`, `check` and `validate` |
 
-The record tier does not depend on the session tier, so `sp show` analyses a file with no session
+The record tier does not depend on the session tier, so `sp record show` analyses a file with no session
 running. A lower tier never includes a higher one; the layering checker the other repositories run
 holds.
 
@@ -140,12 +143,15 @@ changes per period. A real-time block's budget is its duration; a frame's is its
 `budget` analysis reports each period's used fraction, the count over budget and the worst period.
 
 A period may carry tags, `timeline.tag(key, value)`, written once per period off the hot path:
-the input sequence, the variant under test. The record keeps them and `sp compare` groups by them.
+the input sequence, the variant under test. The record keeps them and `sp record compare` groups by them.
 
-Because a closed gate writes no mark, the window cannot learn of a period from the record. P2
-gives `PeriodTimeline` an observer, an interface declared in the capture tier and implemented by
-the window, which each `mark()` calls with the index it opens; the window opens or closes the gate
-there, before the mark is written.
+Because a closed gate writes no mark, the window cannot learn of a period from the record.
+`PeriodTimeline::observe` installs a `PeriodObserver`, declared in the capture tier and implemented
+by the window. Each `mark()` calls `before_mark` with the index it opens, writes its event if the
+gate is open, then calls `after_mark`. The window resumes the gate in `before_mark` when the
+opening period is recorded and pauses it in `after_mark` when it is not, so the last recorded
+period still gets its end mark. `Collector::pause` and `resume` move the gate inside a session
+without discarding the rings.
 
 The window is PyTorch's schedule: `skip` periods are ignored, then cycles of `wait` (nothing
 recorded), `warmup` (recorded, marked warm-up), `active` (recorded), repeated `repeat` times, 0
@@ -158,16 +164,16 @@ last active one, so periods outside the window cost what an off profiler costs.
 class Session final
 {
     public:
-        static Result<std::unique_ptr<Session>> start(const ProfilerConfig& config,
-                                                       const Registry& registry);
+        static SessionStart start(const ProfilerConfig& config, const Registry& registry);
         PeriodTimeline& timeline(std::string_view name);
-        Result<RunRecord> stop();                 // joins the consumer; returns the record
+        SessionStop stop();                          // joins the consumer; returns the record
+        SessionReport report(const RunRecord& record) const;
 };
 ```
 
-`stop` returns the record and nothing else. The host then calls
-`AnalysisRunner::run(record, config.analyses)` and each `RecordWriter`; `sp show` takes the same
-path from a file. Stream writers are the only writers that run inside the session.
+`stop` returns the record and the problems met while recording. `report` runs the configured
+analyses and record writers over a record; `sp record show` takes the same path from a file.
+Stream writers are the only writers that run while the session records.
 
 - One session runs per process; a second `start` is refused with a status naming the first.
 - `start` builds the sources, analyses and writers the configuration names from the registry,
@@ -176,9 +182,14 @@ path from a file. Stream writers are the only writers that run inside the sessio
   engine's fold arithmetic on 64-bit offsets, asks each source for that period's spans and
   counters, and appends the period to the record. Writers that stream (the Chrome trace) write
   each period as it closes, so memory holds one window, not the run.
-- The consumer polls `Collector::drain` at an interval it adapts from each ring's fill: 1 ms while a
-  ring is over half full, doubling after each quiet drain up to 1 s, so an idle session wakes
-  under once a second and a busy one drains before a ring fills.
+- The consumer polls `Collector::drain` at an interval it adapts from the fullest ring: 1 ms
+  while a ring is over half full, the same interval while the fullest is between a quarter and a
+  half, and double the interval, up to 1 s, while every ring is under a quarter. An idle session
+  settles at one wake-up a second, and a busy one drains before a ring fills.
+- An event joins the period of the configured timeline whose span holds its begin. A period
+  closes once a drain is `linger_ms` past its end, or at stop. An event that begins in a closed
+  period counts as late for its thread, and one outside every recorded period as outside. A
+  period whose end mark never came is not kept at stop, and its events count as outside.
 - Dependencies arrive through `start`; the only process-wide state is the collector, because a
   macro at any call site must reach it.
 
@@ -190,7 +201,7 @@ class Source
     public:
         virtual ~Source() = default;
         [[nodiscard]] virtual std::string_view name() const noexcept = 0;
-        virtual Status begin(SourceContext& context) = 0;   // tracks, keys, clock
+        virtual SourceStatus begin(SourceContext& context) = 0;   // tracks, keys, clock
         virtual void collect(std::uint64_t period, SpanSink& sink) = 0;
         virtual void end() = 0;
 };
@@ -229,9 +240,9 @@ tag and commit.
         "chrome_trace": { "path": "run.trace.json" }
     },
     "output": "build/profiles/yolov5n",
-    "buffers": { "ring_events": 65536, "attribute_bytes": 1048576 }
+    "buffers": { "ring_events": 65536, "attribute_bytes": 1048576, "linger_ms": 100 }
 }
 ```
 
-The reader refuses an unknown key and a value out of range, naming the key. The format has a page
-in `docs/reference/` and a version field.
+The reader refuses an unknown key and a value out of range, naming the key.
+`docs/reference/CONFIG_FORMAT.md` documents the format and its version field.

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — docs: Closed the session and the run record, design phase P2, and described the session and record paths (`docs/architecture/ARCHITECTURE.md`).
 - 2026-10-26 — consumer: Added `Consumer::drains()` and the benchmark `sp_bench_consumer`, which measures the drains per second of an idle consumer (`tests/session/consumer/`).
 - 2026-10-26 — record_tool: Added `run_record_tool`, the `sp_record` program and the `sp record` group, which show, compare, check and validate run records (`modules/tools/record_tool/`, `applications/sp_record/`).
 - 2026-10-26 — analysis: Fixed `flows` and the `flow:` check subjects, which kept each call site of a flow apart and so found no item with both a begin and an end; the call sites of one flow name now count as one flow.
