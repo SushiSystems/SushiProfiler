@@ -2,8 +2,8 @@
 # absent, `hub` falls back to its own catalog entry for a module it already knows.
 # The format: docs/reference/MODULE_MANIFEST.md in the SushiStack repository.
 #
-# `fragment` is omitted: SushiProfiler needs a C++17 compiler and CMake only, so it has no
-# cli/sushistack.deps.toml.
+# `fragment` is omitted: the default cli/sushistack.deps.toml holds no dependency, only
+# `[module] cli = "sp"`, the CLI a consumer's package build runs.
 
 [module]
 name = "sushiprofiler"

@@ -1,7 +1,7 @@
 # cli
 
 The `sp` command line interface. `sushiprofiler/cli.py` parses the four commands, `build`, `test`,
-`bench` and `check`, and the `record` group, and `sushiprofiler/services/project.py` does the work. The `docs` group, with its one command
+`bench` and `check`, and the `record` group, registers the shared `package` command, and `sushiprofiler/services/project.py` does the work. The `docs` group, with its one command
 `bundle`, the config loader, the console, the process runner and the CMake driver come from
 sushicore 0.9.2. `tests/` is the pytest suite:
 `cd cli && python -m pytest tests -q`.
@@ -13,6 +13,17 @@ Configuration is layered, lowest precedence first: built-in defaults, `config.to
 toolchain: `sp` builds with the pinned `cxx`, else a clang++ on PATH, else CMake's platform
 default. A found compiler with a found ninja takes the Ninja generator; with no compiler CMake
 chooses its own.
+
+## Package contract
+
+SushiCore builds a SushiProfiler package for a consumer by running `sp build --type <type>
+--build-dir build/pkg-<id> --lean` and then `sp package --build-dir build/pkg-<id> --prefix <p>
+--no-archive --force` in this checkout. `--build-dir` names the tree below the checkout. `--lean`
+builds no tests, applications or benchmarks (`SP_BUILD_TESTS`, `SP_BUILD_APPLICATIONS` and
+`SP_BUILD_BENCHMARKS` off) and refuses `--benchmarks`. `build` always passes the tests and the
+applications switches, so a tree switches between the two by reconfiguring. `package` is
+sushicore's shared command. `SUSHISTACK_CXX` names a compiler that outranks the configured one.
+`cli/sushistack.deps.toml` names this CLI in `[module] cli`.
 
 ## console.py
 

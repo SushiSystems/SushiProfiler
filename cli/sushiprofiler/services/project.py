@@ -62,6 +62,8 @@ K_BUILD_FOLDER = {None: "build", Sanitizer.ADDRESS: "build-asan", Sanitizer.THRE
 K_PACKAGE_SOURCE = Path("tests", "package")
 
 K_BENCHMARKS_VARIABLE = "SP_BUILD_BENCHMARKS"
+K_TESTS_VARIABLE = "SP_BUILD_TESTS"
+K_APPLICATIONS_VARIABLE = "SP_BUILD_APPLICATIONS"
 K_BENCHMARK_FOLDER = "benchmarks"
 K_BENCHMARK_PREFIX = "sp_bench_"
 K_APPLICATION_FOLDER = "applications"
@@ -83,9 +85,24 @@ _RUNNER = Runner(console, PROFILE.program)
 _DRIVER = CMakeDriver(console, _RUNNER)
 
 
-def build_dir(root: Path, sanitizer: Sanitizer | None) -> Path:
-    """Returns the build tree of *sanitizer*, or of the plain build for None."""
+def build_dir(root: Path, sanitizer: Sanitizer | None, requested: str | None = None) -> Path:
+    """Returns the build tree: *requested* below *root* when given, else the one of *sanitizer*."""
+    if requested:
+        return root / requested
     return root / K_BUILD_FOLDER[sanitizer]
+
+
+def tree_switches(lean: bool) -> dict[str, str]:
+    """Returns the cache variables of the tree's contents and their values for *lean* or not.
+
+    The tests and the applications are on unless *lean*. A lean build also turns the
+    benchmarks off; a plain build leaves them to ``--benchmarks``.
+    """
+    state = "OFF" if lean else "ON"
+    switches = {K_TESTS_VARIABLE: state, K_APPLICATIONS_VARIABLE: state}
+    if lean:
+        switches[K_BENCHMARKS_VARIABLE] = "OFF"
+    return switches
 
 
 def size_label_regex(sizes: Sequence[Size]) -> str | None:
@@ -142,11 +159,11 @@ def _compiler_arguments(cfg: Config) -> list[str]:
 
 
 def _needs_configure(cfg: Config, tree: Path, build_type: BuildType,
-                     sanitizer: Sanitizer | None) -> bool:
+                     sanitizer: Sanitizer | None, switches: dict[str, str]) -> bool:
     """Returns whether *tree* must be configured before it is compiled."""
     if not (tree / "CMakeCache.txt").is_file():
         return True
-    expect = {"SP_SANITIZE": sanitizer.value if sanitizer else ""}
+    expect = {"SP_SANITIZE": sanitizer.value if sanitizer else "", **switches}
     if not cfg.is_multi_config():
         expect["CMAKE_BUILD_TYPE"] = K_CMAKE_BUILD_TYPE[build_type]
     generator = cfg.resolved_generator()
@@ -157,7 +174,8 @@ def _needs_configure(cfg: Config, tree: Path, build_type: BuildType,
 
 def build(build_type: BuildType | None = None, clean: bool = False,
           defines: Sequence[str] = (), sanitizer: Sanitizer | None = None,
-          benchmarks: bool | None = None) -> int:
+          benchmarks: bool | None = None, lean: bool = False,
+          tree_path: str | None = None) -> int:
     """Configures the tree of *sanitizer* when it needs it or *defines* are given, then compiles it.
 
     Args:
@@ -166,20 +184,30 @@ def build(build_type: BuildType | None = None, clean: bool = False,
         sanitizer: Builds in that sanitizer's own tree, build-asan/ or build-tsan/.
         benchmarks: True builds the benchmark programs, False stops building them, None keeps
             what the tree has.
+        lean: Builds no tests, applications or benchmarks; what a library package is built as.
+        tree_path: The tree to build in, below the project root, in place of the default one.
+
+    Returns:
+        The exit code; 2 when *lean* and ``benchmarks=True`` ask for opposite things.
     """
+    if lean and benchmarks:
+        console.error("--lean builds no benchmark programs, so --benchmarks cannot join it")
+        return 2
     defines = [*defines, *benchmarks_defines(benchmarks)]
+    switches = tree_switches(lean)
     root = find_project_root()
     cfg = load_config()
-    tree = build_dir(root, sanitizer)
+    tree = build_dir(root, sanitizer, tree_path)
     if clean:
         _DRIVER.clean_tree(tree)
     build_type = resolve_build_type(build_type, tree)
     env = load_build_env(cfg, tree)
 
-    if defines or _needs_configure(cfg, tree, build_type, sanitizer):
+    if defines or _needs_configure(cfg, tree, build_type, sanitizer, switches):
         command = [_DRIVER.cmake(cfg), "-S", str(root), "-B", str(tree),
                    f"-DCMAKE_BUILD_TYPE={K_CMAKE_BUILD_TYPE[build_type]}",
                    f"-DSP_SANITIZE={sanitizer.value if sanitizer else ''}",
+                   *(f"-D{name}={value}" for name, value in switches.items()),
                    *_compiler_arguments(cfg)]
         for define in defines:
             command += ["-D", define]

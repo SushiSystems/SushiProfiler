@@ -1,0 +1,8 @@
+# SushiProfiler dependency fragment. SushiProfiler needs a C++17 compiler and CMake only, so it
+# declares no dependency; the fragment exists to name its CLI.
+
+[module]
+depends_on = []
+# The CLI sushicore runs to build and package this library for a consumer: `sp build --lean`,
+# then `sp package --no-archive`.
+cli = "sp"

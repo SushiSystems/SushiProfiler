@@ -10,6 +10,7 @@ The layers and the compiler search order are in cli/README.md, "config.py".
 
 from __future__ import annotations
 
+import os
 import shutil
 from dataclasses import dataclass
 
@@ -25,6 +26,9 @@ PROFILE = ModuleProfile(
     env_fields=("cxx", "generator", "cmake_exe", "ctest_exe", "ninja_exe", "vs_vcvars"),
 )
 
+#: The compiler a consumer's package build hands the CLI; it outranks the configured one.
+K_STACK_CXX_ENV = "SUSHISTACK_CXX"
+
 _MODULE = ModuleConfig(PROFILE, use_workspace_config=True)
 
 find_project_root = _MODULE.find_project_root
@@ -38,8 +42,13 @@ class Config(ToolConfig):
     # Empty, so CMake picks the platform default when no compiler is found.
     generator: str = ""
 
+    # The compiler SUSHISTACK_CXX names; empty outside a package build. It outranks `cxx`.
+    stack_cxx: str = ""
+
     def resolved_compiler(self) -> str:
-        """Returns the C++ compiler to build with: the pinned one, else clang++ on PATH, else ''."""
+        """Returns the C++ compiler: SUSHISTACK_CXX, else the pinned one, else clang++, else ''."""
+        if self.stack_cxx:
+            return self.expand(self.stack_cxx)
         if self.cxx:
             return self.expand(self.cxx)
         return shutil.which("clang++") or ""
@@ -68,4 +77,6 @@ class Config(ToolConfig):
 
 def load_config() -> Config:
     """Returns the layered configuration for the current platform."""
-    return _MODULE.load(Config)
+    cfg = _MODULE.load(Config)
+    cfg.stack_cxx = os.environ.get(K_STACK_CXX_ENV, "")
+    return cfg

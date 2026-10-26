@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- 2026-10-26 — cli: Added `sp build --build-dir` and `--lean`, the contract of a consumer's package build (`cli.py`, `project.py`).
+- 2026-10-26 — cli: Registered the shared `package` command from sushicore (`cli.py`).
+- 2026-10-26 — cli: Made `sp` honour `SUSHISTACK_CXX` over its configured compiler (`config.py`).
+- 2026-10-26 — deps: Added `cli/sushistack.deps.toml`, which names the CLI `sp` in `[module] cli`.
 - 2026-10-26 — record: Added `K_GRAPH` and `K_ORIGIN` to `DeviceSpanKeys` (`modules/record/record/`).
 - 2026-10-26 — analysis: Changed `roofline` to group by graph and origin, with two new columns after `period` that move every later column by two (`modules/record/analysis/`).
 - 2026-10-26 — record: Added `DeviceSpanKeys`, the attribute and ceiling fact keys, per type too, that device sources write and `roofline` reads (`modules/record/record/`).

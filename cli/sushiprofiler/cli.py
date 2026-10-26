@@ -17,11 +17,13 @@ from typing import Any, Optional
 import typer
 from sushicore.docs_bundle import register_docs_commands
 from sushicore.entry import run as run_app
+from sushicore.provision.commands import ModuleProvision
+from sushicore.provision.package_command import register_package_command
 from sushicore.root_options import register_root_options
 from sushicore.typer_help import help_group
 
 from . import console
-from .config import find_project_root
+from .config import PROFILE, find_project_root, load_config
 from .services import project as project_service
 from .services.project import BuildType, Sanitizer, Size
 
@@ -57,6 +59,19 @@ def _sanitize_option() -> Any:
                              "thread (TSan).")
 
 
+def _build_dir_option() -> Any:
+    """Returns the default of a `--build-dir` parameter."""
+    return typer.Option(None, "--build-dir", metavar="PATH",
+                        help="Build in this tree, below the checkout, instead of build/.")
+
+
+def _lean_option() -> Any:
+    """Returns the default of a `--lean` parameter."""
+    return typer.Option(False, "--lean",
+                        help="Build no tests, applications or benchmarks; what a consumer's "
+                             "package build of SushiProfiler uses.")
+
+
 def _clean_option() -> Any:
     """Returns the default of a `--clean` parameter."""
     return typer.Option(False, "--clean", help="Delete the build tree before configuring.")
@@ -68,7 +83,8 @@ def _clean_option() -> Any:
     epilog="sp build\n"
            "sp build --type release\n"
            "sp build --benchmarks --type release  # Also build the benchmark programs\n"
-           "sp build --sanitize address  # ASan and UBSan, in build-asan/",
+           "sp build --sanitize address  # ASan and UBSan, in build-asan/\n"
+           "sp build --build-dir build/pkg-x --lean  # What a consumer's package build runs",
 )
 def build(
     type: Optional[BuildType] = _type_option(),
@@ -81,10 +97,13 @@ def build(
         None, "--benchmarks/--no-benchmarks",
         help="Build the benchmark programs beside the tests, or stop building them. "
              "When omitted the tree keeps its setting."),
+    build_dir: Optional[str] = _build_dir_option(),
+    lean: bool = _lean_option(),
 ) -> None:
     """Configure when needed, then build the library and the tests."""
     raise typer.Exit(project_service.build(type, clean=clean, defines=define or (),
-                                           sanitizer=sanitize, benchmarks=benchmarks))
+                                           sanitizer=sanitize, benchmarks=benchmarks,
+                                           lean=lean, tree_path=build_dir))
 
 
 @app.command(
@@ -237,6 +256,14 @@ def record_validate(
     """Read a record strictly; exit 1 when it is refused."""
     raise typer.Exit(project_service.record(["validate", record], type))
 
+
+register_package_command(app, ModuleProvision(
+    profile=PROFILE,
+    project_root=find_project_root,
+    load_config=load_config,
+    console=console.current,
+    panel=K_PANEL,
+))
 
 register_docs_commands(
     app,
