@@ -74,9 +74,9 @@ TEST(Small_OverheadAnalysis, MeasuresTheCostAgainstABaseline)
     options.baseline = &baseline;
     const Table table = SushiProfiler::OverheadAnalysis().run(analysis_record(), options);
 
-    ASSERT_EQ(table.rows.size(), 11U);
-    expect_row(table.rows[8], {text("baseline_median_ns:step"), real(100.0)});
-    expect_row(table.rows[9], {text("median_ns:step"), real(110.0)});
-    expect_row(table.rows[10], {text("cost:step"), real(0.1)});
+    ASSERT_EQ(table.rows.size(), 12U);
+    expect_row(table.rows[9], {text("baseline_median_ns:step"), real(100.0)});
+    expect_row(table.rows[10], {text("median_ns:step"), real(110.0)});
+    expect_row(table.rows[11], {text("cost:step"), real(0.1)});
     EXPECT_TRUE(table.notes.empty());
 }
