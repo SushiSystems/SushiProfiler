@@ -28,6 +28,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     periods     capture
     record      record
     record_json record
+    statistics  record
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.

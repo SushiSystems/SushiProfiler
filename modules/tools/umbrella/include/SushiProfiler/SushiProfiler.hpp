@@ -50,6 +50,11 @@
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>
+#include <SushiProfiler/statistics/bootstrap.hpp>
+#include <SushiProfiler/statistics/dispersion.hpp>
+#include <SushiProfiler/statistics/log2_histogram.hpp>
+#include <SushiProfiler/statistics/sorted_samples.hpp>
+#include <SushiProfiler/statistics/steady_state.hpp>
 #include <SushiProfiler/version/version.hpp>
 #include <SushiProfiler/zones/admission.hpp>
 #include <SushiProfiler/zones/macros.hpp>

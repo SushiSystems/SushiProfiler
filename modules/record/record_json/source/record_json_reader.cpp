@@ -28,14 +28,14 @@
 
 #include <SushiProfiler/record_json/record_json.hpp>
 
+#include <algorithm>
+#include <limits>
+#include <utility>
+
 #include <SushiProfiler/json/json_reader.hpp>
 
 #include "record_decoder.hpp"
 #include "record_names.hpp"
-
-#include <algorithm>
-#include <limits>
-#include <utility>
 
 namespace SushiProfiler
 {

@@ -28,12 +28,12 @@
 
 #include <SushiProfiler/record_json/record_json.hpp>
 
+#include <cmath>
+#include <vector>
+
 #include <SushiProfiler/json/json_writer.hpp>
 
 #include "record_names.hpp"
-
-#include <cmath>
-#include <vector>
 
 namespace SushiProfiler
 {
