@@ -32,12 +32,10 @@
 #include <utility>
 #include <vector>
 
-#include <SushiProfiler/sites/site.hpp>
+#include <SushiProfiler/analysis/subject_samples.hpp>
 #include <SushiProfiler/statistics/dispersion.hpp>
 #include <SushiProfiler/statistics/log2_histogram.hpp>
 #include <SushiProfiler/statistics/sorted_samples.hpp>
-
-#include "record_queries.hpp"
 
 namespace SushiProfiler
 {
@@ -76,51 +74,6 @@ namespace SushiProfiler
                     Cell::text(histogram_text(log2_histogram(samples)))};
             table.rows.push_back(std::move(row));
         }
-
-        /// @brief Returns the samples of site @p site in @p periods, period by period.
-        std::vector<double> site_samples(const SiteRecord& site, SiteID id,
-                                         const std::vector<const PeriodRecord*>& periods)
-        {
-            std::vector<double> samples;
-            for (const PeriodRecord* const period : periods)
-            {
-                double value = 0.0;
-                if (site.role == SiteRole::Counter)
-                {
-                    if (Detail::fold_counter(*period, id, site.op, value))
-                        samples.push_back(value);
-                }
-                else if (site.role == SiteRole::Value)
-                {
-                    for (const SampleSeries& series : period->samples)
-                    {
-                        if (series.site == id)
-                            samples.insert(samples.end(), series.values.begin(),
-                                           series.values.end());
-                    }
-                }
-                else if (Detail::runs_site(*period, id))
-                {
-                    samples.push_back(static_cast<double>(Detail::site_inclusive(*period, id)));
-                }
-            }
-            return samples;
-        }
-
-        /// @brief Returns the subject prefix of @p role, or null for a role with no row.
-        const char* prefix_of(SiteRole role) noexcept
-        {
-            switch (role)
-            {
-                case SiteRole::Zone: return "zone:";
-                case SiteRole::LockWait: return "lock_wait:";
-                case SiteRole::Counter: return "counter:";
-                case SiteRole::Value: return "value:";
-                case SiteRole::Instant: return nullptr;
-                case SiteRole::Flow: return nullptr;
-            }
-            return nullptr;
-        }
     } // namespace
 
     std::string_view DistributionAnalysis::name() const noexcept
@@ -142,22 +95,11 @@ namespace SushiProfiler
         table.add_column("max");
         table.add_column("jitter");
         table.add_column("histogram");
-        for (const NameID timeline : Detail::active_timelines(record))
+        for (const SubjectSamples& subject : subject_samples(record))
         {
-            add_row(table, "timeline:" + std::string(record.name_of(timeline)), "ns",
-                    Detail::durations(Detail::active_periods(record, timeline)));
-        }
-        const std::vector<const PeriodRecord*> periods = Detail::active_periods(record);
-        for (std::size_t id = 1U; id < record.sites.size(); ++id)
-        {
-            const SiteRecord& site = record.sites[id];
-            const char* const prefix = prefix_of(site.role);
-            if (prefix == nullptr)
-                continue;
-            const bool timed = site.role == SiteRole::Zone || site.role == SiteRole::LockWait;
-            add_row(table, prefix + Detail::site_label(record, static_cast<SiteID>(id)),
-                    timed ? std::string("ns") : site.unit,
-                    site_samples(site, static_cast<SiteID>(id), periods));
+            const std::string kind = subject.subject.substr(0U, subject.subject.find(':'));
+            if (kind == "timeline" || kind == "zone" || kind == "counter" || kind == "value")
+                add_row(table, subject.subject, subject.unit, subject.samples);
         }
         return table;
     }

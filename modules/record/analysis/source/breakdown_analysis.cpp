@@ -29,7 +29,7 @@
 #include <SushiProfiler/analysis/breakdown_analysis.hpp>
 
 #include <algorithm>
-#include <map>
+#include <numeric>
 #include <string>
 #include <utility>
 #include <vector>
@@ -40,39 +40,6 @@
 
 namespace SushiProfiler
 {
-    namespace
-    {
-        /// @brief The label of the time no zone covered.
-        constexpr const char* K_UNCOVERED = "(uncovered)";
-
-        /// @brief One group's self time per period, and its total over them.
-        struct GroupTimes
-        {
-            std::vector<double> per_period; /**< Self time per active period. */
-            double total = 0.0;             /**< The sum over the periods. */
-        };
-
-        /// @brief Adds the self time of each group in @p period's marking-thread trees.
-        void add_period(const RunRecord& record, const PeriodRecord& period, std::size_t slot,
-                        std::map<std::string, GroupTimes>& groups, double& covered)
-        {
-            for (const ZoneTree& tree : period.zones)
-            {
-                if (tree.thread != period.thread)
-                    continue;
-                for (std::size_t index = 0U; index < tree.nodes.size(); ++index)
-                {
-                    const ZoneNode& node = tree.nodes[index];
-                    GroupTimes& group = groups[Detail::group_of(record, tree, index)];
-                    group.per_period.resize(slot + 1U, 0.0);
-                    group.per_period[slot] += static_cast<double>(node.self_ns);
-                    if (node.parent < 0)
-                        covered += static_cast<double>(node.inclusive_ns);
-                }
-            }
-        }
-    } // namespace
-
     std::string_view BreakdownAnalysis::name() const noexcept
     {
         return "breakdown";
@@ -90,36 +57,24 @@ namespace SushiProfiler
         {
             const std::vector<const PeriodRecord*> periods =
                 Detail::active_periods(record, timeline);
-            std::map<std::string, GroupTimes> groups;
-            GroupTimes uncovered;
-            double length = 0.0;
-            for (std::size_t slot = 0U; slot < periods.size(); ++slot)
-            {
-                double covered = 0.0;
-                add_period(record, *periods[slot], slot, groups, covered);
-                const auto duration = static_cast<double>(periods[slot]->duration_ns());
-                uncovered.per_period.push_back(std::max(0.0, duration - covered));
-                length += duration;
-            }
+            const Detail::GroupSeries series = Detail::group_series(record, periods);
+            const std::vector<double> lengths = Detail::durations(periods);
+            const double length = std::accumulate(lengths.begin(), lengths.end(), 0.0);
             std::vector<std::pair<std::string, SampleSummary>> rows;
-            for (auto& [group, times] : groups)
-            {
-                times.per_period.resize(periods.size(), 0.0);
-                for (const double value : times.per_period)
-                    times.total += value;
-                rows.emplace_back(group, summarise(times.per_period, options.bootstrap));
-            }
+            for (const auto& [group, times] : series.groups)
+                rows.emplace_back(group, summarise(times, options.bootstrap));
             std::stable_sort(rows.begin(), rows.end(), [](const auto& left, const auto& right)
                              {
                                  return left.second.median > right.second.median;
                              });
-            for (const double value : uncovered.per_period)
-                uncovered.total += value;
-            rows.emplace_back(K_UNCOVERED, summarise(uncovered.per_period, options.bootstrap));
+            rows.emplace_back(Detail::K_UNCOVERED_LABEL,
+                              summarise(series.uncovered, options.bootstrap));
             for (const auto& [group, summary] : rows)
             {
-                const double total =
-                    group == K_UNCOVERED ? uncovered.total : groups.at(group).total;
+                const bool uncovered = group == Detail::K_UNCOVERED_LABEL;
+                const std::vector<double>& times =
+                    uncovered ? series.uncovered : series.groups.at(group);
+                const double total = std::accumulate(times.begin(), times.end(), 0.0);
                 Row row{Cell::text(std::string(record.name_of(timeline))), Cell::text(group)};
                 append_summary(row, summary);
                 row.push_back(Cell::real(length > 0.0 ? total / length : 0.0));

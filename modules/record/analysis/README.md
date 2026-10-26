@@ -23,6 +23,13 @@ on `record` and `statistics`, and privately on `events` and `sites`.
 - `SushiProfiler/analysis/sample_summary.hpp`: `summarise` gives the `SampleSummary` every
   timing row reports: count, median, its bootstrap interval, minimum, p95 and coefficient of
   variation. `add_summary_columns` and `append_summary` lay it out as columns and cells.
+- `SushiProfiler/analysis/subject_samples.hpp`: `subject_samples(record)` returns every subject
+  with samples as a `SubjectSamples`: its name, its unit and its samples in period order. The
+  names are the ones checks and comparisons use: `timeline:<t>` period times;
+  `group:<t>/<group>` self time per period, with `(uncovered)` last; `zone:<site>` inclusive
+  time per period that ran the zone or lock wait; `counter:<site>` the fold per period;
+  `value:<site>` every sample; `span:<name>` every span length; `flow:<site>` each item's
+  begin-to-end latency. An overload takes the periods to read.
 
 ## The analyses
 
@@ -46,6 +53,6 @@ The record keeps zone trees, not zone instants, so `device_idle` splits gaps int
 
 Inside `source/`, `record_queries.hpp` holds the lookups several analyses share: active periods
 and timelines, site and node labels, group inheritance, a site's inclusive time and a counter's
-fold.
+fold, the group series of a timeline and a flow's latencies.
 
 The tests are in `tests/record/analysis/`.

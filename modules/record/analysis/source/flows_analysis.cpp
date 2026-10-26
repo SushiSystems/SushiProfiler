@@ -28,8 +28,6 @@
 
 #include <SushiProfiler/analysis/flows_analysis.hpp>
 
-#include <algorithm>
-#include <map>
 #include <string>
 #include <utility>
 #include <vector>
@@ -40,49 +38,6 @@
 
 namespace SushiProfiler
 {
-    namespace
-    {
-        /// @brief One flow point.
-        struct Point
-        {
-            std::uint64_t time_ns = 0U;        /**< When it was recorded. */
-            std::uint64_t item = 0U;           /**< Its item. */
-            FlowPoint place = FlowPoint::Step; /**< Its place on the item's path. */
-        };
-
-        /// @brief Where an item's path stands.
-        struct Path
-        {
-            std::uint64_t begin_ns = 0U; /**< When it began. */
-            std::uint64_t last_ns = 0U;  /**< Its latest point. */
-            bool begun = false;          /**< Whether its begin was seen. */
-        };
-
-        /// @brief Returns the points of flow site @p site in @p periods, in time order.
-        std::vector<Point> points_of(SiteID site, const std::vector<const PeriodRecord*>& periods)
-        {
-            std::vector<Point> points;
-            for (const PeriodRecord* const period : periods)
-            {
-                for (const SampleSeries& series : period->samples)
-                {
-                    if (series.site != site)
-                        continue;
-                    for (std::size_t index = 0U; index < series.items.size(); ++index)
-                    {
-                        points.push_back(Point{series.time_ns[index], series.items[index],
-                                               series.points[index]});
-                    }
-                }
-            }
-            std::stable_sort(points.begin(), points.end(), [](const Point& left, const Point& right)
-                             {
-                                 return left.time_ns < right.time_ns;
-                             });
-            return points;
-        }
-    } // namespace
-
     std::string_view FlowsAnalysis::name() const noexcept
     {
         return "flows";
@@ -100,32 +55,12 @@ namespace SushiProfiler
         {
             if (record.sites[id].role != SiteRole::Flow)
                 continue;
-            std::map<std::uint64_t, Path> paths;
-            std::vector<double> totals;
-            std::vector<double> steps;
-            for (const Point& point : points_of(static_cast<SiteID>(id), periods))
-            {
-                const auto found = paths.find(point.item);
-                if (point.place == FlowPoint::Begin)
-                {
-                    paths[point.item] = Path{point.time_ns, point.time_ns, true};
-                    continue;
-                }
-                if (found == paths.end())
-                {
-                    paths[point.item] = Path{0U, point.time_ns, false};
-                    continue;
-                }
-                steps.push_back(static_cast<double>(point.time_ns - found->second.last_ns));
-                found->second.last_ns = point.time_ns;
-                if (point.place != FlowPoint::End)
-                    continue;
-                if (found->second.begun)
-                    totals.push_back(static_cast<double>(point.time_ns - found->second.begin_ns));
-                paths.erase(found);
-            }
+            const Detail::FlowLatencies latencies =
+                Detail::flow_latencies(static_cast<SiteID>(id), periods);
+            const std::vector<double>& totals = latencies.totals;
+            const std::vector<double>& steps = latencies.steps;
             const std::string label = Detail::site_label(record, static_cast<SiteID>(id));
-            for (auto& [segment, samples] : {std::make_pair("total", &totals),
+            for (const auto& [segment, samples] : {std::make_pair("total", &totals),
                                              std::make_pair("step", &steps)})
             {
                 if (samples->empty())

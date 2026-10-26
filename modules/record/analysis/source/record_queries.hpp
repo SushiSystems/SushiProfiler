@@ -33,6 +33,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,9 @@ namespace SushiProfiler::Detail
 {
     /// @brief The group a zone with no group of its own, under no grouped parent, falls in.
     inline constexpr const char* K_UNGROUPED = "(ungrouped)";
+
+    /// @brief The label of the time no root zone covered.
+    inline constexpr const char* K_UNCOVERED_LABEL = "(uncovered)";
 
     /// @brief Returns the timelines that have an active period, ordered by name.
     [[nodiscard]] std::vector<NameID> active_timelines(const RunRecord& record);
@@ -71,6 +75,32 @@ namespace SushiProfiler::Detail
     /// @return false when the period holds no sample of the site.
     [[nodiscard]] bool fold_counter(const PeriodRecord& period, SiteID site, CounterOp op,
                                     double& out) noexcept;
+
+    /// @brief One timeline's self time per zone group per period, and the time no zone covered.
+    struct GroupSeries
+    {
+        std::map<std::string, std::vector<double>> groups; /**< Self time per period, by group. */
+        std::vector<double> uncovered;                     /**< Uncovered time per period. */
+    };
+
+    /**
+     * @brief Returns the group series of @p periods, summed over each marking thread's trees.
+     *
+     * Every series has one entry per period, 0 where a group did not run.
+     */
+    [[nodiscard]] GroupSeries group_series(const RunRecord& record,
+                                           const std::vector<const PeriodRecord*>& periods);
+
+    /// @brief One flow's latencies: from each item's begin to its end, and between its points.
+    struct FlowLatencies
+    {
+        std::vector<double> totals; /**< Begin to end, one per finished item. */
+        std::vector<double> steps;  /**< Between successive points of an item. */
+    };
+
+    /// @brief Returns the latencies of flow site @p site over @p periods, points in time order.
+    [[nodiscard]] FlowLatencies flow_latencies(SiteID site,
+                                               const std::vector<const PeriodRecord*>& periods);
 
     /// @brief Returns the durations of @p periods, as reals.
     [[nodiscard]] std::vector<double> durations(const std::vector<const PeriodRecord*>& periods);

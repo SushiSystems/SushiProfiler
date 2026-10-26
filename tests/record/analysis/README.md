@@ -29,6 +29,8 @@ and two active periods of 1000 ns. Times are queued, start and end:
   lists the known names.
 - `test_sample_summary.cpp`: the summary of fixed samples; zeros for none; columns and cells line
   up.
+- `test_subject_samples.cpp`: the eleven host subjects of the shared record in order, and the
+  span subjects of the span record.
 - `test_breakdown_analysis.cpp`: `Model` 60, 80, 70; `Data` 30, 20, 30; uncovered 10, 20, 10;
   shares over 330 ns.
 - `test_distribution_analysis.cpp`: the rows of the timeline, three zones, two counters and the

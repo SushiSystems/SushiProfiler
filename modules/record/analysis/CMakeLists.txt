@@ -19,6 +19,7 @@ sushiprofiler_add_module(
         overhead_analysis.cpp
         record_queries.cpp
         sample_summary.cpp
+        subject_samples.cpp
         short_spans_analysis.cpp
         table.cpp
         top_spans_analysis.cpp

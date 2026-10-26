@@ -29,9 +29,53 @@
 #include "record_queries.hpp"
 
 #include <algorithm>
+#include <map>
 
 namespace SushiProfiler::Detail
 {
+    namespace
+    {
+        /// @brief One flow point.
+        struct Point
+        {
+            std::uint64_t time_ns = 0U;        /**< When it was recorded. */
+            std::uint64_t item = 0U;           /**< Its item. */
+            FlowPoint place = FlowPoint::Step; /**< Its place on the item's path. */
+        };
+
+        /// @brief Where an item's path stands.
+        struct Path
+        {
+            std::uint64_t begin_ns = 0U; /**< When it began. */
+            std::uint64_t last_ns = 0U;  /**< Its latest point. */
+            bool begun = false;          /**< Whether its begin was seen. */
+        };
+
+        /// @brief Returns the points of flow site @p site in @p periods, in time order.
+        std::vector<Point> points_of(SiteID site, const std::vector<const PeriodRecord*>& periods)
+        {
+            std::vector<Point> points;
+            for (const PeriodRecord* const period : periods)
+            {
+                for (const SampleSeries& series : period->samples)
+                {
+                    if (series.site != site)
+                        continue;
+                    for (std::size_t index = 0U; index < series.items.size(); ++index)
+                    {
+                        points.push_back(Point{series.time_ns[index], series.items[index],
+                                               series.points[index]});
+                    }
+                }
+            }
+            std::stable_sort(points.begin(), points.end(), [](const Point& left, const Point& right)
+                             {
+                                 return left.time_ns < right.time_ns;
+                             });
+            return points;
+        }
+    } // namespace
+
     std::vector<NameID> active_timelines(const RunRecord& record)
     {
         std::vector<NameID> timelines;
@@ -159,6 +203,65 @@ namespace SushiProfiler::Detail
             }
         }
         return any;
+    }
+
+    GroupSeries group_series(const RunRecord& record,
+                             const std::vector<const PeriodRecord*>& periods)
+    {
+        GroupSeries series;
+        for (std::size_t slot = 0U; slot < periods.size(); ++slot)
+        {
+            const PeriodRecord& period = *periods[slot];
+            double covered = 0.0;
+            for (const ZoneTree& tree : period.zones)
+            {
+                if (tree.thread != period.thread)
+                    continue;
+                for (std::size_t index = 0U; index < tree.nodes.size(); ++index)
+                {
+                    const ZoneNode& node = tree.nodes[index];
+                    std::vector<double>& group = series.groups[group_of(record, tree, index)];
+                    group.resize(periods.size(), 0.0);
+                    group[slot] += static_cast<double>(node.self_ns);
+                    if (node.parent < 0)
+                        covered += static_cast<double>(node.inclusive_ns);
+                }
+            }
+            const auto duration = static_cast<double>(period.duration_ns());
+            series.uncovered.push_back(std::max(0.0, duration - covered));
+        }
+        return series;
+    }
+
+    FlowLatencies flow_latencies(SiteID site, const std::vector<const PeriodRecord*>& periods)
+    {
+        FlowLatencies latencies;
+        std::map<std::uint64_t, Path> paths;
+        for (const Point& point : points_of(site, periods))
+        {
+            const auto found = paths.find(point.item);
+            if (point.place == FlowPoint::Begin)
+            {
+                paths[point.item] = Path{point.time_ns, point.time_ns, true};
+                continue;
+            }
+            if (found == paths.end())
+            {
+                paths[point.item] = Path{0U, point.time_ns, false};
+                continue;
+            }
+            latencies.steps.push_back(static_cast<double>(point.time_ns - found->second.last_ns));
+            found->second.last_ns = point.time_ns;
+            if (point.place != FlowPoint::End)
+                continue;
+            if (found->second.begun)
+            {
+                const std::uint64_t total = point.time_ns - found->second.begin_ns;
+                latencies.totals.push_back(static_cast<double>(total));
+            }
+            paths.erase(found);
+        }
+        return latencies;
     }
 
     std::vector<double> durations(const std::vector<const PeriodRecord*>& periods)

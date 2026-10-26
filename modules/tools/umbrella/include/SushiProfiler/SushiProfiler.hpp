@@ -40,6 +40,7 @@
 #include <SushiProfiler/analysis/overhead_analysis.hpp>
 #include <SushiProfiler/analysis/sample_summary.hpp>
 #include <SushiProfiler/analysis/short_spans_analysis.hpp>
+#include <SushiProfiler/analysis/subject_samples.hpp>
 #include <SushiProfiler/analysis/table.hpp>
 #include <SushiProfiler/analysis/top_spans_analysis.hpp>
 #include <SushiProfiler/clock/calibration.hpp>
