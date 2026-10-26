@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — lock_wait: Added the contended lock guard, which records the time a lock waits only when another thread holds it (`modules/capture/lock_wait/`).
 - 2026-10-26 — zones: Added the recording macros and the scoped zone, which writes one 24-byte event per zone, with counters, values, instants, flows, lanes and caller-timed spans, each compiled out above a level (`modules/capture/zones/`).
 - 2026-10-26 — collector: Added the collector, which opens and closes recording, gives each thread its ring and hands every ring to one consumer, draining an exited thread's ring once before freeing it (`modules/capture/collector/`).
 - 2026-10-26 — build: Allowed a module to depend on another of its tier along an edge `SUSHIPROFILER_SAME_TIER_EDGES` lists (`cmake/SushiProfilerTiers.cmake`).

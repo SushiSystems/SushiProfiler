@@ -25,7 +25,7 @@ through `sp`.
 ## Status
 
 The capture layer (design phase P1) is being built: the clock, the event types, the site
-registry, the rings, the collector and the recording macros exist; lock waits and periods do not
+registry, the rings, the collector, the recording macros and lock waits exist; periods do not
 yet, and nothing above the capture tier is written. The open work is in
 [`docs/design/REMAINING_WORK.md`](docs/design/REMAINING_WORK.md).
 
