@@ -136,13 +136,8 @@ namespace SushiProfiler
         }
         for (auto& [name, lengths] : spans)
             add(subjects, "span:" + name, "ns", std::move(lengths));
-        for (std::size_t id = 1U; id < record.sites.size(); ++id)
-        {
-            if (record.sites[id].role != SiteRole::Flow)
-                continue;
-            add(subjects, "flow:" + Detail::site_label(record, static_cast<SiteID>(id)), "ns",
-                Detail::flow_latencies(static_cast<SiteID>(id), periods).totals);
-        }
+        for (const auto& [name, sites] : Detail::flow_sites(record))
+            add(subjects, "flow:" + name, "ns", Detail::flow_latencies(sites, periods).totals);
         return subjects;
     }
 

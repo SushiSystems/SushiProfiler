@@ -98,8 +98,12 @@ namespace SushiProfiler::Detail
         std::vector<double> steps;  /**< Between successive points of an item. */
     };
 
-    /// @brief Returns the latencies of flow site @p site over @p periods, points in time order.
-    [[nodiscard]] FlowLatencies flow_latencies(SiteID site,
+    /// @brief Returns the flow sites of @p record by label, ascending; one flow's points sit at
+    /// several call sites, each its own site.
+    [[nodiscard]] std::map<std::string, std::vector<SiteID>> flow_sites(const RunRecord& record);
+
+    /// @brief Returns the latencies of the flow whose points @p sites record, in time order.
+    [[nodiscard]] FlowLatencies flow_latencies(const std::vector<SiteID>& sites,
                                                const std::vector<const PeriodRecord*>& periods);
 
     /// @brief Returns the durations of @p periods, as reals.

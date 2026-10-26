@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — analysis: Fixed `flows` and the `flow:` check subjects, which kept each call site of a flow apart and so found no item with both a begin and an end; the call sites of one flow name now count as one flow.
 - 2026-10-26 — session: Added `Session`, which checks the configuration's names at start, records the window's periods and returns the run at stop; `report` runs the analyses and record writers (`modules/session/session/`).
 - 2026-10-26 — consumer: Added `PeriodAssembler`, which places drained events in periods by begin time with a linger and closes them in order, and `Consumer`, which drains at an adaptive interval (`modules/session/consumer/`).
 - 2026-10-26 — registry: Added `Registry`, which makes sources and writers by name and lists the known names on a miss, and the built-in `terminal`, `record` and `chrome_trace` writers (`modules/session/registry/`).

@@ -51,15 +51,16 @@ namespace SushiProfiler::Detail
             bool begun = false;          /**< Whether its begin was seen. */
         };
 
-        /// @brief Returns the points of flow site @p site in @p periods, in time order.
-        std::vector<Point> points_of(SiteID site, const std::vector<const PeriodRecord*>& periods)
+        /// @brief Returns the points of flow sites @p sites in @p periods, in time order.
+        std::vector<Point> points_of(const std::vector<SiteID>& sites,
+                                     const std::vector<const PeriodRecord*>& periods)
         {
             std::vector<Point> points;
             for (const PeriodRecord* const period : periods)
             {
                 for (const SampleSeries& series : period->samples)
                 {
-                    if (series.site != site)
+                    if (std::find(sites.begin(), sites.end(), series.site) == sites.end())
                         continue;
                     for (std::size_t index = 0U; index < series.items.size(); ++index)
                     {
@@ -233,11 +234,24 @@ namespace SushiProfiler::Detail
         return series;
     }
 
-    FlowLatencies flow_latencies(SiteID site, const std::vector<const PeriodRecord*>& periods)
+    std::map<std::string, std::vector<SiteID>> flow_sites(const RunRecord& record)
+    {
+        std::map<std::string, std::vector<SiteID>> sites;
+        for (std::size_t id = 1U; id < record.sites.size(); ++id)
+        {
+            const auto site = static_cast<SiteID>(id);
+            if (record.sites[id].role == SiteRole::Flow)
+                sites[site_label(record, site)].push_back(site);
+        }
+        return sites;
+    }
+
+    FlowLatencies flow_latencies(const std::vector<SiteID>& sites,
+                                 const std::vector<const PeriodRecord*>& periods)
     {
         FlowLatencies latencies;
         std::map<std::uint64_t, Path> paths;
-        for (const Point& point : points_of(site, periods))
+        for (const Point& point : points_of(sites, periods))
         {
             const auto found = paths.find(point.item);
             if (point.place == FlowPoint::Begin)

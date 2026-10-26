@@ -51,15 +51,11 @@ namespace SushiProfiler
         table.add_column("segment");
         add_summary_columns(table, Unit::Nanoseconds);
         const std::vector<const PeriodRecord*> periods = Detail::active_periods(record);
-        for (std::size_t id = 1U; id < record.sites.size(); ++id)
+        for (const auto& [label, sites] : Detail::flow_sites(record))
         {
-            if (record.sites[id].role != SiteRole::Flow)
-                continue;
-            const Detail::FlowLatencies latencies =
-                Detail::flow_latencies(static_cast<SiteID>(id), periods);
+            const Detail::FlowLatencies latencies = Detail::flow_latencies(sites, periods);
             const std::vector<double>& totals = latencies.totals;
             const std::vector<double>& steps = latencies.steps;
-            const std::string label = Detail::site_label(record, static_cast<SiteID>(id));
             for (const auto& [segment, samples] : {std::make_pair("total", &totals),
                                              std::make_pair("step", &steps)})
             {

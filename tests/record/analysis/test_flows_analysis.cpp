@@ -53,3 +53,27 @@ TEST(Small_FlowsAnalysis, MeasuresTotalAndStepLatencyAcrossPeriods)
                                real(80.0), real(10.0), real(80.0),
                                real(std::sqrt(1425.0) / 47.5)});
 }
+
+TEST(Small_FlowsAnalysis, JoinsTheCallSitesOfOneFlowByName)
+{
+    SushiProfiler::RunRecord record = analysis_record();
+    SushiProfiler::SiteRecord end_site = record.sites[7];
+    record.sites.push_back(end_site);
+    const auto end_id = static_cast<SushiProfiler::SiteID>(record.sites.size() - 1U);
+    for (SushiProfiler::PeriodRecord& period : record.periods)
+    {
+        for (SushiProfiler::SampleSeries& series : period.samples)
+        {
+            if (series.site == 7U && !series.points.empty() &&
+                series.points.front() == SushiProfiler::FlowPoint::End)
+                series.site = end_id;
+        }
+    }
+
+    const Table table = SushiProfiler::FlowsAnalysis().run(record, {});
+
+    ASSERT_EQ(table.rows.size(), 2U);
+    expect_row(table.rows[0], {text("item"), text("total"), whole(2), real(95.0), real(90.0),
+                               real(100.0), real(90.0), real(99.5),
+                               real(std::sqrt(50.0) / 95.0)});
+}
