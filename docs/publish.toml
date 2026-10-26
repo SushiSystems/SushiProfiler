@@ -1,0 +1,6 @@
+name = "sushiprofiler"
+title = "SushiProfiler"
+summary = "SushiProfiler is the profiler of the Sushi libraries: a C++17 library that records where the time of a period of a program goes."
+sections = ["getting_started", "architecture", "reference"]
+exclude = []
+api = false

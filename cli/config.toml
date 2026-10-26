@@ -1,0 +1,15 @@
+# SushiProfiler CLI configuration.
+#
+# Layering (lowest -> highest precedence):
+#   built-in defaults  ->  this file  ->  config.local.toml  ->  SP_* env vars
+#
+# SushiProfiler pins no toolchain. `sp` builds with an explicit `cxx`, else a clang++ on PATH, else
+# CMake's platform default. A machine-specific path belongs in a gitignored config.local.toml
+# next to this file, with the same layout.
+#
+# [tool]
+# cxx = "C:/path/to/clang++.exe"     # also SP_CXX
+# generator = "Ninja"                # also SP_CMAKE_GENERATOR
+# vs_vcvars = "C:/.../vcvars64.bat"  # the MSVC environment a clang++ on Windows needs
+
+[tool]

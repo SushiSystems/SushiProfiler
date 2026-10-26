@@ -1,0 +1,28 @@
+# Build trees of `sp build`, one per sanitizer
+build/
+build-asan/
+build-tsan/
+out/
+
+# IDEs
+.vscode/
+.vs/
+*.swp
+
+# Machine-specific CLI config (config.toml holds the shared defaults)
+cli/config.local.toml
+
+# Python
+cli/build/
+cli/*.egg-info/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# CMake run in place by mistake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+_deps/
+docs/archive/

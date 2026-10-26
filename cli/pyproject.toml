@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sushiprofiler-cli"
+version = "0.1.0"
+description = "SushiProfiler developer CLI (build / test / check)"
+authors = [{ name = "Mustafa Garip", email = "mustafagarip@sushisystems.io" }]
+license = { text = "PolyForm-Noncommercial-1.0.0" }
+requires-python = ">=3.11"
+dependencies = [
+    "sushicore==0.9.2",
+    "typer>=0.12",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0", "pytest-timeout>=2.3"]
+
+[project.scripts]
+sp = "sushiprofiler.cli:main"
+sushiprofiler = "sushiprofiler.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sushiprofiler*"]
+
+[tool.setuptools.package-data]
+sushiprofiler = ["py.typed"]
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+markers = [
+    "small: one process and one thread, no network, no sleep, no file outside the build tree (60 s)",
+    "medium: threads and processes, localhost, files in a temporary folder (300 s)",
+    "large: real hardware, or a run longer than medium allows (900 s)",
+]

@@ -1,0 +1,1 @@
+cli/config\.local\.toml # machine-specific CLI config that git ignores, so no checkout holds it

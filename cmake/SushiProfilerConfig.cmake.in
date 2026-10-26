@@ -1,0 +1,17 @@
+# SushiProfilerConfig.cmake.in
+# SushiProfiler - https://github.com/sushisystems/sushiprofiler
+# Copyright (c) 2026-present Mustafa Garip & Sushi Systems
+# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
+# Commercial use requires a licence from Sushi Systems.
+
+@PACKAGE_INIT@
+
+# What find_package(SushiProfiler) gives a consumer: SushiProfiler::SushiProfiler. It carries
+# this tree's include roots and Threads, and neither its warnings nor its sanitizer.
+
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+
+include("${CMAKE_CURRENT_LIST_DIR}/SushiProfilerTargets.cmake")
+
+check_required_components(SushiProfiler)
