@@ -802,6 +802,8 @@ TEST_F(Small_PeriodAssembler, ASourceStillCollectsAPausedPeriod)
     rig_.pauses().begin(100U);
     rig_.pauses().end(200U);
     PlacingSource source({});
+    SourceContext context(names_, record_.tracks, 0U);
+    ASSERT_TRUE(source.begin(context).ok());
     const AssemblySettings settings = follow(every_period(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {&source}, rig_.parts());
 

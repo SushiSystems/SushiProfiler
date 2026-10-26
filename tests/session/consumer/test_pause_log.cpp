@@ -144,7 +144,7 @@ TEST(Medium_PauseLog, ConcurrentBeginEndAndOverlapsAgree)
             {
                 while (!done.load(std::memory_order_acquire))
                 {
-                    if (log.overlaps(1'000'000'000U, 2'000'000'000U))
+                    if (log.overlaps(0U, 500U))
                         wrong.fetch_add(1);
                     static_cast<void>(log.ends_after(0U));
                 }
@@ -152,8 +152,8 @@ TEST(Medium_PauseLog, ConcurrentBeginEndAndOverlapsAgree)
     }
     for (std::uint64_t index = 0U; index < 10'000U; ++index)
     {
-        log.begin(index * 10U);
-        log.end(index * 10U + 5U);
+        log.begin(1'000U + index * 10U);
+        log.end(1'000U + index * 10U + 5U);
     }
     done.store(true, std::memory_order_release);
     for (std::thread& reader : readers)
