@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.1.0 — 2026-10-26
+
 - 2026-10-26 — docs: Corrected what the release review found false: the manual index, the size rule, the record tool's exit codes and refusals, `sp check`'s count, and `attribute_bytes`, which nothing applies yet (`docs/README.md`).
 - 2026-10-26 — docs: Closed the session and the run record, design phase P2, and described the session and record paths (`docs/architecture/ARCHITECTURE.md`).
 - 2026-10-26 — consumer: Added `Consumer::drains()` and the benchmark `sp_bench_consumer`, which measures the drains per second of an idle consumer (`tests/session/consumer/`).
