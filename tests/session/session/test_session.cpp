@@ -21,7 +21,7 @@
 
 /**
  * @file test_session.cpp
- * @brief Tests a session end to end on two threads, and its refusals at start.
+ * @brief Tests a session end to end on two threads, its record's use, and its refusals.
  * @author Mustafa Garip
  * @see tests/session/session/README.md
  */
@@ -38,7 +38,9 @@
 #include <string>
 #include <thread>
 
+#include <SushiProfiler/checks/verdict.hpp>
 #include <SushiProfiler/collector/collector.hpp>
+#include <SushiProfiler/compare/compare_records.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 #include <SushiProfiler/record_json/record_json.hpp>
 #include <SushiProfiler/zones/macros.hpp>
@@ -247,6 +249,20 @@ TEST(Medium_Session, RecordsTenPeriodsFromTwoThreads)
     EXPECT_EQ(report.tables.size(), 4U);
     for (const char* table : {"breakdown", "counters", "flows", "overhead"})
         EXPECT_NE(terminal.str().find(std::string("== ") + table + " =="), std::string::npos);
+    ASSERT_EQ(report.tables[2].name, "flows");
+    EXPECT_EQ(report.tables[2].rows.size(), 2U);
+    const SushiProfiler::Comparison same = SushiProfiler::compare_records(record, record, {});
+    ASSERT_TRUE(same.ok()) << same.error;
+    EXPECT_FALSE(same.table.rows.empty());
+    const SushiProfiler::ChecksReadResult checks = SushiProfiler::read_checks(
+        R"([{"subject": "flow:e2e.item", "statistic": "max", "at_most_ns": 1},
+            {"subject": "timeline:e2e.step", "statistic": "min", "at_least_ns": 1}])");
+    ASSERT_TRUE(checks.ok()) << checks.error;
+    const std::vector<SushiProfiler::Verdict> verdicts =
+        SushiProfiler::check(record, checks.checks);
+    ASSERT_EQ(verdicts.size(), 2U);
+    EXPECT_FALSE(verdicts[0].passed);
+    EXPECT_TRUE(verdicts[1].passed) << verdicts[1].reason;
     const SushiProfiler::RecordReadResult reread =
         SushiProfiler::read_record(file_text(folder + "/run.sprec.json"));
     ASSERT_TRUE(reread.ok()) << reread.error;
