@@ -43,6 +43,8 @@
 #include <SushiProfiler/analysis/subject_samples.hpp>
 #include <SushiProfiler/analysis/table.hpp>
 #include <SushiProfiler/analysis/top_spans_analysis.hpp>
+#include <SushiProfiler/checks/check.hpp>
+#include <SushiProfiler/checks/verdict.hpp>
 #include <SushiProfiler/clock/calibration.hpp>
 #include <SushiProfiler/clock/trace_clock.hpp>
 #include <SushiProfiler/collector/collector.hpp>
