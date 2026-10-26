@@ -24,9 +24,10 @@ through `sp`.
 
 ## Status
 
-The capture layer (design phase P1) is written: the clock, the event types, the site registry,
-the rings, the collector, the recording macros, lock waits and period timelines. Its benchmarks
-are not, and nothing above the capture tier is written. The open work is in
+The capture layer, design phase P1, is built: the clock, the event types, the site registry, the
+rings, the collector, the recording macros, lock waits and period timelines, with benchmarks that
+meet the design's budget. Nothing above the capture tier is written yet: no session, record or
+analysis. The open work is in
 [`docs/design/REMAINING_WORK.md`](docs/design/REMAINING_WORK.md).
 
 ## Documentation

@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — docs: Closed the capture layer, design phase P1, and described its record path (`docs/architecture/ARCHITECTURE.md`).
 - 2026-10-26 — zones: Measured the hot path, 1.3 ns with the gate closed and 13.3 ns per recorded zone on a Ryzen 5 7600X, and proved a recording thread never allocates after its sites' first use (`tests/capture/zones/`).
 - 2026-10-26 — cli: Added `sp build --benchmarks` and `sp bench`, which build and run the benchmark programs (`cli/sushiprofiler/`).
 - 2026-10-26 — build: Added `PRIVATE_DEPENDS` to `sushiprofiler_add_module`, for a module whose `source/` files alone include a dependency (`cmake/SushiProfilerModule.cmake`).

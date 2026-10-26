@@ -4,16 +4,7 @@ Next id: RW-4
 
 ## Next
 
-- RW-1 Every other phase builds on the capture layer
-- RW-2 The libraries above wait on its release
-
-## Capture
-
-### RW-1 Build the capture layer of the profiler
-- State: open
-- Done when: the zone, ring and allocation tests pass and the budget benchmarks meet the budget of
-  the design document
-- Source: `docs/design/PROFILER/README.md`
+- RW-2 Every later phase reads the record, and the libraries above wait on its release
 
 ## Session and record
 

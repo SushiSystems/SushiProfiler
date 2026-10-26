@@ -1,8 +1,8 @@
 # SushiProfiler
 
-**Status:** Open — approved by the owner on 2026-10-26; P1 is next.
+**Status:** Open — approved by the owner on 2026-10-26; P1 built 2026-10-26, P2 is next.
 **About:** A general-purpose profiler for any C++17 program: zones, counters, values, flows and device spans over marked periods, kept as a run record that is analysed, compared and checked.
-**Modules:** none
+**Modules:** `modules/foundation/clock`, `modules/foundation/events`, `modules/capture/sites`, `modules/capture/rings`, `modules/capture/collector`, `modules/capture/zones`, `modules/capture/lock_wait`, `modules/capture/periods`
 
 ## Problem
 
@@ -91,7 +91,7 @@ Performance budget, measured by benchmarks in this repository before P2 closes:
 
 | Id | Phase | State |
 | --- | --- | --- |
-| P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | planned |
+| P1 | SushiProfiler: `clock`, `events`, `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods`; the zone, ring and allocation tests; the budget benchmarks | built |
 | P2 | SushiProfiler: `config`, `registry`, `window`, `sources`, `environment`, `fold`, `consumer`, `session`, `record`, `statistics`, `analysis`, the writers, `compare`, checks, `sp show / compare / check / validate` | planned |
 | P3 | SushiRuntime: the device source, the node table, the runtime's own zones | planned |
 | P4 | SushiBLAS: cost rules, `device_ceilings`, `roofline`, the benchmark harness on a timeline | planned |
@@ -116,5 +116,5 @@ The acceptance criteria and the design record of the approval are in SushiAI's w
   lowering passes the IR node id in the task description, a SushiBLAS change.
 - Whether a period on SushiRuntime's command-graph replay path can be timed as one span, so an
   unprofiled run still has a device total.
-- Static or shared library once the first module has sources; static is the orchestrator's
-  proposal, because the hot path is inline and every client embeds it.
+- Static or shared library. It builds static, the orchestrator's proposal, because the hot path is
+  inline and every client embeds it; a shared build would need the collector exported once.

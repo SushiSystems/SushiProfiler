@@ -39,6 +39,28 @@ the rule.
 The module `umbrella` sits in the top tier, so every module is below it, and it includes every
 public header of the library.
 
+## The capture path
+
+A program records through the macros of `zones`. Each call site builds its `Site` as a
+`static constexpr` object beside a static `SiteHandle`, so nothing runs before the first record.
+A record passes `Detail::admit` in `zones/admission.hpp`, in this order:
+
+1. The gate: `Collector::recording()`, one relaxed load. A closed gate ends the record here.
+2. The site: `SiteRegistry::id_of` registers the handle on first use and is one acquire load
+   after; the site's enable byte, which a `SiteFilter` sets by level and group, says whether it
+   records.
+3. The ring: `Collector::ring()` returns the thread's `ThreadRing`.
+
+A zone reads `Collector::now()`, TSC ticks when the counter is invariant, on entry and pushes one
+24-byte `TraceEvent` on exit. Counters, values, instants, flows and caller-timed spans push one
+event each. Period marks and lanes carry no site, so only the gate turns them off. A record above
+its library's compiled level is compiled out and costs nothing.
+
+One consumer calls `Collector::drain`, which moves each ring's events, drops and fill into a
+`DrainBatch` with a calibration point and frees the rings of exited threads. The producers never
+signal it; the consumer, which the session tier will hold, chooses its next poll from the fill.
+`tests/capture/zones/benchmark_zones.cpp` measures the path.
+
 ## Adding a module
 
 A module is a folder `modules/<tier>/<module>/` with `include/SushiProfiler/<module>/`, a
@@ -50,9 +72,9 @@ Neither `modules/CMakeLists.txt` nor `tests/CMakeLists.txt` changes: both walk t
 ## The library target
 
 `sushiprofiler_compose_library` in `cmake/SushiProfilerLibrary.cmake` builds the one target,
-`SushiProfiler::SushiProfiler`, from what the modules recorded. While no module lists a source
-file the target is an INTERFACE library carrying the include roots of every module and Threads.
-Once a module lists sources, it is a static library over them. `sushiprofiler_install_package`
+`SushiProfiler::SushiProfiler`, from what the modules recorded: a static library over every
+module's `source/` files, carrying the include roots of every module and Threads. A module with no
+sources adds only its include root. `sushiprofiler_install_package`
 installs it as the package `SushiProfiler`; `tests/package/` builds a consumer against that
 install.
 

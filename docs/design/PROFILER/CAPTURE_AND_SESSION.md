@@ -142,6 +142,11 @@ changes per period. A real-time block's budget is its duration; a frame's is its
 A period may carry tags, `timeline.tag(key, value)`, written once per period off the hot path:
 the input sequence, the variant under test. The record keeps them and `sp compare` groups by them.
 
+Because a closed gate writes no mark, the window cannot learn of a period from the record. P2
+gives `PeriodTimeline` an observer, an interface declared in the capture tier and implemented by
+the window, which each `mark()` calls with the index it opens; the window opens or closes the gate
+there, before the mark is written.
+
 The window is PyTorch's schedule: `skip` periods are ignored, then cycles of `wait` (nothing
 recorded), `warmup` (recorded, marked warm-up), `active` (recorded), repeated `repeat` times, 0
 meaning until the session stops. The gate opens at the first warm-up period and closes after the
