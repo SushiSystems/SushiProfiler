@@ -48,11 +48,22 @@ namespace SushiProfiler
     std::uint64_t PeriodTimeline::mark(std::uint64_t budget_ns) noexcept
     {
         const std::uint64_t index = marks_.fetch_add(1U, std::memory_order_relaxed);
+        PeriodObserver* const observer = observer_.load(std::memory_order_acquire);
+        if (observer != nullptr)
+            observer->before_mark(*this, index);
+        write_mark(index, budget_ns);
+        if (observer != nullptr)
+            observer->after_mark(*this, index);
+        return index;
+    }
+
+    void PeriodTimeline::write_mark(std::uint64_t index, std::uint64_t budget_ns) const noexcept
+    {
         if (!Collector::recording())
-            return index;
+            return;
         ThreadRing* const ring = Collector::ring();
         if (ring == nullptr)
-            return index;
+            return;
         const std::uint64_t now = Collector::now();
         static_cast<void>(
             ring->push(TraceEvent{now, index, pack_site(EventKind::PeriodMark, 0U), id_}));
@@ -61,7 +72,11 @@ namespace SushiProfiler
             static_cast<void>(ring->push(
                 TraceEvent{now, budget_ns, pack_site(EventKind::PeriodBudget, 0U), id_}));
         }
-        return index;
+    }
+
+    void PeriodTimeline::observe(PeriodObserver* observer) noexcept
+    {
+        observer_.store(observer, std::memory_order_release);
     }
 
     std::uint64_t PeriodTimeline::current() const noexcept

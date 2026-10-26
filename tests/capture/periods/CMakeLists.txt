@@ -7,4 +7,5 @@
 sushiprofiler_add_module_tests(
     MODULE periods
     SOURCES
+        test_period_observer.cpp
         test_period_timeline.cpp)

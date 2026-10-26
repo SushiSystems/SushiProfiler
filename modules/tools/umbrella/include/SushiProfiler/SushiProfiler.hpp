@@ -39,6 +39,7 @@
 #include <SushiProfiler/json/json_value.hpp>
 #include <SushiProfiler/json/json_writer.hpp>
 #include <SushiProfiler/lock_wait/contended_lock.hpp>
+#include <SushiProfiler/periods/period_observer.hpp>
 #include <SushiProfiler/periods/period_timeline.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>

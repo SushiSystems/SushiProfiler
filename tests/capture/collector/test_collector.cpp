@@ -247,3 +247,34 @@ TEST_F(Medium_Collector, AnExitedThreadIsDrainedThenFreed)
     EXPECT_TRUE(exited->retired);
     EXPECT_EQ(find(second, index), nullptr);
 }
+
+TEST_F(Small_Collector, PauseClosesTheGateAndKeepsTheRings)
+{
+    push_events(4U);
+    Collector::instance().pause();
+
+    EXPECT_FALSE(Collector::recording());
+    EXPECT_TRUE(Collector::instance().is_open());
+    DrainBatch batch;
+    Collector::instance().drain(batch);
+    const ThreadDrain* const mine = find(batch, Collector::thread_index());
+    ASSERT_NE(mine, nullptr);
+    EXPECT_EQ(mine->events.size(), 4U);
+}
+
+TEST_F(Small_Collector, ResumeOpensTheGateOfAnOpenSession)
+{
+    Collector::instance().pause();
+    Collector::instance().resume();
+
+    EXPECT_TRUE(Collector::recording());
+}
+
+TEST_F(Small_Collector, ResumeDoesNothingWhileClosed)
+{
+    Collector::instance().close();
+    Collector::instance().resume();
+
+    EXPECT_FALSE(Collector::recording());
+    EXPECT_FALSE(Collector::instance().is_open());
+}

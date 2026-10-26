@@ -10,6 +10,10 @@ destroyed, so a thread that exits after `main` returns still retires into it.
   `open(CollectorSettings)` applies the site filter, discards what the rings held from before, frees
   retired rings, takes the first calibration point and opens the gate; a second `open` returns
   false. `close()` closes the gate and leaves the rings for one more drain.
+- The session and the gate. `open` starts a session and `close` ends it; `is_open` says whether
+  one runs. Inside it, `pause` closes the gate and `resume` opens it again without discarding
+  what the rings hold, so a capture window can skip periods; `resume` does nothing while no
+  session is open.
 - The clock. `Collector::now()` stamps events with TSC ticks when the counter is invariant and with
   steady nanoseconds otherwise; the collector chooses once, and `DrainBatch::ticks_are_tsc` says
   which.

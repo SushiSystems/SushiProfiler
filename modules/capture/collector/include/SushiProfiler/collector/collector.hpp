@@ -89,10 +89,16 @@ namespace SushiProfiler
              */
             bool open(const CollectorSettings& settings);
 
-            /// @brief Closes the gate; the rings keep their events for one more drain.
+            /// @brief Ends the session and closes the gate; the rings keep their events to drain.
             void close();
 
-            /// @brief Returns whether the collector is open.
+            /// @brief Closes the gate inside an open session, keeping what the rings hold.
+            void pause();
+
+            /// @brief Opens the gate again inside an open session; does nothing while closed.
+            void resume();
+
+            /// @brief Returns whether a session is open, paused or not.
             [[nodiscard]] bool is_open() const noexcept;
 
             /// @brief Moves every ring's events into @p out and frees the rings of exited threads.
@@ -157,13 +163,16 @@ namespace SushiProfiler
             /// @brief Non-zero while the collector records.
             static std::atomic<std::uint32_t> gate_;
 
+            /// @brief Whether a session is open, between `open` and `close`.
+            std::atomic<bool> open_{false};
+
             /// @brief The sites of the process.
             SiteRegistry sites_;
 
             /// @brief The interned names of the process.
             NameTable names_;
 
-            /// @brief Guards registrations_, settings_, next_index_ and first_point_.
+            /// @brief Guards the registrations, the settings, the first point and the gate's moves.
             mutable std::mutex mutex_;
 
             /// @brief Every thread with a ring not yet freed.

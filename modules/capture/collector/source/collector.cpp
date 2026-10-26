@@ -93,7 +93,7 @@ namespace SushiProfiler
     bool Collector::open(const CollectorSettings& settings)
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (gate_.load(std::memory_order_relaxed) != 0U)
+        if (open_.load(std::memory_order_relaxed))
             return false;
         settings_ = settings;
         sites_.apply(settings.filter);
@@ -110,18 +110,34 @@ namespace SushiProfiler
         registrations_ = std::move(kept);
         discard_.clear();
         first_point_ = sample();
+        open_.store(true, std::memory_order_release);
         gate_.store(1U, std::memory_order_release);
         return true;
     }
 
     void Collector::close()
     {
+        std::lock_guard<std::mutex> lock(mutex_);
+        open_.store(false, std::memory_order_release);
         gate_.store(0U, std::memory_order_release);
+    }
+
+    void Collector::pause()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        gate_.store(0U, std::memory_order_release);
+    }
+
+    void Collector::resume()
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (open_.load(std::memory_order_relaxed))
+            gate_.store(1U, std::memory_order_release);
     }
 
     bool Collector::is_open() const noexcept
     {
-        return gate_.load(std::memory_order_acquire) != 0U;
+        return open_.load(std::memory_order_acquire);
     }
 
     void Collector::drain(DrainBatch& out)

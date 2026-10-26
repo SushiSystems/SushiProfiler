@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/periods/period_observer.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -62,7 +63,7 @@ namespace SushiProfiler
             /// @brief Opens the next period with the timeline's budget and returns its index.
             std::uint64_t mark() noexcept;
 
-            /// @brief Opens the next period with @p budget_ns, or none for 0, and returns its index.
+            /// @brief Opens the next period with budget @p budget_ns, 0 for none; returns its index.
             std::uint64_t mark(std::uint64_t budget_ns) noexcept;
 
             /// @brief Returns the index of the open period, or K_NO_PERIOD before the first mark.
@@ -75,6 +76,12 @@ namespace SushiProfiler
              */
             void tag(std::string_view key, std::string_view value);
 
+            /**
+             * @brief Makes @p observer hear every later mark; null removes the one installed.
+             * @pre @p observer outlives its installation.
+             */
+            void observe(PeriodObserver* observer) noexcept;
+
             /// @brief Returns the timeline's interned name.
             [[nodiscard]] NameID id() const noexcept;
 
@@ -82,6 +89,9 @@ namespace SushiProfiler
             [[nodiscard]] std::string_view name() const noexcept;
 
         private:
+            /// @brief Writes the mark of period @p index, and its budget, if the gate is open.
+            void write_mark(std::uint64_t index, std::uint64_t budget_ns) const noexcept;
+
             /// @brief The timeline's name.
             std::string name_;
 
@@ -93,5 +103,8 @@ namespace SushiProfiler
 
             /// @brief The number of marks so far.
             std::atomic<std::uint64_t> marks_{0U};
+
+            /// @brief The observer of the marks, or null.
+            std::atomic<PeriodObserver*> observer_{nullptr};
     };
 } // namespace SushiProfiler

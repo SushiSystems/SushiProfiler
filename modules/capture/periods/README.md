@@ -17,5 +17,11 @@ nanoseconds.
 - `tag(key, value)` interns both strings and writes a `PeriodTag` the fold attaches to the open
   period. It takes a lock, so a real-time thread does not tag.
 
+`SushiProfiler/periods/period_observer.hpp` declares `PeriodObserver`, which a timeline calls on
+the marking thread around each mark: `before_mark`, then the mark is written if the gate is open,
+then `after_mark`. `observe(observer)` installs one, or removes it with null. A capture window
+opens the gate in `before_mark` and closes it in `after_mark`, so the last recorded period still
+gets its end mark.
+
 Marks and tags have no site; only the gate turns them off. The tests are in
 `tests/capture/periods/`.
