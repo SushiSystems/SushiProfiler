@@ -22,7 +22,7 @@ are the same value.
   a warm-up period keeps none.
 - `SushiProfiler/record/device_span_keys.hpp`: the keys a device source writes and `roofline`
   reads, in the namespace `SushiProfiler::DeviceSpanKeys`: the span attribute names `K_NODE`,
-  `K_INVOCATION`, `K_OPERATION`, `K_LAUNCHED_WIDTH`, `K_LIVE_WIDTH`, `K_DTYPE`, `K_FLOPS` and
+  `K_GRAPH`, `K_ORIGIN`, `K_INVOCATION`, `K_OPERATION`, `K_LAUNCHED_WIDTH`, `K_LIVE_WIDTH`, `K_DTYPE`, `K_FLOPS` and
   `K_BYTES`, and `peak_flops_fact(track)`, `peak_flops_fact(track, dtype)` and
   `peak_bytes_per_s_fact(track)`, which build the environment fact names `device.<track>.peak_flops`,
   `device.<track>.peak_flops.<dtype>` and `device.<track>.peak_bytes_per_s`. Each key's kind and

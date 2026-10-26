@@ -41,6 +41,12 @@ namespace SushiProfiler::DeviceSpanKeys
     /// @brief Integer span attribute: which invocation of the graph the span belongs to.
     inline constexpr std::string_view K_INVOCATION = "invocation";
 
+    /// @brief Name span attribute: the label of the graph whose plan ran the node.
+    inline constexpr std::string_view K_GRAPH = "graph";
+
+    /// @brief Name span attribute: the caller's label for the operation the node was recorded for.
+    inline constexpr std::string_view K_ORIGIN = "origin";
+
     /// @brief Integer span attribute: the id of the operation the node performs.
     inline constexpr std::string_view K_OPERATION = "operation";
 

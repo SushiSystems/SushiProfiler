@@ -10,6 +10,8 @@ a source and an analysis use them and never write the word again.
 | Key | Kind | Meaning | Constant |
 | --- | --- | --- | --- |
 | `node` | integer span attribute | The index of the graph node that ran | `K_NODE` |
+| `graph` | name span attribute | The label of the graph whose plan ran the node; a node index is unique only within one plan, so `roofline` keeps graphs apart | `K_GRAPH` |
+| `origin` | name span attribute | The caller's label for the operation the node was recorded for, such as an IR node; `roofline` keeps origins apart | `K_ORIGIN` |
 | `invocation` | integer span attribute | Which invocation of the graph the span belongs to | `K_INVOCATION` |
 | `operation` | integer span attribute | The id of the operation the node performs | `K_OPERATION` |
 | `launched_width` | integer span attribute | The work items the launch started | `K_LAUNCHED_WIDTH` |

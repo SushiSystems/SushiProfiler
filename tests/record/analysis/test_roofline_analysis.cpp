@@ -142,14 +142,14 @@ TEST(Small_RooflineAnalysis, GivesEachNodeItsRowAndSplitsAMixedTypeAndMergesTheS
     const Table table = SushiProfiler::RooflineAnalysis().run(typed_record(), {});
 
     ASSERT_EQ(table.rows.size(), 4U);
-    EXPECT_TRUE(table.rows[0][3].empty());
-    EXPECT_EQ(*table.rows[1][3].as_whole(), 7);
-    EXPECT_EQ(*table.rows[1][4].as_text(), "f16");
-    EXPECT_EQ(*table.rows[1][5].as_whole(), 2);
-    EXPECT_EQ(*table.rows[2][3].as_whole(), 8);
-    EXPECT_EQ(*table.rows[2][4].as_text(), "f16");
-    EXPECT_EQ(*table.rows[3][3].as_whole(), 8);
-    EXPECT_EQ(*table.rows[3][4].as_text(), "f32");
+    EXPECT_TRUE(table.rows[0][5].empty());
+    EXPECT_EQ(*table.rows[1][5].as_whole(), 7);
+    EXPECT_EQ(*table.rows[1][6].as_text(), "f16");
+    EXPECT_EQ(*table.rows[1][7].as_whole(), 2);
+    EXPECT_EQ(*table.rows[2][5].as_whole(), 8);
+    EXPECT_EQ(*table.rows[2][6].as_text(), "f16");
+    EXPECT_EQ(*table.rows[3][5].as_whole(), 8);
+    EXPECT_EQ(*table.rows[3][6].as_text(), "f32");
 }
 
 TEST(Small_RooflineAnalysis, PicksTheCeilingOfTheSpansTypeAndFallsBackToTheTypelessOne)
@@ -158,15 +158,15 @@ TEST(Small_RooflineAnalysis, PicksTheCeilingOfTheSpansTypeAndFallsBackToTheTypel
 
     ASSERT_EQ(table.rows.size(), 4U);
     expect_row(table.rows[1],
-               {whole(1), text("gemm"), text("queue 0"), whole(7), text("f16"), whole(2),
+               {whole(1), Cell(), Cell(), text("gemm"), text("queue 0"), whole(7), text("f16"), whole(2),
                 whole(200'000), whole(200'000'000), whole(2'000'000), real(1e12), real(1e10),
                 real(100.0), real(4e12), real(1e11), real(4e12), real(0.25), text("compute")});
     expect_row(table.rows[2],
-               {whole(1), text("gemm"), text("queue 0"), whole(8), text("f16"), whole(1),
+               {whole(1), Cell(), Cell(), text("gemm"), text("queue 0"), whole(8), text("f16"), whole(1),
                 whole(100'000), whole(50'000'000), whole(1'000'000), real(5e11), real(1e10),
                 real(50.0), real(4e12), real(1e11), real(4e12), real(0.125), text("compute")});
     expect_row(table.rows[3],
-               {whole(1), text("gemm"), text("queue 0"), whole(8), text("f32"), whole(1),
+               {whole(1), Cell(), Cell(), text("gemm"), text("queue 0"), whole(8), text("f32"), whole(1),
                 whole(100'000), whole(100'000'000), whole(1'000'000), real(1e12), real(1e10),
                 real(100.0), real(1e12), real(1e11), real(1e12), real(1.0), text("compute")});
 }
@@ -177,7 +177,7 @@ TEST(Small_RooflineAnalysis, ARowWithNoFlopsButBytesIsMeasuredAgainstTheMemoryCe
 
     ASSERT_EQ(table.rows.size(), 4U);
     expect_row(table.rows[0],
-               {whole(1), text("gemm"), text("queue 0"), Cell(), Cell(), whole(1),
+               {whole(1), Cell(), Cell(), text("gemm"), text("queue 0"), Cell(), Cell(), whole(1),
                 whole(100'000), whole(0), whole(8'000'000), real(0.0), real(8e10), real(0.0),
                 real(1e12), real(1e11), real(0.0), real(0.8), text("memory")});
 }
@@ -188,11 +188,11 @@ TEST(Small_RooflineAnalysis, ReportsAchievedRatesAndIntensityPerPeriodNameAndTra
 
     ASSERT_EQ(table.rows.size(), 3U);
     expect_row(table.rows[0],
-               {whole(1), text("copy"), text("queue 0"), Cell(), Cell(), whole(1), whole(100'000),
+               {whole(1), Cell(), Cell(), text("copy"), text("queue 0"), Cell(), Cell(), whole(1), whole(100'000),
                 whole(1'000'000), whole(8'000'000), real(1e10), real(8e10), real(0.125),
                 real(1e12), real(1e11), real(1.25e10), real(0.8), text("memory")});
     expect_row(table.rows[1],
-               {whole(1), text("gemm"), text("queue 0"), Cell(), Cell(), whole(2), whole(200'000),
+               {whole(1), Cell(), Cell(), text("gemm"), text("queue 0"), Cell(), Cell(), whole(2), whole(200'000),
                 whole(100'000'000), whole(4'000'000), real(5e11), real(2e10), real(25.0),
                 real(1e12), real(1e11), real(1e12), real(0.5), text("compute")});
 }
@@ -204,10 +204,10 @@ TEST(Small_RooflineAnalysis, LeavesTheCeilingCellsEmptyWhenTheTrackHasNoFacts)
     ASSERT_EQ(table.rows.size(), 3U);
     const SushiProfiler::Row& row = table.rows[2];
     EXPECT_EQ(*row[0].as_whole(), 2);
-    EXPECT_EQ(*row[2].as_text(), "queue 1");
-    EXPECT_NEAR(*row[9].as_real(), 1e11, 1.0);
-    EXPECT_NEAR(*row[11].as_real(), 20.0, 1e-9);
-    for (std::size_t column = 12U; column < row.size(); ++column)
+    EXPECT_EQ(*row[4].as_text(), "queue 1");
+    EXPECT_NEAR(*row[11].as_real(), 1e11, 1.0);
+    EXPECT_NEAR(*row[13].as_real(), 20.0, 1e-9);
+    for (std::size_t column = 14U; column < row.size(); ++column)
         EXPECT_TRUE(row[column].empty()) << "column " << column;
 }
 
@@ -239,5 +239,88 @@ TEST(Small_RooflineAnalysis, AnUnreadableCeilingFactIsTreatedAsMissing)
     const Table table = SushiProfiler::RooflineAnalysis().run(record, {});
 
     ASSERT_EQ(table.rows.size(), 3U);
-    EXPECT_TRUE(table.rows[0][16].empty());
+    EXPECT_TRUE(table.rows[0][18].empty());
+}
+
+namespace
+{
+    /// @brief Appends a `gemm` span of 100 us on `queue 0` with 1e8 FLOP and 1e6 B, on node 3,
+    /// with @p graph and @p origin when not 0.
+    void add_labelled(PeriodRecord& period, SushiProfiler::NameID graph,
+                      SushiProfiler::NameID origin)
+    {
+        const std::size_t row = period.spans.append(Span{0U, 0U, 100'000U, 1U, 1U, 0U, 0U});
+        period.spans.set_integer(row, 2U, 100'000'000);
+        period.spans.set_integer(row, 3U, 1'000'000);
+        period.spans.set_integer(row, 4U, 3);
+        if (graph != 0U)
+            period.spans.set_name(row, 5U, graph);
+        if (origin != 0U)
+            period.spans.set_name(row, 6U, origin);
+    }
+
+    /// @brief Returns a record of one period on `queue 0`, without ceilings, whose spans are all
+    /// `gemm` on node 3 of 100 us with 1e8 FLOP and 1e6 B.
+    ///
+    /// The graph and origin of the spans, in order: (`g1`, none), (`g2`, none), (`g1`, `o1`),
+    /// (`g1`, `o2`), (`g1`, `o1`), and (none, none).
+    RunRecord labelled_record()
+    {
+        RunRecord record;
+        record.names = {"", "gemm", "flops", "bytes", "node", "graph", "origin", "g1", "g2", "o1",
+                        "o2"};
+        record.tracks = {"", "queue 0"};
+        PeriodRecord period;
+        period.index = 1U;
+        period.timeline = 1U;
+        period.end_ns = 1'000'000U;
+        add_labelled(period, 7U, 0U);
+        add_labelled(period, 8U, 0U);
+        add_labelled(period, 7U, 9U);
+        add_labelled(period, 7U, 10U);
+        add_labelled(period, 7U, 9U);
+        add_labelled(period, 0U, 0U);
+        record.periods = {period};
+        return record;
+    }
+} // namespace
+
+TEST(Small_RooflineAnalysis, TwoGraphsWithTheSameNodeIndexGiveTwoRows)
+{
+    const Table table = SushiProfiler::RooflineAnalysis().run(labelled_record(), {});
+
+    ASSERT_EQ(table.rows.size(), 5U);
+    EXPECT_TRUE(table.rows[0][1].empty());
+    EXPECT_TRUE(table.rows[0][2].empty());
+    EXPECT_EQ(*table.rows[1][1].as_text(), "g1");
+    EXPECT_TRUE(table.rows[1][2].empty());
+    EXPECT_EQ(*table.rows[1][7].as_whole(), 1);
+    EXPECT_EQ(*table.rows[4][1].as_text(), "g2");
+    EXPECT_EQ(*table.rows[4][7].as_whole(), 1);
+}
+
+TEST(Small_RooflineAnalysis, TwoOriginsOfOneGraphGiveTwoRowsAndTheSameOriginMerges)
+{
+    const Table table = SushiProfiler::RooflineAnalysis().run(labelled_record(), {});
+
+    ASSERT_EQ(table.rows.size(), 5U);
+    expect_row(table.rows[2],
+               {whole(1), text("g1"), text("o1"), text("gemm"), text("queue 0"), whole(3), Cell(),
+                whole(2), whole(200'000), whole(200'000'000), whole(2'000'000), real(1e12),
+                real(1e10), real(100.0), Cell(), Cell(), Cell(), Cell(), Cell()});
+    expect_row(table.rows[3],
+               {whole(1), text("g1"), text("o2"), text("gemm"), text("queue 0"), whole(3), Cell(),
+                whole(1), whole(100'000), whole(100'000'000), whole(1'000'000), real(1e12),
+                real(1e10), real(100.0), Cell(), Cell(), Cell(), Cell(), Cell()});
+}
+
+TEST(Small_RooflineAnalysis, SpansWithoutGraphOrOriginKeepTheirRowAndValues)
+{
+    const Table table = SushiProfiler::RooflineAnalysis().run(labelled_record(), {});
+
+    ASSERT_EQ(table.rows.size(), 5U);
+    expect_row(table.rows[0],
+               {whole(1), Cell(), Cell(), text("gemm"), text("queue 0"), whole(3), Cell(),
+                whole(1), whole(100'000), whole(100'000'000), whole(1'000'000), real(1e12),
+                real(1e10), real(100.0), Cell(), Cell(), Cell(), Cell(), Cell()});
 }

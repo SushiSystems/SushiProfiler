@@ -81,9 +81,11 @@ of its two spans as unattributed rather than guessing.
 
 An attribute block is a run of `(KeyID, kind, value)` triples in a per-period arena: integers,
 doubles and interned strings. A device source writes the keys of `DeviceSpanKeys`
-(`SushiProfiler/record/device_span_keys.hpp`, listed in `CLIENTS.md`): `node`, `invocation`,
-`operation`, `launched_width`, `live_width`, and `flops`, `bytes` and `dtype` when the library that
-recorded the node stated its cost. SushiAI writes `ir_node` and `op`. SushiProfiler reads no key by
+(`SushiProfiler/record/device_span_keys.hpp`, listed in `CLIENTS.md`): `node`, `graph`,
+`origin`, `invocation`, `operation`, `launched_width`, `live_width`, and `flops`, `bytes` and
+`dtype` when the library that recorded the node stated its cost. `graph` labels the graph whose
+plan ran the node, since a node index is unique only within one plan, and `origin` is the caller's
+label for the operation the node was recorded for. SushiAI writes `ir_node` and `op`. SushiProfiler reads no key by
 name except in the analyses that say so.
 
 ## The hot path

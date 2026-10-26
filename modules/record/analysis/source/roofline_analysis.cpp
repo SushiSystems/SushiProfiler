@@ -43,20 +43,24 @@ namespace SushiProfiler
 {
     namespace
     {
-        /// @brief What one row sums over: a name on a track, per node and element type.
+        /// @brief What one row sums over: a name on a track, per graph, origin, node and element
+        /// type.
         struct GroupKey
         {
+            std::string graph;         /**< The graph label, or empty. */
+            std::string origin;        /**< The caller's operation label, or empty. */
             std::string name;          /**< The span name. */
             TrackID track = 0U;        /**< The track. */
             bool has_node = false;     /**< Whether the spans carry the `node` attribute. */
             std::int64_t node = 0;     /**< The node, when they do. */
             std::string dtype;         /**< The element type, or empty. */
 
-            /// @brief Orders keys by name, track, node and element type.
+            /// @brief Orders keys by graph, origin, name, track, node and element type.
             [[nodiscard]] bool operator<(const GroupKey& other) const
             {
-                return std::tie(name, track, has_node, node, dtype) <
-                       std::tie(other.name, other.track, other.has_node, other.node, other.dtype);
+                return std::tie(graph, origin, name, track, has_node, node, dtype) <
+                       std::tie(other.graph, other.origin, other.name, other.track, other.has_node,
+                                other.node, other.dtype);
             }
         };
 
@@ -85,6 +89,14 @@ namespace SushiProfiler
                 return nullptr;
             const AttributeColumn* const column = period.spans.attribute(key);
             return column != nullptr && column->kind == AttributeKind::Name ? column : nullptr;
+        }
+
+        /// @brief Returns the name row @p row of @p column holds, or empty when it holds none.
+        std::string name_at(const RunRecord& record, const AttributeColumn* column, std::size_t row)
+        {
+            if (column == nullptr || column->present[row] != 1U)
+                return {};
+            return std::string(record.name_of(static_cast<NameID>(column->integers[row])));
         }
 
         /// @brief Returns whether row @p row of @p column holds a value that is not negative.
@@ -129,6 +141,8 @@ namespace SushiProfiler
         Table table;
         table.name = "roofline";
         table.add_column("period", Unit::Count);
+        table.add_column("graph");
+        table.add_column("origin");
         table.add_column("name");
         table.add_column("track");
         table.add_column("node", Unit::Count);
@@ -149,6 +163,8 @@ namespace SushiProfiler
         const NameID bytes_key = record.find_name(DeviceSpanKeys::K_BYTES);
         const NameID node_key = record.find_name(DeviceSpanKeys::K_NODE);
         const NameID dtype_key = record.find_name(DeviceSpanKeys::K_DTYPE);
+        const NameID graph_key = record.find_name(DeviceSpanKeys::K_GRAPH);
+        const NameID origin_key = record.find_name(DeviceSpanKeys::K_ORIGIN);
         std::int64_t skipped = 0;
         for (const PeriodRecord* const period : Detail::active_periods(record))
         {
@@ -156,6 +172,8 @@ namespace SushiProfiler
             const AttributeColumn* const bytes = integer_column(*period, bytes_key);
             const AttributeColumn* const nodes = integer_column(*period, node_key);
             const AttributeColumn* const dtypes = name_column(*period, dtype_key);
+            const AttributeColumn* const graphs = name_column(*period, graph_key);
+            const AttributeColumn* const origins = name_column(*period, origin_key);
             std::map<GroupKey, Totals> groups;
             for (std::size_t row = 0U; row < period->spans.size(); ++row)
             {
@@ -173,11 +191,9 @@ namespace SushiProfiler
                     key.has_node = true;
                     key.node = nodes->integers[row];
                 }
-                if (dtypes != nullptr && dtypes->present[row] == 1U)
-                {
-                    key.dtype = std::string(
-                        record.name_of(static_cast<NameID>(dtypes->integers[row])));
-                }
+                key.dtype = name_at(record, dtypes, row);
+                key.graph = name_at(record, graphs, row);
+                key.origin = name_at(record, origins, row);
                 Totals& totals = groups[key];
                 ++totals.spans;
                 totals.time_ns += span.end_ns - span.start_ns;
@@ -193,6 +209,8 @@ namespace SushiProfiler
                 const double flops_rate = seconds > 0.0 ? flops_total / seconds : 0.0;
                 const double bytes_rate = seconds > 0.0 ? bytes_total / seconds : 0.0;
                 Row row{Cell::whole(static_cast<std::int64_t>(period->index)),
+                        key.graph.empty() ? Cell() : Cell::text(key.graph),
+                        key.origin.empty() ? Cell() : Cell::text(key.origin),
                         Cell::text(key.name), Cell::text(track),
                         key.has_node ? Cell::whole(key.node) : Cell(),
                         key.dtype.empty() ? Cell() : Cell::text(key.dtype),

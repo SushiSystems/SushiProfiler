@@ -35,6 +35,8 @@ namespace Keys = SushiProfiler::DeviceSpanKeys;
 TEST(Small_DeviceSpanKeys, TheAttributeKeysAreTheWordsTheSourcesWrite)
 {
     EXPECT_EQ(Keys::K_NODE, "node");
+    EXPECT_EQ(Keys::K_GRAPH, "graph");
+    EXPECT_EQ(Keys::K_ORIGIN, "origin");
     EXPECT_EQ(Keys::K_INVOCATION, "invocation");
     EXPECT_EQ(Keys::K_OPERATION, "operation");
     EXPECT_EQ(Keys::K_LAUNCHED_WIDTH, "launched_width");

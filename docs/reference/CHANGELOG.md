@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-10-26 — record: Added `K_GRAPH` and `K_ORIGIN` to `DeviceSpanKeys` (`modules/record/record/`).
+- 2026-10-26 — analysis: Changed `roofline` to group by graph and origin, with two new columns after `period` that move every later column by two (`modules/record/analysis/`).
 - 2026-10-26 — record: Added `DeviceSpanKeys`, the attribute and ceiling fact keys, per type too, that device sources write and `roofline` reads (`modules/record/record/`).
 - 2026-10-26 — analysis: Added `roofline`: per span name, node and type, achieved FLOP/s and bytes/s and the share of the bound the ceiling facts give (`modules/record/analysis/`).
 - 2026-10-26 — docs: Added the client library guide: the shared or static choice, `register_profiler_parts` and what a source may rely on (`docs/guides/CLIENT_LIBRARY.md`).
