@@ -62,7 +62,7 @@ namespace SushiProfiler
     struct BufferSettings
     {
         std::uint32_t ring_events = 65'536U;      /**< Events per thread ring, 64 to 2^24. */
-        std::uint64_t attribute_bytes = 1'048'576U; /**< Bytes of span attributes per period. */
+        std::uint64_t attribute_bytes = 1'048'576U; /**< A limit no part applies yet (RW-6). */
         std::uint32_t linger_ms = 100U;           /**< How long a period stays open, to 60 000. */
     };
 

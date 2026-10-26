@@ -7,7 +7,7 @@ The tests mirror `modules/`: the test of
 
 ## Sizes
 
-A test's size is the prefix of its GoogleTest suite. The build refuses a suite without one.
+A test's size is the prefix of its GoogleTest suite. A suite without one is never registered with ctest, and `tools/testing/check_test_sizes.py` fails on it.
 
 | Size | The test may use | Timeout |
 | --- | --- | --- |

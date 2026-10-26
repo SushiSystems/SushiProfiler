@@ -1,6 +1,6 @@
 # Remaining work
 
-Next id: RW-6
+Next id: RW-7
 
 ## Decisions waiting for the owner
 
@@ -21,6 +21,15 @@ Next id: RW-6
   "under one". A slowest poll above 1 s meets the row as written, and makes a burst after a quiet
   stretch wait longer for its first drain
 - Source: `docs/design/PROFILER/README.md`
+
+## Session
+
+### RW-6 Apply `buffers.attribute_bytes` or remove it
+- State: open
+- Done when: a period's span attributes stop at the configured byte count and the excess is
+  counted as dropped spans, or the key leaves the configuration format. The reader accepts and
+  range-checks it today, and no part uses it
+- Source: `docs/design/PROFILER/CAPTURE_AND_SESSION.md`
 
 ## Later
 

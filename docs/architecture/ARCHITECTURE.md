@@ -36,8 +36,9 @@ the rule.
 - The checker. `tools/layering/check_layering.py` reads the same order and fails an upward
   include, an include of another module's `source/`, and an include the module did not declare.
 
-The module `umbrella` sits in the top tier, so every module is below it, and it includes every
-public header of the library.
+The module `umbrella` sits in the top tier and includes every public header of the library. Every
+other module is in a lower tier, except `record_tool`, which it reaches through the same-tier edge
+`umbrella record_tool`.
 
 ## The capture path
 

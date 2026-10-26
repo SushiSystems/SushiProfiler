@@ -19,7 +19,7 @@ runs that program. The module depends on `analysis`, `checks`, `compare`, `recor
 
 Exit code 2 means the tool could not do what was asked: an unknown command, option or analysis,
 a missing value, a wrong number of files, a file that cannot be read, or a check file that does
-not parse. Every refusal names the file it comes from.
+not parse. A refusal about a file names that file.
 
 `source/tool_arguments.hpp` splits the arguments of a command into words, options with a value
 and flags, and reads the files. Each command is its own source file behind

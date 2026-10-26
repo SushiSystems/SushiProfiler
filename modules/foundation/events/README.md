@@ -8,7 +8,7 @@ is header-only and depends on the standard library alone.
 - `SushiProfiler/events/trace_event.hpp`: `TraceEvent`, 24 trivially copyable bytes: two 64-bit
   fields, a site word and a name. `EventKind` names 14 kinds, kept in the top four bits of the
   site word by `pack_site` and read back by `kind_of` and `site_of`. Each enumerator's comment says
-  what `begin`, `end` and `name` hold for it: Times are 64-bit, so no span is clipped.
+  what `begin`, `end` and `name` hold for it. Times are 64-bit, so no span is clipped.
   `value_bits` and `value_of` carry a counter's or value's double through the `end` field bit for
   bit, NaN payloads and signed zeros included.
 

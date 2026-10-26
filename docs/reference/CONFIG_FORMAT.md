@@ -37,7 +37,7 @@ recorded. There are `repeat` cycles, and `repeat` 0 means until the session stop
 | `buffers` key | Range | Default | Holds |
 | --- | --- | --- | --- |
 | `ring_events` | 64 to 2^24 | 65 536 | Events per thread ring, rounded up to a power of two |
-| `attribute_bytes` | 0 to 2^32 | 1 048 576 | Bytes of span attributes kept per period |
+| `attribute_bytes` | 0 to 2^32 | 1 048 576 | Reserved for a limit on the bytes of span attributes per period; read and range-checked, but nothing applies it yet (RW-6) |
 | `linger_ms` | 0 to 60 000 | 100 | How long a period stays open after its end for late events |
 
 A source's or writer's settings object is read by that part, not by the configuration reader;

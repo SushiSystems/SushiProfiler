@@ -42,7 +42,8 @@ and runs its one program.
 
 ## sp check
 
-Runs the shared checkers under `tools/`.
+Runs nine of the shared checkers under `tools/`. `python -I tools/check_all.py .` runs all twelve,
+with the backlog and design checkers, then the tests.
 
 ```bash
 sp check
@@ -52,7 +53,8 @@ sp check --report    # counts per rule, exit 0
 ## sp record
 
 Reads run records with the `sp_record` program that `sp build` builds. Each command exits 1 when
-a record is invalid, a check fails or two builds differ, and 2 on a usage error.
+a record is invalid, a check fails or two builds differ, and 2 on a usage error or a file that
+cannot be read. `sp record` itself exits 1 when the build holds no `sp_record`.
 
 ```bash
 sp record validate run.sprec.json
