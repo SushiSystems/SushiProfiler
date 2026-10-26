@@ -60,6 +60,9 @@
 #include <SushiProfiler/record/sample_series.hpp>
 #include <SushiProfiler/record/span_table.hpp>
 #include <SushiProfiler/record_json/record_json.hpp>
+#include <SushiProfiler/record_writers/record_file_writer.hpp>
+#include <SushiProfiler/record_writers/record_writer.hpp>
+#include <SushiProfiler/record_writers/terminal_writer.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>

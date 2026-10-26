@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — record_writers: Added the terminal writer, which prints analysis tables aligned with readable units, and the record file writer (`modules/record/record_writers/`).
 - 2026-10-26 — analysis: Added the span analyses device_idle, top_spans and short_spans (`modules/record/analysis/`).
 - 2026-10-26 — analysis: Added named analyses over a record, with a catalog and a runner: breakdown, distribution, budget, counters, flows and overhead (`modules/record/analysis/`).
 - 2026-10-26 — statistics: Added type-7 percentiles, the coefficient of variation, jitter, a seeded bootstrap interval of the median, MSER-5 and a log2 histogram (`modules/record/statistics/`).

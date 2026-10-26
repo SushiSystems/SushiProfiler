@@ -30,6 +30,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     record_json record
     statistics  record
     analysis    record
+    record_writers record
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.
@@ -45,7 +46,11 @@ set(SUSHIPROFILER_SAME_TIER_EDGES
     periods     collector
     record_json record
     analysis    record
-    analysis    statistics)
+    record_writers record
+    analysis    statistics
+    record_writers analysis
+    record_writers record
+    record_writers record_json)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
 function(sushiprofiler_module_tier module out)
