@@ -78,6 +78,7 @@
 #include <SushiProfiler/record_writers/terminal_writer.hpp>
 #include <SushiProfiler/registry/registry.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>
+#include <SushiProfiler/session/session.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>
