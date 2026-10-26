@@ -86,6 +86,8 @@
 #include <SushiProfiler/statistics/log2_histogram.hpp>
 #include <SushiProfiler/statistics/sorted_samples.hpp>
 #include <SushiProfiler/statistics/steady_state.hpp>
+#include <SushiProfiler/stream_writers/chrome_trace_writer.hpp>
+#include <SushiProfiler/stream_writers/stream_writer.hpp>
 #include <SushiProfiler/version/version.hpp>
 #include <SushiProfiler/window/window.hpp>
 #include <SushiProfiler/zones/admission.hpp>

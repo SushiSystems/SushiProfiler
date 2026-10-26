@@ -38,6 +38,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     sources     session
     environment session
     fold        session
+    stream_writers session
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.
@@ -63,7 +64,8 @@ set(SUSHIPROFILER_SAME_TIER_EDGES
     checks         analysis
     checks         record
     checks         statistics
-    window         config)
+    window         config
+    stream_writers fold)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
 function(sushiprofiler_module_tier module out)
