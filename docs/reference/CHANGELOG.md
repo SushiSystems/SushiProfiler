@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — analysis: Added named analyses over a record, with a catalog and a runner: breakdown, distribution, budget, counters, flows and overhead (`modules/record/analysis/`).
 - 2026-10-26 — statistics: Added type-7 percentiles, the coefficient of variation, jitter, a seeded bootstrap interval of the median, MSER-5 and a log2 histogram (`modules/record/statistics/`).
 - 2026-10-26 — record_json: Added the record file format, written byte for byte the same and read strictly, with each refusal naming its JSON path (`modules/record/record_json/`, `docs/reference/RECORD_FORMAT.md`).
 - 2026-10-26 — record: Added the run record: periods with zone trees, span columns with attributes, and sample series, keyed by the collector's ids (`modules/record/record/`).

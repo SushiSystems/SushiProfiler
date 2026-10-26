@@ -1,0 +1,35 @@
+# tests/record/analysis
+
+`analysis_record.hpp` builds the record the analysis tests share and compares rows cell by cell,
+reals within 1e-9 relative. Its timeline `step` runs on thread 0:
+
+| Period | Length | Zones (inclusive, self) | Samples |
+| --- | --- | --- | --- |
+| 0, warm-up | 100 | forward (99, 99) | none |
+| 1 | 100 | forward (60, 40) > conv (20, 20); load (30, 30) | bytes 100, 50; peak 5, 9, 3; loss 1, 3; item 1 begins at 110, steps at 130 |
+| 2 | 120 | forward (80, 50) > conv (30, 30); load (20, 20) | bytes 200; peak 4; loss 2; item 1 ends at 210, item 2 begins at 250 |
+| 3 | 110 | forward (70, 70); load (30, 30) | peak 7; item 2 steps at 330, ends at 340 |
+
+`forward` is in group `Model`, `conv` has no group and inherits it, and `load` is in `Data`.
+`bytes` is a sum and `peak` a maximum, both in `B`. Active periods have a 105 ns budget. The
+thread dropped 2 events and was late with 1; the record's drops are 1, 2 and 3.
+
+- `test_table.cpp`: a cell holds one kind; cells of different kinds differ; columns by name.
+- `test_analysis.cpp`: the options' defaults; an analysis runs through the interface.
+- `test_analysis_catalog.cpp`: made by name; a taken name refused; the built-ins in order.
+- `test_analysis_runner.cpp`: tables in the order asked; an unknown name refuses the run and
+  lists the known names.
+- `test_sample_summary.cpp`: the summary of fixed samples; zeros for none; columns and cells line
+  up.
+- `test_breakdown_analysis.cpp`: `Model` 60, 80, 70; `Data` 30, 20, 30; uncovered 10, 20, 10;
+  shares over 330 ns.
+- `test_distribution_analysis.cpp`: the rows of the timeline, three zones, two counters and the
+  value, with percentiles, jitter and histogram words.
+- `test_budget_analysis.cpp`: two periods over budget, the worst is period 2 at 120/105 with
+  `forward`; no budget, no row.
+- `test_counters_analysis.cpp`: `bytes` sums to 150 and 200; `peak` peaks at 9, 4 and 7.
+- `test_flows_analysis.cpp`: totals 100 and 90; steps 20, 80, 80 and 10.
+- `test_overhead_analysis.cpp`: 33 events and 792 bytes, every drop, the note without a
+  baseline, and a 10% cost against a baseline of 90, 100 and 110 ns.
+
+The bootstrap ends in the expected rows come from a Python reimplementation of the generator.
