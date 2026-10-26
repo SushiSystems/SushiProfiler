@@ -25,6 +25,10 @@ needs none of this.
 | A per-period fact from a source (RW-7) | `SpanSink::set_fact(name, value)` sets a fact on the period it fills |
 | Sources whose work arrives frames late | `Source::max_delay_ns()` (default 0) states how late a source's work can arrive. A period closes once the drain time passes its end plus the larger of `consumer.linger_ms` and every started source's delay, so a GPU source that reads back three frames late is collected whole. The live view lags by that wait, and nothing else does |
 | Lag of the live view | Measured at the first build: a benchmark marks a 60 Hz timeline and reports the time from a period's end to its `latest()` publication, for linger 0 and for a 50 ms source delay. The consumer's slowest poll while a `LiveView` is held is bounded by `live.max_poll_ms` (default 4) |
+| A lock passed to a condition variable | `SP_LOCK_WAIT_NAMED(lock, name, mutex)` declares `std::unique_lock<Mutex> lock`, tries first and opens a lock-wait zone only when the try fails, so the lock passes to `std::condition_variable::wait` |
+| Naming a thread | `SP_THREAD_NAME(name)` in `zones/macros.hpp`, forwarding to `Collector::set_thread_name` |
+| A source that pays for device timing only while a session wants it | `Collector::sources_wanted()`, one relaxed load, true from the session's `begin` of its sources until their `end` |
+| Counters and values named at run time (RW-13) | `SP_COUNTER_AT` and `SP_VALUE_AT` take a name built at run time, interned on first use per name, as `SP_ZONE_NAMED_AT` does |
 
 ## Version
 
