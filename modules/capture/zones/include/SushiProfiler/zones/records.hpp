@@ -83,7 +83,8 @@ namespace SushiProfiler
         if (ring == nullptr)
             return;
         const std::uint64_t now = Collector::now();
-        static_cast<void>(ring->push(TraceEvent{now, now, pack_site(EventKind::Instant, site), 0U}));
+        const TraceEvent event{now, now, pack_site(EventKind::Instant, site), 0U};
+        static_cast<void>(ring->push(event));
     }
 
     /// @brief Records an occurrence at @p steady_ns, a time the caller read on the steady clock.

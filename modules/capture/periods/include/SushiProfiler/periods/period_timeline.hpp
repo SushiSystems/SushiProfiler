@@ -63,7 +63,7 @@ namespace SushiProfiler
             /// @brief Opens the next period with the timeline's budget and returns its index.
             std::uint64_t mark() noexcept;
 
-            /// @brief Opens the next period with budget @p budget_ns, 0 for none; returns its index.
+            /// @brief Opens the next period with @p budget_ns, 0 for none; returns its index.
             std::uint64_t mark(std::uint64_t budget_ns) noexcept;
 
             /// @brief Returns the index of the open period, or K_NO_PERIOD before the first mark.

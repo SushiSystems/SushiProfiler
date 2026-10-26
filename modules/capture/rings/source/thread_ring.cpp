@@ -84,7 +84,8 @@ namespace SushiProfiler
 
     void ThreadRing::set_name(std::string_view name) noexcept
     {
-        const std::size_t length = name.size() < K_NAME_CAPACITY ? name.size() : K_NAME_CAPACITY - 1U;
+        const std::size_t length =
+            name.size() < K_NAME_CAPACITY ? name.size() : K_NAME_CAPACITY - 1U;
         const std::uint32_t sequence = name_sequence_.load(std::memory_order_relaxed);
         name_sequence_.store(sequence + 1U, std::memory_order_relaxed);
         std::atomic_thread_fence(std::memory_order_release);
