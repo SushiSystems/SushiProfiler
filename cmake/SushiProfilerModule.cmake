@@ -69,9 +69,10 @@ function(sushiprofiler_add_header_check module include_root)
 endfunction()
 
 # sushiprofiler_add_module(NAME <module> TIER <tier> [HEADER_ONLY]
-#                     [SOURCES <file under source/>...] [DEPENDS <module>...])
+#                     [SOURCES <file under source/>...] [DEPENDS <module>...]
+#                     [PRIVATE_DEPENDS <module>...])
 function(sushiprofiler_add_module)
-    cmake_parse_arguments(ARG "HEADER_ONLY" "NAME;TIER" "SOURCES;DEPENDS" ${ARGN})
+    cmake_parse_arguments(ARG "HEADER_ONLY" "NAME;TIER" "SOURCES;DEPENDS;PRIVATE_DEPENDS" ${ARGN})
     if("${ARG_NAME}" STREQUAL "" OR "${ARG_TIER}" STREQUAL "")
         message(FATAL_ERROR "sushiprofiler_add_module(): NAME and TIER are required.")
     endif()
@@ -92,6 +93,10 @@ function(sushiprofiler_add_module)
     if(NOT ARG_HEADER_ONLY AND NOT ARG_SOURCES)
         message(FATAL_ERROR "sushiprofiler_add_module(${ARG_NAME}): no SOURCES; mark it HEADER_ONLY.")
     endif()
+    if(ARG_HEADER_ONLY AND ARG_PRIVATE_DEPENDS)
+        message(FATAL_ERROR
+            "sushiprofiler_add_module(${ARG_NAME}): a HEADER_ONLY module has no PRIVATE_DEPENDS.")
+    endif()
 
     set(target "sushiprofiler_module_${ARG_NAME}")
     set(include_root "${CMAKE_CURRENT_SOURCE_DIR}/include")
@@ -100,6 +105,10 @@ function(sushiprofiler_add_module)
     foreach(dependency IN LISTS ARG_DEPENDS)
         sushiprofiler_check_module_edge("${ARG_NAME}" "${dependency}")
         target_link_libraries(${target} INTERFACE "sushiprofiler_module_${dependency}")
+    endforeach()
+    # The library compiles every source with every include root; a private edge is only checked.
+    foreach(dependency IN LISTS ARG_PRIVATE_DEPENDS)
+        sushiprofiler_check_module_edge("${ARG_NAME}" "${dependency}")
     endforeach()
     set_property(GLOBAL APPEND PROPERTY SUSHIPROFILER_INCLUDE_ROOTS "${include_root}")
 

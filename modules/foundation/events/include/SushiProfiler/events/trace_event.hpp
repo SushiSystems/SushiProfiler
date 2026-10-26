@@ -45,7 +45,8 @@ namespace SushiProfiler
         ExternalInstant, /**< begin and end the caller's steady ns. */
         Counter,         /**< begin ticks; end the value's bits, folded by the site's operation. */
         Value,           /**< begin ticks; end the value's bits, kept as sampled. */
-        PeriodMark,      /**< begin ticks; end the budget in ns or 0; name the timeline. */
+        PeriodMark,      /**< begin ticks; end the opened period's index; name the timeline. */
+        PeriodBudget,    /**< begin ticks; end the period's budget in ns; name the timeline. */
         PeriodTag,       /**< begin ticks; end key << 32 then value; name the timeline. */
         FlowBegin,       /**< begin ticks; end the caller's item id. */
         FlowStep,        /**< begin ticks; end the caller's item id. */
@@ -55,7 +56,7 @@ namespace SushiProfiler
     };
 
     /// @brief The number of kinds; a kind's value is below it.
-    inline constexpr std::uint8_t K_EVENT_KIND_COUNT = 13U;
+    inline constexpr std::uint8_t K_EVENT_KIND_COUNT = 14U;
 
     /// @brief One record in a thread's ring, whatever its kind.
     struct TraceEvent

@@ -24,6 +24,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     collector   capture
     zones       capture
     lock_wait   capture
+    periods     capture
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.
@@ -34,7 +35,9 @@ set(SUSHIPROFILER_SAME_TIER_EDGES
     zones       rings
     zones       collector
     lock_wait   sites
-    lock_wait   zones)
+    lock_wait   zones
+    periods     rings
+    periods     collector)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
 function(sushiprofiler_module_tier module out)

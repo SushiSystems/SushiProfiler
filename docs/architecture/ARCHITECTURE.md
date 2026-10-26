@@ -13,7 +13,7 @@ Modules sit in tiers, lowest first. `cmake/SushiProfilerTiers.cmake` states the 
 | Tier | Modules today |
 | --- | --- |
 | `foundation` | `version`, `clock`, `events` |
-| `capture` | `sites`, `rings`, `collector`, `zones`, `lock_wait` |
+| `capture` | `sites`, `rings`, `collector`, `zones`, `lock_wait`, `periods` |
 | `record` | none |
 | `session` | none |
 | `tools` | `umbrella` |
@@ -22,15 +22,17 @@ A tier is the folder `modules/<tier>/`; it appears with its first module.
 
 ## The dependency rule
 
-A module includes only modules of a lower tier, and only those it lists in its `DEPENDS`. A lower
-tier never includes a higher one. Inside one tier, a module includes another only along an edge
-`SUSHIPROFILER_SAME_TIER_EDGES` in `cmake/SushiProfilerTiers.cmake` lists. Two layers hold it.
+A module includes only modules of a lower tier, and only those it lists in its `DEPENDS`, or in
+its `PRIVATE_DEPENDS` when only its `source/` files include them. Inside one tier, a module
+includes another only along an edge that `SUSHIPROFILER_SAME_TIER_EDGES` in
+`cmake/SushiProfilerTiers.cmake` lists. A lower tier never includes a higher one. Two layers hold
+the rule.
 
 - The build. `sushiprofiler_add_module` in `cmake/SushiProfilerModule.cmake` refuses a dependency
-  that is not declared before its consumer, that the tier table does not list, or that is not
-  below the consumer's tier. A module's include roots are those of its own and its listed
-  dependencies, so an include of any other module does not compile. Each public header is also
-  compiled alone.
+  that is not declared before its consumer, that the tier table does not list, that sits in a
+  higher tier, or that sits in the same tier without a listed edge. A module's public include
+  roots are those of its own and its `DEPENDS`, and each public header is compiled alone with
+  them, so a header that includes any other module does not compile.
 - The checker. `tools/layering/check_layering.py` reads the same order and fails an upward
   include, an include of another module's `source/`, and an include the module did not declare.
 

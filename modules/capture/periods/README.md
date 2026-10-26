@@ -1,0 +1,21 @@
+# periods
+
+Named timelines that divide a run into numbered periods, in the namespace `SushiProfiler`. It
+depends on `events`, `rings` and `collector`.
+
+`SushiProfiler/periods/period_timeline.hpp` declares `PeriodTimeline`. A timeline is built with a
+name, such as `train.step` or `engine.frame`, which it interns, and an optional budget in
+nanoseconds.
+
+- `mark()` opens the next period and returns its index, from 0. The index advances whether or not
+  the collector records. Each recorded mark writes a `PeriodMark` event carrying the index and the
+  timeline, and a `PeriodBudget` event when the period has a budget, so a source that stamps its
+  own data with the index agrees with the record even when marks were closed out or a full ring
+  dropped one. `mark(budget_ns)` gives this period its own budget; 0 gives it none.
+- `current()` returns the open period's index, one relaxed load, or `K_NO_PERIOD` before the first
+  mark. Several threads may mark one timeline.
+- `tag(key, value)` interns both strings and writes a `PeriodTag` the fold attaches to the open
+  period. It takes a lock, so a real-time thread does not tag.
+
+Marks and tags have no site; only the gate turns them off. The tests are in
+`tests/capture/periods/`.

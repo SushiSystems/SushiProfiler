@@ -131,8 +131,9 @@ record states the clock and its measured cost per read.
 ## Periods and the window
 
 A timeline is a named sequence of periods: `"train.step"`, `"bench.iteration"`, `"engine.frame"`.
-`PeriodTimeline::mark()` pushes one period event on the caller's ring and returns the new period's
-index. Several timelines may run at once; the configuration names the one the window follows.
+`PeriodTimeline::mark()` returns the new period's index and pushes a period event carrying it on
+the caller's ring. The index advances while the gate is closed, so a recorded mark and a source
+that stamps its data with the index agree. Several timelines may run at once; the configuration names the one the window follows.
 
 A timeline may carry a budget: `PeriodTimeline(name, budget_ns)`, or `mark(budget_ns)` when it
 changes per period. A real-time block's budget is its duration; a frame's is its interval. The

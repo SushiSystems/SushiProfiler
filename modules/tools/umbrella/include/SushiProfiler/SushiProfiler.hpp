@@ -36,6 +36,7 @@
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/collector/collector_settings.hpp>
 #include <SushiProfiler/lock_wait/contended_lock.hpp>
+#include <SushiProfiler/periods/period_timeline.hpp>
 #include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
