@@ -12,12 +12,12 @@ include(CMakePackageConfigHelpers)
 set(SP_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/SushiProfiler"
     CACHE STRING "Where the SushiProfiler CMake package files are installed")
 
-# Installs sushiprofiler, every public include root, the export set and the package
-# configuration. Call it after sushiprofiler_compose_library().
+# Installs sushiprofiler, sushiprofiler_static, every public include root, the export set and
+# the package configuration. Call it after sushiprofiler_compose_library().
 function(sushiprofiler_install_package)
     get_property(include_roots GLOBAL PROPERTY SUSHIPROFILER_INCLUDE_ROOTS)
 
-    install(TARGETS sushiprofiler
+    install(TARGETS sushiprofiler sushiprofiler_static
         EXPORT SushiProfilerTargets
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"

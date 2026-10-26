@@ -30,12 +30,14 @@
 
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/periods/period_observer.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <atomic>
 #include <cstdint>
 #include <string>
 #include <string_view>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -45,7 +47,7 @@ namespace SushiProfiler
      * the collector records, and every recorded mark carries it, so a source that stamps its own
      * data with the index agrees with the record even when marks were closed out or dropped.
      */
-    class PeriodTimeline final
+    class SUSHIPROFILER_API PeriodTimeline final
     {
         public:
             /// @brief The value of `current()` before the first mark.
@@ -108,3 +110,4 @@ namespace SushiProfiler
             std::atomic<PeriodObserver*> observer_{nullptr};
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

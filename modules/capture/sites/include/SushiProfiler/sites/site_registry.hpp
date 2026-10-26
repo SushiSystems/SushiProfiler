@@ -30,6 +30,7 @@
 
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/sites/site.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -39,6 +40,7 @@
 #include <string>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -73,7 +75,7 @@ namespace SushiProfiler
      * Ids run from 1 to the capacity. A site past the capacity is refused: its handle is marked
      * so it never takes the lock again, `id_of` returns 0, and `refused()` counts it once.
      */
-    class SiteRegistry final
+    class SUSHIPROFILER_API SiteRegistry final
     {
         public:
             /// @brief The capacity of the process-wide registry.
@@ -147,3 +149,4 @@ namespace SushiProfiler
             std::atomic<std::uint64_t> refused_{0U};
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

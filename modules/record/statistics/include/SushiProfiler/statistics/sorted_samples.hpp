@@ -28,9 +28,12 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstddef>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -39,7 +42,7 @@ namespace SushiProfiler
      * Percentiles use the type-7 rule: rank (n - 1) p / 100, interpolated linearly between the
      * two samples around it. Every query other than size and empty requires at least one sample.
      */
-    class SortedSamples final
+    class SUSHIPROFILER_API SortedSamples final
     {
         public:
             /// @brief Sorts @p samples; none may be NaN.
@@ -72,3 +75,4 @@ namespace SushiProfiler
             std::vector<double> values_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

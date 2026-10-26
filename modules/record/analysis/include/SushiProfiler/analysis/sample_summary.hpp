@@ -30,6 +30,7 @@
 
 #include <SushiProfiler/analysis/table.hpp>
 #include <SushiProfiler/statistics/bootstrap.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -49,12 +50,12 @@ namespace SushiProfiler
     };
 
     /// @brief Returns the summary of @p samples; every field but count is 0 for none.
-    [[nodiscard]] SampleSummary summarise(const std::vector<double>& samples,
-                                          const BootstrapSettings& bootstrap);
+    [[nodiscard]] SUSHIPROFILER_API SampleSummary summarise(const std::vector<double>& samples,
+                                                            const BootstrapSettings& bootstrap);
 
     /// @brief Appends the summary's columns: count, median, low, high, min, p95, cv.
-    void add_summary_columns(Table& table, Unit unit);
+    SUSHIPROFILER_API void add_summary_columns(Table& table, Unit unit);
 
     /// @brief Appends @p summary's cells to @p row, in the order of add_summary_columns.
-    void append_summary(Row& row, const SampleSummary& summary);
+    SUSHIPROFILER_API void append_summary(Row& row, const SampleSummary& summary);
 } // namespace SushiProfiler

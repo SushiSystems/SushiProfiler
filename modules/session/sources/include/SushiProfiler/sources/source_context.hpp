@@ -31,16 +31,18 @@
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/record/span_table.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Gives a starting source the record's names, its track table and its time origin.
-    class SourceContext final
+    class SUSHIPROFILER_API SourceContext final
     {
         public:
             /**
@@ -76,3 +78,4 @@ namespace SushiProfiler
             std::uint64_t origin_steady_ns_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

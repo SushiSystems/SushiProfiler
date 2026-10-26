@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/json/json_value.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -100,5 +101,5 @@ namespace SushiProfiler
      * Refused, each with its path: a version other than K_CONFIG_FORMAT_VERSION or none, an
      * unknown key, a value of the wrong kind, and a value out of the range its field states.
      */
-    [[nodiscard]] ConfigReadResult read_profiler_config(std::string_view text);
+    [[nodiscard]] SUSHIPROFILER_API ConfigReadResult read_profiler_config(std::string_view text);
 } // namespace SushiProfiler

@@ -26,17 +26,22 @@
  * @see tests/capture/collector/README.md
  */
 
+#include "second_image.hpp"
+
 #include <SushiProfiler/collector/collector.hpp>
+#include <SushiProfiler/zones/macros.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cstdint>
+#include <string>
 #include <thread>
 #include <vector>
 
 using SushiProfiler::DrainBatch;
 using SushiProfiler::Collector;
 using SushiProfiler::CollectorSettings;
+using SushiProfiler::EventKind;
 using SushiProfiler::ThreadDrain;
 using SushiProfiler::ThreadRing;
 using SushiProfiler::TraceEvent;
@@ -277,4 +282,108 @@ TEST_F(Small_Collector, ResumeDoesNothingWhileClosed)
 
     EXPECT_FALSE(Collector::recording());
     EXPECT_FALSE(Collector::instance().is_open());
+}
+
+namespace
+{
+    /// @brief Opens the collector for each test and closes and empties it after.
+    class Medium_SecondImage : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                close_and_empty();
+                ASSERT_TRUE(Collector::instance().open(CollectorSettings{}));
+            }
+
+            void TearDown() override
+            {
+                close_and_empty();
+            }
+
+            /// @brief Closes the collector and discards what its rings hold.
+            static void close_and_empty()
+            {
+                Collector::instance().close();
+                DrainBatch discarded;
+                Collector::instance().drain(discarded);
+            }
+
+            /// @brief Returns the drain of thread @p index in @p batch, or null.
+            static const ThreadDrain* find(const DrainBatch& batch, std::uint32_t index)
+            {
+                for (const ThreadDrain& thread : batch.threads)
+                {
+                    if (thread.thread_index == index)
+                        return &thread;
+                }
+                return nullptr;
+            }
+
+            /// @brief Returns the names of the zones in @p events, oldest first.
+            static std::vector<std::string> zone_names(const std::vector<TraceEvent>& events)
+            {
+                std::vector<std::string> names;
+                for (const TraceEvent& event : events)
+                {
+                    if (SushiProfiler::kind_of(event) != EventKind::Zone)
+                        continue;
+                    const SushiProfiler::SiteID site = SushiProfiler::site_of(event);
+                    names.push_back(Collector::instance().sites().info(site).name);
+                }
+                return names;
+            }
+    };
+} // namespace
+
+TEST_F(Medium_SecondImage, AZoneOfTheSecondImageReachesTheCollectorOfTheExecutable)
+{
+    {
+        SP_ZONE("executable_zone");
+    }
+    SushiProfilerTests::record_zone_in_second_image();
+
+    DrainBatch batch;
+    Collector::instance().drain(batch);
+    const ThreadDrain* const mine = find(batch, Collector::thread_index());
+
+    ASSERT_NE(mine, nullptr);
+    const std::vector<std::string> names = zone_names(mine->events);
+    ASSERT_EQ(names.size(), 2U);
+    EXPECT_EQ(names[0], "executable_zone");
+    EXPECT_EQ(names[1], "second_image_zone");
+}
+
+TEST_F(Medium_SecondImage, AThreadThatOnlyRunsTheSecondImageGetsItsRingFromTheSameCollector)
+{
+    std::uint32_t thread_index = Collector::K_NO_THREAD;
+    std::thread(
+        [&thread_index]
+        {
+            SushiProfilerTests::record_zone_in_second_image();
+            thread_index = Collector::thread_index();
+        })
+        .join();
+
+    DrainBatch batch;
+    Collector::instance().drain(batch);
+    const ThreadDrain* const worker = find(batch, thread_index);
+
+    ASSERT_NE(thread_index, Collector::K_NO_THREAD);
+    ASSERT_NE(worker, nullptr);
+    EXPECT_NE(thread_index, Collector::thread_index());
+    EXPECT_EQ(zone_names(worker->events), std::vector<std::string>{"second_image_zone"});
+}
+
+TEST_F(Medium_SecondImage, AClosedCollectorRecordsNothingFromTheSecondImage)
+{
+    Collector::instance().close();
+    SushiProfilerTests::record_zone_in_second_image();
+
+    DrainBatch batch;
+    Collector::instance().drain(batch);
+
+    EXPECT_FALSE(Collector::recording());
+    const ThreadDrain* const mine = find(batch, Collector::thread_index());
+    EXPECT_TRUE(mine == nullptr || mine->events.empty());
 }

@@ -98,11 +98,14 @@ Neither `modules/CMakeLists.txt` nor `tests/CMakeLists.txt` changes: both walk t
 
 ## The library target
 
-`sushiprofiler_compose_library` in `cmake/SushiProfilerLibrary.cmake` builds the one target,
-`SushiProfiler::SushiProfiler`, from what the modules recorded: a static library over every
-module's `source/` files, carrying the include roots of every module and Threads. A module with no
-sources adds only its include root. `sushiprofiler_install_package`
-installs it as the package `SushiProfiler`; `tests/package/` builds a consumer against that
+`sushiprofiler_compose_library` in `cmake/SushiProfilerLibrary.cmake` builds two targets from what
+the modules recorded, each over every module's `source/` files and carrying the include roots of
+every module and Threads. `SushiProfiler::SushiProfiler` is a shared library with hidden symbols,
+exporting what `SUSHIPROFILER_API` marks (`SushiProfiler/version/export.hpp`), so every image of a
+process reaches one collector. `SushiProfiler::SushiProfilerStatic` is a static library that defines
+`SUSHIPROFILER_STATIC`, for a plug-in that keeps a collector of its own. A module with no sources
+adds only its include root. `sushiprofiler_install_package` installs both as the package
+`SushiProfiler`; `tests/package/` builds a consumer against that
 install.
 
 ## The version

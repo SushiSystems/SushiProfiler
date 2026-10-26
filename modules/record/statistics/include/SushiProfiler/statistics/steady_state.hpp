@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstddef>
 #include <vector>
 
@@ -44,5 +46,5 @@ namespace SushiProfiler
      * tie. A trailing partial batch is ignored.
      * @return A multiple of five; 0 for fewer than two batches.
      */
-    [[nodiscard]] std::size_t mser5(const std::vector<double>& series);
+    [[nodiscard]] SUSHIPROFILER_API std::size_t mser5(const std::vector<double>& series);
 } // namespace SushiProfiler

@@ -9,4 +9,4 @@ sushiprofiler_add_module(
     SOURCES
         consumer.cpp
         period_assembler.cpp
-    DEPENDS clock collector fold record sites sources stream_writers window)
+    DEPENDS version clock collector fold record sites sources stream_writers window)

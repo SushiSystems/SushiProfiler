@@ -11,4 +11,5 @@ sushiprofiler_add_module(
         dispersion.cpp
         log2_histogram.cpp
         sorted_samples.cpp
-        steady_state.cpp)
+        steady_state.cpp
+    DEPENDS version)

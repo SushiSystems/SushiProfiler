@@ -29,12 +29,14 @@
 #pragma once
 
 #include <SushiProfiler/json/json_value.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Says whether an indented writer breaks a container over lines.
@@ -50,7 +52,7 @@ namespace SushiProfiler
      * The caller keeps the grammar: a key before each member, containers closed in order. A real
      * that is not finite is written as null, since JSON has no NaN or infinity.
      */
-    class JsonWriter final
+    class SUSHIPROFILER_API JsonWriter final
     {
         public:
             /// @brief Builds a writer, indented by two spaces when @p pretty is set.
@@ -134,3 +136,4 @@ namespace SushiProfiler
             std::string text_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

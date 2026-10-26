@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/json/json_value.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,7 @@
 #include <string_view>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -46,7 +48,7 @@ namespace SushiProfiler
      * Every read names where it is: a keyed read adds `.key` and an element read adds `[i]` for its
      * duration, so a refusal reads `periods[2].spans.track: <reason>`.
      */
-    class JsonFieldReader final
+    class SUSHIPROFILER_API JsonFieldReader final
     {
         public:
             /// @brief Builds a reader that names the document @p root when the path is empty.
@@ -166,7 +168,7 @@ namespace SushiProfiler
             }
 
             /// @brief Adds one path segment for the life of the object.
-            class Segment final
+            class SUSHIPROFILER_API Segment final
             {
                 public:
                     /// @brief Adds `.key`.
@@ -218,3 +220,4 @@ namespace SushiProfiler
             std::string error_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

@@ -32,6 +32,7 @@
 #include <SushiProfiler/events/trace_event.hpp>
 #include <SushiProfiler/record/period_record.hpp>
 #include <SushiProfiler/record/sample_series.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <vector>
@@ -88,5 +89,6 @@ namespace SushiProfiler
      * ends after the zone open around it, or before it begins, is unmatched: the first becomes
      * that zone's sibling, the second is dropped. Period and lane events are not folded.
      */
-    [[nodiscard]] PeriodFold fold_period(const std::vector<ThreadEvents>& threads);
+    [[nodiscard]] SUSHIPROFILER_API PeriodFold fold_period(
+        const std::vector<ThreadEvents>& threads);
 } // namespace SushiProfiler

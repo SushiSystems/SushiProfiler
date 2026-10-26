@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports, per timeline and group, the self time per active period, plus the time no
      * zone covered.
      */
-    class BreakdownAnalysis final : public Analysis
+    class SUSHIPROFILER_API BreakdownAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `breakdown`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

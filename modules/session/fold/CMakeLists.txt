@@ -10,4 +10,4 @@ sushiprofiler_add_module(
         lane_tracker.cpp
         period_fold.cpp
         record_clock.cpp
-    DEPENDS clock events record)
+    DEPENDS version clock events record)

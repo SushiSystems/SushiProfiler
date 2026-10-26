@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports per track the busy and idle time per active period, and why the device was
      * idle.
      */
-    class DeviceIdleAnalysis final : public Analysis
+    class SUSHIPROFILER_API DeviceIdleAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `device_idle`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

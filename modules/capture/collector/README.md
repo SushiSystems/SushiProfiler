@@ -28,6 +28,10 @@ destroyed, so a thread that exits after `main` returns still retires into it.
   system call.
 - `sites()`, `names()` and `apply(SiteFilter)` give the process's site registry and name table.
 
+The library is shared, so the `Collector` lives in one image and every image of a process that
+records through its macros reaches that one object. The static target `sushiprofiler_static` is
+linked into one image and keeps a collector of its own.
+
 Two `thread_local` guards retire a ring when its thread exits: one built at registration, and a
 namespace-scope backstop that the MSVC ABI builds at thread attach and destroys last, since that
 ABI never runs the destructor of a `thread_local` built during TLS teardown. A thread that first

@@ -29,11 +29,13 @@
 #pragma once
 
 #include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Names a track a source reports spans on, such as one device queue.
@@ -60,7 +62,7 @@ namespace SushiProfiler
     };
 
     /// @brief One attribute key's values over a period's spans; a span may lack it.
-    struct AttributeColumn
+    struct SUSHIPROFILER_API AttributeColumn
     {
         NameID key = 0U;                        /**< The attribute's interned key. */
         AttributeKind kind = AttributeKind::Integer; /**< What the column holds. */
@@ -78,7 +80,7 @@ namespace SushiProfiler
      * Every column, attributes included, has one entry per span. A column added after spans
      * exist marks them absent, and a span added after columns exist is absent from each.
      */
-    class SpanTable
+    class SUSHIPROFILER_API SpanTable
     {
         public:
             /// @brief Appends @p span and returns its row.
@@ -125,3 +127,4 @@ namespace SushiProfiler
             std::vector<AttributeColumn> attributes_;   /**< The attribute columns. */
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

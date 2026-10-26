@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-10-26 — library: Built `SushiProfiler::SushiProfiler` shared, so every image of a process reaches one collector; `SushiProfiler::SushiProfilerStatic` keeps a collector per plug-in (`cmake/SushiProfilerLibrary.cmake`).
+
 ## v0.1.0 — 2026-10-26
 
 - 2026-10-26 — docs: Corrected what the release review found false: the manual index, the size rule, the record tool's exit codes and refusals, `sp check`'s count, and `attribute_bytes`, which nothing applies yet (`docs/README.md`).

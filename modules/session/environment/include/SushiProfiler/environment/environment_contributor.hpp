@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/environment/record_facts.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <vector>
 
@@ -50,6 +51,6 @@ namespace SushiProfiler
      * Contributors run in order; a fact set again replaces the earlier value in place, so a host
      * can state its own `build_type` over the library's.
      */
-    [[nodiscard]] RecordFacts gather_facts(
+    [[nodiscard]] SUSHIPROFILER_API RecordFacts gather_facts(
         const std::vector<const EnvironmentContributor*>& contributors);
 } // namespace SushiProfiler

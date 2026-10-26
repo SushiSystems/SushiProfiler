@@ -31,6 +31,7 @@
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/record/span_table.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <cstdint>
@@ -38,6 +39,7 @@
 #include <string>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -47,7 +49,7 @@ namespace SushiProfiler
      * order, is refused and counted, as is an attribute on such a key or of another kind than
      * its column, so the record stays one that read_record accepts.
      */
-    class SpanSink final
+    class SUSHIPROFILER_API SpanSink final
     {
         public:
             /// @brief Builds a sink over @p table that checks ids against @p names and @p tracks.
@@ -100,3 +102,4 @@ namespace SushiProfiler
             std::uint64_t refused_ = 0U;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

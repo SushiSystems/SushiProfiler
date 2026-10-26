@@ -28,18 +28,21 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <vector>
 
 namespace SushiProfiler
 {
     /// @brief Returns the arithmetic mean of @p samples, or 0 for none.
-    [[nodiscard]] double mean(const std::vector<double>& samples) noexcept;
+    [[nodiscard]] SUSHIPROFILER_API double mean(const std::vector<double>& samples) noexcept;
 
     /**
      * @brief Returns the sample standard deviation over the mean.
      * @return 0 for fewer than two samples or a mean of 0.
      */
-    [[nodiscard]] double coefficient_of_variation(const std::vector<double>& samples) noexcept;
+    [[nodiscard]] SUSHIPROFILER_API double coefficient_of_variation(
+        const std::vector<double>& samples) noexcept;
 
     /**
      * @brief Returns the median absolute difference between successive samples of @p series.
@@ -47,5 +50,5 @@ namespace SushiProfiler
      * Unlike the standard deviation it ignores a slow drift and measures period-to-period noise.
      * @return 0 for fewer than two samples.
      */
-    [[nodiscard]] double jitter(const std::vector<double>& series);
+    [[nodiscard]] SUSHIPROFILER_API double jitter(const std::vector<double>& series);
 } // namespace SushiProfiler

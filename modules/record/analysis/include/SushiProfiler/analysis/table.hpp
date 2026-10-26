@@ -28,11 +28,14 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstdint>
 #include <string>
 #include <variant>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Names what a column's numbers measure, so a writer can format them.
@@ -45,7 +48,7 @@ namespace SushiProfiler
     };
 
     /// @brief One column of a table.
-    struct Column
+    struct SUSHIPROFILER_API Column
     {
         std::string name;     /**< The column's name. */
         Unit unit = Unit::None; /**< What its numbers measure. */
@@ -55,7 +58,7 @@ namespace SushiProfiler
     };
 
     /// @brief One cell: empty, text, a whole number or a real.
-    class Cell final
+    class SUSHIPROFILER_API Cell final
     {
         public:
             /// @brief Builds an empty cell.
@@ -97,7 +100,7 @@ namespace SushiProfiler
     using Row = std::vector<Cell>;
 
     /// @brief What one analysis found: its columns, its rows in order, and notes on the whole.
-    struct Table
+    struct SUSHIPROFILER_API Table
     {
         std::string name;                /**< The analysis that made it. */
         std::vector<Column> columns;     /**< The columns, in order. */
@@ -111,3 +114,4 @@ namespace SushiProfiler
         [[nodiscard]] std::size_t column(const std::string& column_name) const noexcept;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

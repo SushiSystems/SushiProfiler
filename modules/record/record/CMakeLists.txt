@@ -11,4 +11,4 @@ sushiprofiler_add_module(
         run_record.cpp
         sample_series.cpp
         span_table.cpp
-    DEPENDS events sites)
+    DEPENDS version events sites)

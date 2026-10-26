@@ -8,4 +8,4 @@ sushiprofiler_add_module(
     NAME config TIER session
     SOURCES
         profiler_config.cpp
-    DEPENDS json)
+    DEPENDS version json)

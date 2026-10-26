@@ -38,6 +38,7 @@
 #include <SushiProfiler/sites/site_registry.hpp>
 #include <SushiProfiler/sources/source.hpp>
 #include <SushiProfiler/stream_writers/stream_writer.hpp>
+#include <SushiProfiler/version/export.hpp>
 #include <SushiProfiler/window/window.hpp>
 
 #include <cstdint>
@@ -47,6 +48,7 @@
 #include <utility>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief How the assembler places events in periods.
@@ -73,7 +75,7 @@ namespace SushiProfiler
      * the drain time less the linger passes it. A period closes once that time passes its end.
      * modules/session/consumer/README.md gives the steps.
      */
-    class PeriodAssembler final
+    class SUSHIPROFILER_API PeriodAssembler final
     {
         public:
             /// @brief Builds an assembler that fills @p record; every reference outlives it.
@@ -160,3 +162,4 @@ namespace SushiProfiler
             std::vector<std::string> problems_;         /**< What went wrong outside the record. */
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <ostream>
 #include <string>
 #include <vector>
@@ -49,6 +51,6 @@ namespace SushiProfiler
      * The commands are `show`, `compare`, `check`, `validate` and `help`. Results go to @p out,
      * refusals and usage to @p err. Returns K_TOOL_OK, K_TOOL_FAILED or K_TOOL_USAGE.
      */
-    [[nodiscard]] int run_record_tool(const std::vector<std::string>& arguments,
-                                      std::ostream& out, std::ostream& err);
+    [[nodiscard]] SUSHIPROFILER_API int run_record_tool(const std::vector<std::string>& arguments,
+                                                        std::ostream& out, std::ostream& err);
 } // namespace SushiProfiler

@@ -29,10 +29,12 @@
 #pragma once
 
 #include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Names where a flow point sits on its item's path.
@@ -49,7 +51,7 @@ namespace SushiProfiler
      * Every series has `time_ns`. A counter or value series also has `values`, one per time; a
      * flow series has `items` and `points`; an instant series has times alone.
      */
-    struct SampleSeries
+    struct SUSHIPROFILER_API SampleSeries
     {
         SiteID site = 0U;                  /**< The recording site. */
         std::uint32_t thread = 0U;         /**< The recording thread's index. */
@@ -62,3 +64,4 @@ namespace SushiProfiler
         [[nodiscard]] bool operator==(const SampleSeries& other) const;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

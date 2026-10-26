@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/events/ids.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <mutex>
@@ -37,6 +38,7 @@
 #include <unordered_map>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -45,7 +47,7 @@ namespace SushiProfiler
      * Interning takes a lock and may allocate, so a hot path interns its names ahead of time
      * and records the ids.
      */
-    class NameTable final
+    class SUSHIPROFILER_API NameTable final
     {
         public:
             /// @brief Returns the id of @p text, interning it on first use; 0 for empty text.
@@ -68,3 +70,4 @@ namespace SushiProfiler
             std::vector<std::string> texts_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

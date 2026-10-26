@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports events and bytes recorded, every drop, and the period-time cost against a
      * baseline.
      */
-    class OverheadAnalysis final : public Analysis
+    class SUSHIPROFILER_API OverheadAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `overhead`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

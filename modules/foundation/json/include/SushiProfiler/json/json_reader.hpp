@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/json/json_value.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <optional>
@@ -67,5 +68,5 @@ namespace SushiProfiler
      * A whole number without a fraction or exponent keeps 64 bits; a duplicate key, nesting past
      * K_JSON_MAX_DEPTH and anything after the value are refused.
      */
-    [[nodiscard]] JsonReadResult read_json(std::string_view text);
+    [[nodiscard]] SUSHIPROFILER_API JsonReadResult read_json(std::string_view text);
 } // namespace SushiProfiler

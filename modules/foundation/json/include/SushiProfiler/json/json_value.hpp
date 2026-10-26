@@ -28,12 +28,15 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <variant>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Names what a JSON value holds.
@@ -52,7 +55,7 @@ namespace SushiProfiler
     struct JsonMember;
 
     /// @brief One JSON value of any kind.
-    class JsonValue
+    class SUSHIPROFILER_API JsonValue
     {
         public:
             /// @brief Builds null.
@@ -140,7 +143,7 @@ namespace SushiProfiler
     };
 
     /// @brief One member of a JSON object.
-    struct JsonMember
+    struct SUSHIPROFILER_API JsonMember
     {
         std::string key; /**< The member's name. */
         JsonValue value; /**< The member's value. */
@@ -149,3 +152,4 @@ namespace SushiProfiler
         [[nodiscard]] bool operator==(const JsonMember& other) const;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

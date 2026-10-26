@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/record/run_record.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <optional>
@@ -59,7 +60,7 @@ namespace SushiProfiler
      * The same record always gives the same bytes. A real that is not finite is written as the
      * string `NaN`, `Infinity` or `-Infinity`; a NaN's payload is not kept.
      */
-    [[nodiscard]] std::string write_record(const RunRecord& record);
+    [[nodiscard]] SUSHIPROFILER_API std::string write_record(const RunRecord& record);
 
     /**
      * @brief Reads a record, refusing what the format does not allow.
@@ -68,5 +69,5 @@ namespace SushiProfiler
      * or missing key, a value of the wrong kind or out of range, columns of unequal length, and a
      * site, name, thread or parent id that points nowhere.
      */
-    [[nodiscard]] RecordReadResult read_record(std::string_view text);
+    [[nodiscard]] SUSHIPROFILER_API RecordReadResult read_record(std::string_view text);
 } // namespace SushiProfiler

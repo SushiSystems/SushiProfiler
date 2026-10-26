@@ -120,5 +120,3 @@ The acceptance criteria and the design record of the approval are in SushiAI's w
   lowering passes the IR node id in the task description, a SushiBLAS change.
 - Whether a period on SushiRuntime's command-graph replay path can be timed as one span, so an
   unprofiled run still has a device total.
-- Static or shared library. It builds static, the orchestrator's proposal, because the hot path is
-  inline and every client embeds it; a shared build would need the collector exported once.

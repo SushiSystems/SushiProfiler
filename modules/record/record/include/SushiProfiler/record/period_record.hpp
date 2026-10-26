@@ -31,15 +31,17 @@
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/record/sample_series.hpp>
 #include <SushiProfiler/record/span_table.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief A named fact, such as an environment entry or a period's execution layer.
-    struct Fact
+    struct SUSHIPROFILER_API Fact
     {
         std::string name;  /**< What the fact is about. */
         std::string value; /**< Its value, as text. */
@@ -49,7 +51,7 @@ namespace SushiProfiler
     };
 
     /// @brief One tag of a period, as interned key and value.
-    struct Tag
+    struct SUSHIPROFILER_API Tag
     {
         NameID key = 0U;   /**< The tag's key. */
         NameID value = 0U; /**< The tag's value. */
@@ -59,7 +61,7 @@ namespace SushiProfiler
     };
 
     /// @brief One node of a zone tree: every call of one site, under one parent, merged.
-    struct ZoneNode
+    struct SUSHIPROFILER_API ZoneNode
     {
         SiteID site = 0U;              /**< The zone's site. */
         NameID name = 0U;              /**< The zone's dynamic name, or 0 for the site's. */
@@ -73,7 +75,7 @@ namespace SushiProfiler
     };
 
     /// @brief The zones one thread ran in one lane of a period, as a tree; parents come first.
-    struct ZoneTree
+    struct SUSHIPROFILER_API ZoneTree
     {
         std::uint32_t thread = 0U;    /**< The thread's index. */
         NameID lane = 0U;             /**< The lane, or 0 outside any lane. */
@@ -84,7 +86,7 @@ namespace SushiProfiler
     };
 
     /// @brief One period of a timeline, as recorded.
-    struct PeriodRecord
+    struct SUSHIPROFILER_API PeriodRecord
     {
         std::uint64_t index = 0U;      /**< The period's index on its timeline. */
         NameID timeline = 0U;          /**< The timeline. */
@@ -109,3 +111,4 @@ namespace SushiProfiler
         [[nodiscard]] bool operator==(const PeriodRecord& other) const;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

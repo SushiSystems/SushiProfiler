@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/stream_writers/stream_writer.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <fstream>
@@ -38,6 +39,7 @@
 #include <string_view>
 #include <utility>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -46,7 +48,7 @@ namespace SushiProfiler
      * Process 1 holds the host: one row per thread, one per lane under it and one per timeline.
      * Process 2 holds one row per device track. Times are microseconds since the record's origin.
      */
-    class ChromeTraceWriter final : public StreamWriter
+    class SUSHIPROFILER_API ChromeTraceWriter final : public StreamWriter
     {
         public:
             /// @brief Builds a writer of the file at @p path.
@@ -104,3 +106,4 @@ namespace SushiProfiler
             std::int64_t next_row_ = 1'000'000;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

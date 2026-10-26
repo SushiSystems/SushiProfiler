@@ -23,5 +23,5 @@ sushiprofiler_add_module(
         short_spans_analysis.cpp
         table.cpp
         top_spans_analysis.cpp
-    DEPENDS record statistics
+    DEPENDS version record statistics
     PRIVATE_DEPENDS events sites)

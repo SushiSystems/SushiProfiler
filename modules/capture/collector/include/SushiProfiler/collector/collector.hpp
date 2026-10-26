@@ -35,6 +35,7 @@
 #include <SushiProfiler/rings/thread_ring.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
 #include <SushiProfiler/sites/site_registry.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <atomic>
 #include <cstddef>
@@ -45,6 +46,7 @@
 #include <string_view>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -54,7 +56,7 @@ namespace SushiProfiler
      * site must reach it. It is built on first use and never destroyed, so a thread that exits
      * after `main` returns still finds it. One consumer calls `drain`.
      */
-    class Collector final
+    class SUSHIPROFILER_API Collector final
     {
         public:
             /// @brief Thread index of a thread with no ring.
@@ -191,3 +193,4 @@ namespace SushiProfiler
             std::vector<TraceEvent> discard_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

@@ -8,4 +8,4 @@ sushiprofiler_add_module(
     NAME rings TIER capture
     SOURCES
         thread_ring.cpp
-    DEPENDS events)
+    DEPENDS version events)

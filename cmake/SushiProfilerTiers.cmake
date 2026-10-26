@@ -47,6 +47,8 @@ set(SUSHIPROFILER_MODULE_TIERS
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.
 set(SUSHIPROFILER_SAME_TIER_EDGES
+    clock          version
+    json           version
     collector      sites
     collector      rings
     zones          sites

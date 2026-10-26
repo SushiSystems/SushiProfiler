@@ -31,16 +31,18 @@
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/record/period_record.hpp>
 #include <SushiProfiler/sites/site.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief One recording site, with its strings owned.
-    struct SiteRecord
+    struct SUSHIPROFILER_API SiteRecord
     {
         std::string name;               /**< What the site measures. */
         std::string group;              /**< Its group, or empty to inherit its parent's. */
@@ -56,7 +58,7 @@ namespace SushiProfiler
     };
 
     /// @brief One thread that recorded, and what it lost.
-    struct ThreadRecord
+    struct SUSHIPROFILER_API ThreadRecord
     {
         std::uint32_t index = 0U;  /**< The thread's index. */
         std::string name;          /**< Its name, or empty. */
@@ -69,7 +71,7 @@ namespace SushiProfiler
     };
 
     /// @brief The clock the record's times were read on.
-    struct ClockRecord
+    struct SUSHIPROFILER_API ClockRecord
     {
         std::string source;               /**< `tsc` or `steady`. */
         double nanoseconds_per_tick = 1.0; /**< The calibration's slope. */
@@ -80,7 +82,7 @@ namespace SushiProfiler
     };
 
     /// @brief What the run lost outside any one thread.
-    struct RecordDrops
+    struct SUSHIPROFILER_API RecordDrops
     {
         std::uint64_t outside_periods = 0U; /**< Events that began outside every period. */
         std::uint64_t open_at_stop = 0U;    /**< Zones still open when the session stopped. */
@@ -96,7 +98,7 @@ namespace SushiProfiler
      * Times are nanoseconds since the session's first calibration point. `names[i]` is the text
      * of NameID `i` and `sites[i]` the site of SiteID `i`; index 0 of each is empty.
      */
-    struct RunRecord
+    struct SUSHIPROFILER_API RunRecord
     {
         std::vector<Fact> environment;     /**< The host, the libraries and the configuration. */
         std::vector<Fact> build;           /**< Build type, optimisation and sanitisers. */
@@ -122,3 +124,4 @@ namespace SushiProfiler
         [[nodiscard]] bool operator==(const RunRecord& other) const;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

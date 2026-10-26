@@ -30,6 +30,7 @@
 
 #include <SushiProfiler/checks/check.hpp>
 #include <SushiProfiler/record/run_record.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <string>
 #include <vector>
@@ -50,9 +51,9 @@ namespace SushiProfiler
      *
      * A check whose subject has no samples in the record fails.
      */
-    [[nodiscard]] std::vector<Verdict> check(const RunRecord& record,
-                                             const std::vector<Check>& checks);
+    [[nodiscard]] SUSHIPROFILER_API std::vector<Verdict> check(const RunRecord& record,
+                                                               const std::vector<Check>& checks);
 
     /// @brief Returns whether every verdict passed.
-    [[nodiscard]] bool all_passed(const std::vector<Verdict>& verdicts) noexcept;
+    [[nodiscard]] SUSHIPROFILER_API bool all_passed(const std::vector<Verdict>& verdicts) noexcept;
 } // namespace SushiProfiler

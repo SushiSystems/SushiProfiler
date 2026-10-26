@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstdint>
 #include <vector>
 
@@ -55,6 +57,6 @@ namespace SushiProfiler
      * samples and settings give the same interval on every compiler and platform.
      * @pre @p samples is not empty and holds no NaN; `settings.resamples` is at least 1.
      */
-    [[nodiscard]] Interval bootstrap_median_interval(const std::vector<double>& samples,
-                                                     const BootstrapSettings& settings = {});
+    [[nodiscard]] SUSHIPROFILER_API Interval bootstrap_median_interval(
+        const std::vector<double>& samples, const BootstrapSettings& settings = {});
 } // namespace SushiProfiler

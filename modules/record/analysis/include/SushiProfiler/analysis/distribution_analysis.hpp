@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports p50, p90, p99, maximum, jitter and a log2 histogram per timeline, zone,
      * counter and value.
      */
-    class DistributionAnalysis final : public Analysis
+    class SUSHIPROFILER_API DistributionAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `distribution`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

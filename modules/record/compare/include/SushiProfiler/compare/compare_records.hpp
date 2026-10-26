@@ -31,6 +31,7 @@
 #include <SushiProfiler/analysis/table.hpp>
 #include <SushiProfiler/record/run_record.hpp>
 #include <SushiProfiler/statistics/bootstrap.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <string>
 
@@ -63,6 +64,6 @@ namespace SushiProfiler
      * is named only when the intervals do not overlap. Tagged periods are compared by tag set,
      * and differing build facts refuse the comparison unless the options allow them.
      */
-    [[nodiscard]] Comparison compare_records(const RunRecord& baseline, const RunRecord& candidate,
-                                             const CompareOptions& options = {});
+    [[nodiscard]] SUSHIPROFILER_API Comparison compare_records(
+        const RunRecord& baseline, const RunRecord& candidate, const CompareOptions& options = {});
 } // namespace SushiProfiler

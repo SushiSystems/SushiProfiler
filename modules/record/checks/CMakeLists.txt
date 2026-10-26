@@ -9,5 +9,5 @@ sushiprofiler_add_module(
     SOURCES
         check.cpp
         verdict.cpp
-    DEPENDS record
+    DEPENDS version record
     PRIVATE_DEPENDS analysis json statistics)

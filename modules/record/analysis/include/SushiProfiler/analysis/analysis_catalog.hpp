@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <memory>
 #include <string>
@@ -36,13 +37,14 @@
 #include <utility>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Makes one analysis.
     using AnalysisFactory = std::unique_ptr<Analysis> (*)();
 
     /// @brief Maps analysis names to the factories that make them.
-    class AnalysisCatalog final
+    class SUSHIPROFILER_API AnalysisCatalog final
     {
         public:
             /// @brief Adds @p factory under @p name; returns false when the name is taken.
@@ -63,5 +65,6 @@ namespace SushiProfiler
     };
 
     /// @brief Adds every analysis SushiProfiler ships to @p catalog.
-    void register_builtin_analyses(AnalysisCatalog& catalog);
+    SUSHIPROFILER_API void register_builtin_analyses(AnalysisCatalog& catalog);
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

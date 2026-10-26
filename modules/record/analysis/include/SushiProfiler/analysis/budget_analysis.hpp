@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports, per budgeted timeline, the used fraction, the periods over budget and the
      * worst period.
      */
-    class BudgetAnalysis final : public Analysis
+    class SUSHIPROFILER_API BudgetAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `budget`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

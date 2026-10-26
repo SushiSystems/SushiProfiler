@@ -13,4 +13,5 @@ sushiprofiler_add_module(
         show_command.cpp
         tool_arguments.cpp
         validate_command.cpp
+    DEPENDS version
     PRIVATE_DEPENDS analysis checks compare record record_json record_writers)

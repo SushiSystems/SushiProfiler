@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports the spans under the options' bound, and their cost at the launch floor when
      * known.
      */
-    class ShortSpansAnalysis final : public Analysis
+    class SUSHIPROFILER_API ShortSpansAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `short_spans`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

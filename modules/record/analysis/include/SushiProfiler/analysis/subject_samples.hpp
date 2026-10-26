@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/record/run_record.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <string>
 #include <vector>
@@ -51,9 +52,10 @@ namespace SushiProfiler
      * `counter:<site>` the fold per period; `value:<site>` every sample; `span:<name>` every span
      * length; `flow:<site>` each item's begin-to-end latency.
      */
-    [[nodiscard]] std::vector<SubjectSamples> subject_samples(
+    [[nodiscard]] SUSHIPROFILER_API std::vector<SubjectSamples> subject_samples(
         const RunRecord& record, const std::vector<const PeriodRecord*>& periods);
 
     /// @brief Returns the subjects of every period of @p record that is not warm-up.
-    [[nodiscard]] std::vector<SubjectSamples> subject_samples(const RunRecord& record);
+    [[nodiscard]] SUSHIPROFILER_API std::vector<SubjectSamples> subject_samples(
+        const RunRecord& record);
 } // namespace SushiProfiler

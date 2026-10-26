@@ -33,6 +33,7 @@
 #include <SushiProfiler/record_writers/record_writer.hpp>
 #include <SushiProfiler/sources/source.hpp>
 #include <SushiProfiler/stream_writers/stream_writer.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <functional>
 #include <map>
@@ -42,6 +43,7 @@
 #include <string_view>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief A part a factory made, or why it could not.
@@ -64,7 +66,7 @@ namespace SushiProfiler
         std::function<Made<RecordWriter>(const JsonValue& settings, const std::string& output)>;
 
     /// @brief Holds the factories a configuration names and the contributors every session runs.
-    class Registry final
+    class SUSHIPROFILER_API Registry final
     {
         public:
             /// @brief Adds @p factory as source @p name; returns false when the name is taken.
@@ -128,5 +130,6 @@ namespace SushiProfiler
      * the registry. `record` and `chrome_trace` take `path`, joined to the output folder when it
      * is relative.
      */
-    void register_builtin_writers(Registry& registry, std::ostream& terminal);
+    SUSHIPROFILER_API void register_builtin_writers(Registry& registry, std::ostream& terminal);
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

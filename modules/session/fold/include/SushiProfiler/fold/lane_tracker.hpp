@@ -30,11 +30,13 @@
 
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <cstdint>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -43,7 +45,7 @@ namespace SushiProfiler
      * A lane begin opens its lane and a lane end closes the innermost open lane of that name.
      * An event between them belongs to the innermost open lane, or to lane 0 outside every lane.
      */
-    class LaneTracker final
+    class SUSHIPROFILER_API LaneTracker final
     {
         public:
             /// @brief Returns the lane of @p event, opening or closing a lane on lane events.
@@ -66,3 +68,4 @@ namespace SushiProfiler
             std::uint64_t unmatched_ = 0U;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

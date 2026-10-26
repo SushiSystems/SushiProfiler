@@ -30,9 +30,11 @@
 
 #include <SushiProfiler/config/profiler_config.hpp>
 #include <SushiProfiler/periods/period_observer.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Where a period falls in the window's schedule.
@@ -52,7 +54,7 @@ namespace SushiProfiler
      * is written; after the mark that opens any other period it pauses it, so the period before
      * still gets its end. The session opens the collector paused.
      */
-    class Window final : public PeriodObserver
+    class SUSHIPROFILER_API Window final : public PeriodObserver
     {
         public:
             /// @brief Builds a window over @p schedule; `schedule.active` is at least 1.
@@ -77,3 +79,4 @@ namespace SushiProfiler
             WindowSchedule schedule_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

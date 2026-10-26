@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/record/period_record.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <string>
 #include <string_view>
@@ -44,11 +45,12 @@ namespace SushiProfiler
     };
 
     /// @brief Sets fact @p name of @p facts to @p value, replacing its value when it is there.
-    void set_fact(std::vector<Fact>& facts, std::string_view name, std::string value);
+    SUSHIPROFILER_API void set_fact(std::vector<Fact>& facts, std::string_view name,
+                                    std::string value);
 
     /// @brief Returns the host's facts: `os`, `cpu` and `hardware_threads`.
-    [[nodiscard]] std::vector<Fact> host_facts();
+    [[nodiscard]] SUSHIPROFILER_API std::vector<Fact> host_facts();
 
     /// @brief Returns how this library was built: `compiler` and `build_type`.
-    [[nodiscard]] std::vector<Fact> library_build_facts();
+    [[nodiscard]] SUSHIPROFILER_API std::vector<Fact> library_build_facts();
 } // namespace SushiProfiler

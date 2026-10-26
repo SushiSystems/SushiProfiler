@@ -29,11 +29,13 @@
 #pragma once
 
 #include <SushiProfiler/record_writers/record_writer.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
 #include <ostream>
 #include <string>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -42,7 +44,7 @@ namespace SushiProfiler
      * Times print in ns, us, ms or s, ratios as percentages. A text column is left-aligned and a
      * number column right-aligned; rows past the limit are counted, not printed.
      */
-    class TerminalWriter final : public RecordWriter
+    class SUSHIPROFILER_API TerminalWriter final : public RecordWriter
     {
         public:
             /// @brief Builds a writer to @p out, which outlives it, printing @p rows rows a table.
@@ -61,5 +63,6 @@ namespace SushiProfiler
     };
 
     /// @brief Returns @p cell as the terminal writer prints it in a column of @p unit.
-    [[nodiscard]] std::string format_cell(const Cell& cell, Unit unit);
+    [[nodiscard]] SUSHIPROFILER_API std::string format_cell(const Cell& cell, Unit unit);
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

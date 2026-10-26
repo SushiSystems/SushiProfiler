@@ -38,6 +38,7 @@
 #include <SushiProfiler/registry/registry.hpp>
 #include <SushiProfiler/sources/source.hpp>
 #include <SushiProfiler/stream_writers/stream_writer.hpp>
+#include <SushiProfiler/version/export.hpp>
 #include <SushiProfiler/window/window.hpp>
 
 #include <cstddef>
@@ -49,6 +50,7 @@
 #include <utility>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     class Session;
@@ -87,7 +89,7 @@ namespace SushiProfiler
      * One session runs per process. Every name the configuration gives is checked at start, so a
      * typo fails before anything is recorded.
      */
-    class Session final
+    class SUSHIPROFILER_API Session final
     {
         public:
             /// @brief Starts a session from @p config with the parts @p registry makes.
@@ -152,3 +154,4 @@ namespace SushiProfiler
             bool stopped_ = false;                      /**< Whether stop() ran. */
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

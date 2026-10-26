@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/clock/calibration.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -42,6 +43,7 @@
 #endif
 #endif
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -50,7 +52,7 @@ namespace SushiProfiler
      * `now()` is one instruction and no system call. Its ticks map onto steady time only when
      * `ticks_are_invariant()` holds; a caller that finds it false stamps with `steady_now_ns()`.
      */
-    class TraceClock
+    class SUSHIPROFILER_API TraceClock
     {
         public:
             TraceClock() = delete;
@@ -106,3 +108,4 @@ namespace SushiProfiler
             static constexpr int K_SAMPLE_ATTEMPTS = 16;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

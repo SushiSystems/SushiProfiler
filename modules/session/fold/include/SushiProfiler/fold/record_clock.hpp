@@ -30,13 +30,15 @@
 
 #include <SushiProfiler/clock/calibration.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <cstdint>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Moves event times onto the record's clock, nanoseconds since the session's origin.
-    class RecordClock final
+    class SUSHIPROFILER_API RecordClock final
     {
         public:
             /**
@@ -67,3 +69,4 @@ namespace SushiProfiler
             bool ticks_are_tsc_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

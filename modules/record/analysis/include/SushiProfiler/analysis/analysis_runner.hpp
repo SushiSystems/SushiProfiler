@@ -29,10 +29,12 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis_catalog.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <string>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief The tables of one run, or why none were made.
@@ -49,7 +51,7 @@ namespace SushiProfiler
     };
 
     /// @brief Runs analyses from one catalog.
-    class AnalysisRunner final
+    class SUSHIPROFILER_API AnalysisRunner final
     {
         public:
             /// @brief Builds a runner over @p catalog, which outlives it.
@@ -70,3 +72,4 @@ namespace SushiProfiler
             const AnalysisCatalog& catalog_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

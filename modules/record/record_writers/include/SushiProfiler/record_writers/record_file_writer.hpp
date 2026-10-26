@@ -29,13 +29,15 @@
 #pragma once
 
 #include <SushiProfiler/record_writers/record_writer.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <string>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Saves the record to one file in the record format; the tables are not saved.
-    class RecordFileWriter final : public RecordWriter
+    class SUSHIPROFILER_API RecordFileWriter final : public RecordWriter
     {
         public:
             /// @brief Builds a writer to @p path, replaced on each write.
@@ -50,3 +52,4 @@ namespace SushiProfiler
             std::string path_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

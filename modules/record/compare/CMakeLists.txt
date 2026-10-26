@@ -8,4 +8,4 @@ sushiprofiler_add_module(
     NAME compare TIER record
     SOURCES
         compare_records.cpp
-    DEPENDS analysis record statistics)
+    DEPENDS version analysis record statistics)

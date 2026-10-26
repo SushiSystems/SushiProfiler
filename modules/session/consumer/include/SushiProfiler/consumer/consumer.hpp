@@ -31,6 +31,7 @@
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/consumer/period_assembler.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -39,6 +40,7 @@
 #include <mutex>
 #include <thread>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief The shortest wait between drains.
@@ -53,11 +55,11 @@ namespace SushiProfiler
      * Over half full gives the fastest poll; under a quarter doubles the wait up to the slowest;
      * in between keeps it.
      */
-    [[nodiscard]] std::chrono::milliseconds next_poll(std::chrono::milliseconds current,
-                                                      double fullest) noexcept;
+    [[nodiscard]] SUSHIPROFILER_API std::chrono::milliseconds next_poll(
+        std::chrono::milliseconds current, double fullest) noexcept;
 
     /// @brief Drains the collector into an assembler on its own thread until stopped.
-    class Consumer final
+    class SUSHIPROFILER_API Consumer final
     {
         public:
             /// @brief Builds a consumer of @p collector into @p assembler; both outlive it.
@@ -112,3 +114,4 @@ namespace SushiProfiler
             std::atomic<std::uint64_t> drains_{0U};
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

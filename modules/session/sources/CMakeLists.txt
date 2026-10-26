@@ -9,4 +9,4 @@ sushiprofiler_add_module(
     SOURCES
         source_context.cpp
         span_sink.cpp
-    DEPENDS events record sites)
+    DEPENDS version events record sites)

@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports each counter folded per active period by its operation, then summarised over
      * periods.
      */
-    class CountersAnalysis final : public Analysis
+    class SUSHIPROFILER_API CountersAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `counters`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

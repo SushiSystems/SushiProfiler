@@ -10,5 +10,5 @@ sushiprofiler_add_module(
         record_json_reader.cpp
         record_json_writer.cpp
         record_names.cpp
-    DEPENDS record
+    DEPENDS version record
     PRIVATE_DEPENDS json sites)

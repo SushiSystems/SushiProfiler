@@ -28,13 +28,16 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstdint>
 #include <vector>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /// @brief Counts samples by power of two: bin i holds [2^(first + i), 2^(first + i + 1)).
-    struct Log2Histogram
+    struct SUSHIPROFILER_API Log2Histogram
     {
         std::uint64_t nonpositive = 0U;    /**< Samples at or below 0, which have no bin. */
         int first_exponent = 0;            /**< The exponent of the first bin. */
@@ -45,5 +48,7 @@ namespace SushiProfiler
     };
 
     /// @brief Returns the histogram of @p samples; none may be NaN or infinite.
-    [[nodiscard]] Log2Histogram log2_histogram(const std::vector<double>& samples);
+    [[nodiscard]] SUSHIPROFILER_API Log2Histogram log2_histogram(
+        const std::vector<double>& samples);
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

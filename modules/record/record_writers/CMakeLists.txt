@@ -9,5 +9,5 @@ sushiprofiler_add_module(
     SOURCES
         record_file_writer.cpp
         terminal_writer.cpp
-    DEPENDS analysis record
+    DEPENDS version analysis record
     PRIVATE_DEPENDS record_json)

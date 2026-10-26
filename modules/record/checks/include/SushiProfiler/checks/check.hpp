@@ -28,6 +28,8 @@
 
 #pragma once
 
+#include <SushiProfiler/version/export.hpp>
+
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -71,7 +73,7 @@ namespace SushiProfiler
     };
 
     /// @brief Returns the word for @p statistic: median, p50, p90, p95, p99, min or max.
-    [[nodiscard]] std::string_view statistic_word(Statistic statistic) noexcept;
+    [[nodiscard]] SUSHIPROFILER_API std::string_view statistic_word(Statistic statistic) noexcept;
 
     /**
      * @brief Reads a JSON array of checks.
@@ -80,5 +82,5 @@ namespace SushiProfiler
      * `group:`, `zone:`, `span:`, `flow:`) takes `at_most_ns` and `at_least_ns`; `counter:` and
      * `value:` take `at_most` and `at_least`. Anything else is refused, naming its path.
      */
-    [[nodiscard]] ChecksReadResult read_checks(std::string_view text);
+    [[nodiscard]] SUSHIPROFILER_API ChecksReadResult read_checks(std::string_view text);
 } // namespace SushiProfiler

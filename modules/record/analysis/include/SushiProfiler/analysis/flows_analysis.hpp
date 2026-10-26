@@ -29,14 +29,16 @@
 #pragma once
 
 #include <SushiProfiler/analysis/analysis.hpp>
+#include <SushiProfiler/version/export.hpp>
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
      * @brief Reports each flow's latency from begin to end and between successive points of an
      * item.
      */
-    class FlowsAnalysis final : public Analysis
+    class SUSHIPROFILER_API FlowsAnalysis final : public Analysis
     {
         public:
             /// @brief Returns `flows`.
@@ -47,3 +49,4 @@ namespace SushiProfiler
                                     const AnalysisOptions& options) const override;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP

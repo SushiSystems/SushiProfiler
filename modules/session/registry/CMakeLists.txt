@@ -8,4 +8,4 @@ sushiprofiler_add_module(
     NAME registry TIER session
     SOURCES
         registry.cpp
-    DEPENDS environment json record_writers sources stream_writers)
+    DEPENDS version environment json record_writers sources stream_writers)

@@ -8,4 +8,4 @@ sushiprofiler_add_module(
     NAME collector TIER capture
     SOURCES
         collector.cpp
-    DEPENDS clock events sites rings)
+    DEPENDS version clock events sites rings)

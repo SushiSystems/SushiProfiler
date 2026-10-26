@@ -10,4 +10,5 @@ sushiprofiler_add_module(
         json_field_reader.cpp
         json_reader.cpp
         json_value.cpp
-        json_writer.cpp)
+        json_writer.cpp
+    DEPENDS version)

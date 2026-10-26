@@ -29,6 +29,7 @@
 #pragma once
 
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/version/export.hpp>
 
 #include <array>
 #include <atomic>
@@ -45,6 +46,7 @@
 #pragma warning(disable : 4324)
 #endif
 
+SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
     /**
@@ -54,7 +56,7 @@ namespace SushiProfiler
      * and `fill`. `push` never blocks, allocates or calls the system: a full ring drops the event
      * and counts it. Head and tail sit on their own cache lines.
      */
-    class ThreadRing final
+    class SUSHIPROFILER_API ThreadRing final
     {
         public:
             /// @brief The smallest capacity a ring is given.
@@ -138,6 +140,7 @@ namespace SushiProfiler
             std::array<std::atomic<char>, K_NAME_CAPACITY> name_;
     };
 } // namespace SushiProfiler
+SUSHIPROFILER_DLL_WARNINGS_POP
 
 #if defined(_MSC_VER)
 #pragma warning(pop)

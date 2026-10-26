@@ -8,5 +8,5 @@ sushiprofiler_add_module(
     NAME window TIER session
     SOURCES
         window.cpp
-    DEPENDS config periods
+    DEPENDS version config periods
     PRIVATE_DEPENDS collector)

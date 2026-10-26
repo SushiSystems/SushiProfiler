@@ -9,4 +9,4 @@ sushiprofiler_add_module(
     SOURCES
         name_table.cpp
         site_registry.cpp
-    DEPENDS events)
+    DEPENDS version events)

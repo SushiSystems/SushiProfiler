@@ -9,4 +9,4 @@ sushiprofiler_add_module(
     SOURCES
         environment_contributor.cpp
         record_facts.cpp
-    DEPENDS record)
+    DEPENDS version record)
