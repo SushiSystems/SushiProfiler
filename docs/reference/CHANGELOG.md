@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — compare: Added `compare_records`, which compares two records subject by subject and names a change only when the median intervals do not overlap (`modules/record/compare/`).
 - 2026-10-26 — analysis: Added `subject_samples`, the samples of every timeline, group, zone, counter, value, span and flow under the names checks and comparisons use (`modules/record/analysis/`).
 - 2026-10-26 — record_writers: Added the terminal writer, which prints analysis tables aligned with readable units, and the record file writer (`modules/record/record_writers/`).
 - 2026-10-26 — analysis: Added the span analyses device_idle, top_spans and short_spans (`modules/record/analysis/`).

@@ -48,6 +48,7 @@
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/collector/collector_settings.hpp>
 #include <SushiProfiler/collector/drain_batch.hpp>
+#include <SushiProfiler/compare/compare_records.hpp>
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
