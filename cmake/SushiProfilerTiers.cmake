@@ -17,6 +17,7 @@ set(SUSHIPROFILER_TIER_ORDER
 # Module, then its tier. A dependency is listed before its consumer.
 set(SUSHIPROFILER_MODULE_TIERS
     version     foundation
+    clock       foundation
     umbrella    foundation)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.

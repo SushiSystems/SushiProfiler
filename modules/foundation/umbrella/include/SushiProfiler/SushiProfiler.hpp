@@ -28,4 +28,6 @@
 
 #pragma once
 
+#include <SushiProfiler/clock/calibration.hpp>
+#include <SushiProfiler/clock/trace_clock.hpp>
 #include <SushiProfiler/version/version.hpp>

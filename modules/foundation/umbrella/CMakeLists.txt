@@ -9,4 +9,4 @@
 sushiprofiler_add_module(
     NAME umbrella TIER foundation
     HEADER_ONLY
-    DEPENDS version)
+    DEPENDS version clock)
