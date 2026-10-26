@@ -2,7 +2,7 @@
 
 **Status:** Open — written 2026-10-26; decided by the orchestrator on the owner's delegation, nothing built yet.
 
-**Implements:** `docs/design/PROFILER/README.md` phase P2b.
+**Implements:** PROFILER#P2b
 
 The three wave-1 analyses (SushiRuntime, SushiDSP and SushiTrack, each in its own
 `docs/agent/2026_10_26_PROFILER_AND_LOG_ADOPTION/SPEC.md`) found that v0.1.0 cannot serve a library
