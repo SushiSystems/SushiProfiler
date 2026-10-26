@@ -33,9 +33,12 @@
 #include <SushiProfiler/analysis/breakdown_analysis.hpp>
 #include <SushiProfiler/analysis/budget_analysis.hpp>
 #include <SushiProfiler/analysis/counters_analysis.hpp>
+#include <SushiProfiler/analysis/device_idle_analysis.hpp>
 #include <SushiProfiler/analysis/distribution_analysis.hpp>
 #include <SushiProfiler/analysis/flows_analysis.hpp>
 #include <SushiProfiler/analysis/overhead_analysis.hpp>
+#include <SushiProfiler/analysis/short_spans_analysis.hpp>
+#include <SushiProfiler/analysis/top_spans_analysis.hpp>
 
 namespace SushiProfiler
 {
@@ -61,8 +64,11 @@ namespace SushiProfiler
         add<BreakdownAnalysis>(catalog);
         add<BudgetAnalysis>(catalog);
         add<CountersAnalysis>(catalog);
+        add<DeviceIdleAnalysis>(catalog);
         add<DistributionAnalysis>(catalog);
         add<FlowsAnalysis>(catalog);
         add<OverheadAnalysis>(catalog);
+        add<ShortSpansAnalysis>(catalog);
+        add<TopSpansAnalysis>(catalog);
     }
 } // namespace SushiProfiler

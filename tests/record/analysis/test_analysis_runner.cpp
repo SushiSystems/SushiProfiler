@@ -68,5 +68,5 @@ TEST(Small_AnalysisRunner, AnUnknownNameRefusesTheWholeRun)
     EXPECT_FALSE(run.ok());
     EXPECT_TRUE(run.tables.empty());
     EXPECT_EQ(run.error, "unknown analysis \"roofline\"; known: breakdown budget counters "
-                         "distribution flows overhead");
+                         "device_idle distribution flows overhead short_spans top_spans");
 }

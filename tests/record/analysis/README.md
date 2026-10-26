@@ -14,6 +14,14 @@ reals within 1e-9 relative. Its timeline `step` runs on thread 0:
 `bytes` is a sum and `peak` a maximum, both in `B`. Active periods have a 105 ns budget. The
 thread dropped 2 events and was late with 1; the record's drops are 1, 2 and 3.
 
+`span_record()` holds one timeline on track `queue 0`, a warm-up period with one `gemm` span,
+and two active periods of 1000 ns. Times are queued, start and end:
+
+| Period | Spans |
+| --- | --- |
+| 1, 1000 to 2000 | `gemm` 1000, 1100, 1400 with `batch` 4; `copy` 1000, 1400, 1405; `gemm` 1500, 1600, 1900 with `batch` 8 |
+| 2, 2000 to 3000 | `gemm` 1950, 2000, 2600 with `batch` 4; `copy` 2590, 2700, 2708 |
+
 - `test_table.cpp`: a cell holds one kind; cells of different kinds differ; columns by name.
 - `test_analysis.cpp`: the options' defaults; an analysis runs through the interface.
 - `test_analysis_catalog.cpp`: made by name; a taken name refused; the built-ins in order.
@@ -29,6 +37,12 @@ thread dropped 2 events and was late with 1; the record's drops are 1, 2 and 3.
   `forward`; no budget, no row.
 - `test_counters_analysis.cpp`: `bytes` sums to 150 and 200; `peak` peaks at 9, 4 and 7.
 - `test_flows_analysis.cpp`: totals 100 and 90; steps 20, 80, 80 and 10.
+- `test_device_idle_analysis.cpp`: idle 395 and 392 ns; launch gaps 100 and 100, host gaps 295
+  and 292; no spans, no rows.
+- `test_top_spans_analysis.cpp`: `gemm` 1200 ns over three spans before `copy` 13 over two; by
+  `batch` and cut at two, `gemm` 4 and `gemm` 8 with one group not shown.
+- `test_short_spans_analysis.cpp`: two of five spans under 10 ns, 13 ns of 1213; priced at a
+  20 ns floor, 40 ns.
 - `test_overhead_analysis.cpp`: 33 events and 792 bytes, every drop, the note without a
   baseline, and a 10% cost against a baseline of 90, 100 and 110 ns.
 

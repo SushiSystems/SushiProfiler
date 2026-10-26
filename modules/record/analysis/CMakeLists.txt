@@ -13,11 +13,14 @@ sushiprofiler_add_module(
         budget_analysis.cpp
         builtin_analyses.cpp
         counters_analysis.cpp
+        device_idle_analysis.cpp
         distribution_analysis.cpp
         flows_analysis.cpp
         overhead_analysis.cpp
         record_queries.cpp
         sample_summary.cpp
+        short_spans_analysis.cpp
         table.cpp
+        top_spans_analysis.cpp
     DEPENDS record statistics
     PRIVATE_DEPENDS events sites)

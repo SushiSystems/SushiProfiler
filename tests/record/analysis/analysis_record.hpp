@@ -46,6 +46,14 @@ namespace SushiProfilerTests
      */
     [[nodiscard]] SushiProfiler::RunRecord analysis_record();
 
+    /**
+     * @brief Returns the record the span analysis tests read.
+     *
+     * Track `queue 0` runs `gemm` and `copy` spans in a warm-up period and two active periods of
+     * 1000 ns each; tests/record/analysis/README.md lists every span.
+     */
+    [[nodiscard]] SushiProfiler::RunRecord span_record();
+
     /// @brief Returns a text cell.
     [[nodiscard]] SushiProfiler::Cell text(const char* value);
 

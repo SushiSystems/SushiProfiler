@@ -34,11 +34,14 @@
 #include <SushiProfiler/analysis/breakdown_analysis.hpp>
 #include <SushiProfiler/analysis/budget_analysis.hpp>
 #include <SushiProfiler/analysis/counters_analysis.hpp>
+#include <SushiProfiler/analysis/device_idle_analysis.hpp>
 #include <SushiProfiler/analysis/distribution_analysis.hpp>
 #include <SushiProfiler/analysis/flows_analysis.hpp>
 #include <SushiProfiler/analysis/overhead_analysis.hpp>
 #include <SushiProfiler/analysis/sample_summary.hpp>
+#include <SushiProfiler/analysis/short_spans_analysis.hpp>
 #include <SushiProfiler/analysis/table.hpp>
+#include <SushiProfiler/analysis/top_spans_analysis.hpp>
 #include <SushiProfiler/clock/calibration.hpp>
 #include <SushiProfiler/clock/trace_clock.hpp>
 #include <SushiProfiler/collector/collector.hpp>

@@ -41,6 +41,7 @@ using SushiProfiler::RunRecord;
 using SushiProfiler::SampleSeries;
 using SushiProfiler::SiteRecord;
 using SushiProfiler::SiteRole;
+using SushiProfiler::Span;
 using SushiProfiler::ThreadRecord;
 using SushiProfiler::ZoneNode;
 using SushiProfiler::ZoneTree;
@@ -149,6 +150,29 @@ namespace SushiProfilerTests
                          flow({330U, 340U}, {2U, 2U}, {FlowPoint::Step, FlowPoint::End})};
 
         record.periods = {warmup, first, second, third};
+        return record;
+    }
+
+    RunRecord span_record()
+    {
+        RunRecord record;
+        record.names = {"", "step", "gemm", "copy", "batch"};
+        record.tracks = {"", "queue 0"};
+        record.threads = {ThreadRecord{0U, "main", 0U, 0U}};
+        PeriodRecord warmup = period(0U, 0U, 1000U);
+        warmup.warmup = true;
+        warmup.spans.append(Span{0U, 10U, 900U, 1U, 2U, 0U, 0U});
+        PeriodRecord first = period(1U, 1000U, 2000U);
+        const std::size_t row_1 = first.spans.append(Span{1000U, 1100U, 1400U, 1U, 2U, 0U, 0U});
+        first.spans.set_integer(row_1, 4U, 4);
+        first.spans.append(Span{1000U, 1400U, 1405U, 1U, 3U, 0U, 0U});
+        const std::size_t row_2 = first.spans.append(Span{1500U, 1600U, 1900U, 1U, 2U, 0U, 0U});
+        first.spans.set_integer(row_2, 4U, 8);
+        PeriodRecord second = period(2U, 2000U, 3000U);
+        const std::size_t row_3 = second.spans.append(Span{1950U, 2000U, 2600U, 1U, 2U, 0U, 0U});
+        second.spans.set_integer(row_3, 4U, 4);
+        second.spans.append(Span{2590U, 2700U, 2708U, 1U, 3U, 0U, 0U});
+        record.periods = {warmup, first, second};
         return record;
     }
 

@@ -14,8 +14,11 @@ sushiprofiler_add_module_tests(
         test_breakdown_analysis.cpp
         test_budget_analysis.cpp
         test_counters_analysis.cpp
+        test_device_idle_analysis.cpp
         test_distribution_analysis.cpp
         test_flows_analysis.cpp
         test_overhead_analysis.cpp
         test_sample_summary.cpp
-        test_table.cpp)
+        test_short_spans_analysis.cpp
+        test_table.cpp
+        test_top_spans_analysis.cpp)

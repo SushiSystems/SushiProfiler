@@ -70,7 +70,8 @@ TEST(Small_AnalysisCatalog, TheBuiltinsAreListedInOrder)
     AnalysisCatalog catalog;
     SushiProfiler::register_builtin_analyses(catalog);
 
-    const std::vector<std::string> expected = {"breakdown", "budget",       "counters",
-                                               "distribution", "flows", "overhead"};
+    const std::vector<std::string> expected = {
+        "breakdown", "budget",   "counters",    "device_idle", "distribution",
+        "flows",     "overhead", "short_spans", "top_spans"};
     EXPECT_EQ(catalog.names(), expected);
 }
