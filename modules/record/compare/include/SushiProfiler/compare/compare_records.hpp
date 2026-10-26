@@ -59,11 +59,9 @@ namespace SushiProfiler
     /**
      * @brief Compares @p candidate against @p baseline, subject by subject.
      *
-     * A row holds both medians with their bootstrap intervals and the ratio of medians, whose
-     * interval runs from the candidate's low over the baseline's high to the candidate's high over
-     * the baseline's low. A change is named only when the two intervals do not overlap. When both
-     * records tag their periods, rows are grouped by the tag set. Differing build facts refuse the
-     * comparison unless the options allow them.
+     * A row holds both medians with their bootstrap intervals and the ratio of medians; a change
+     * is named only when the intervals do not overlap. Tagged periods are compared by tag set,
+     * and differing build facts refuse the comparison unless the options allow them.
      */
     [[nodiscard]] Comparison compare_records(const RunRecord& baseline, const RunRecord& candidate,
                                              const CompareOptions& options = {});
