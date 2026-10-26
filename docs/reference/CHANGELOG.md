@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — environment: Added the host and build facts of a record and `EnvironmentContributor`, through which each library adds its own (`modules/session/environment/`).
 - 2026-10-26 — sources: Added the `Source` interface, with `SourceContext` for its tracks, names and clock and `SpanSink`, which refuses spans the record cannot hold (`modules/session/sources/`).
 - 2026-10-26 — window: Added `Window`, which places each period of the followed timeline in a PyTorch-style schedule and opens the collector only for warm-up and active periods (`modules/session/window/`).
 - 2026-10-26 — config: Added the profiler configuration and its strict reader, which keeps a default for every key left out (`modules/session/config/`, `docs/reference/CONFIG_FORMAT.md`).
