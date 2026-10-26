@@ -52,6 +52,8 @@
 #include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/compare/compare_records.hpp>
 #include <SushiProfiler/config/profiler_config.hpp>
+#include <SushiProfiler/consumer/consumer.hpp>
+#include <SushiProfiler/consumer/period_assembler.hpp>
 #include <SushiProfiler/environment/environment_contributor.hpp>
 #include <SushiProfiler/environment/record_facts.hpp>
 #include <SushiProfiler/events/ids.hpp>
