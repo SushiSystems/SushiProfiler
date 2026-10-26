@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* record_decoder.cpp                                                     */
+/* json_field_reader.cpp                                                  */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -20,17 +20,18 @@
 /**************************************************************************/
 
 /**
- * @file record_decoder.cpp
- * @brief Reads record fields by kind and range and words each refusal with its JSON path.
+ * @file json_field_reader.cpp
+ * @brief Reads JSON fields by kind and range and words each refusal with its JSON path.
  * @author Mustafa Garip
- * @see docs/reference/RECORD_FORMAT.md
+ * @see modules/foundation/json/README.md
  */
 
-#include "record_decoder.hpp"
+#include <SushiProfiler/json/json_field_reader.hpp>
 
 #include <cmath>
+#include <utility>
 
-namespace SushiProfiler::Detail
+namespace SushiProfiler
 {
     namespace
     {
@@ -52,7 +53,7 @@ namespace SushiProfiler::Detail
         }
     } // namespace
 
-    RecordDecoder::Segment::Segment(RecordDecoder& decoder, std::string_view key)
+    JsonFieldReader::Segment::Segment(JsonFieldReader& decoder, std::string_view key)
         : decoder_(decoder), restore_(decoder.path_.size())
     {
         if (!decoder_.path_.empty())
@@ -60,7 +61,7 @@ namespace SushiProfiler::Detail
         decoder_.path_.append(key);
     }
 
-    RecordDecoder::Segment::Segment(RecordDecoder& decoder, std::size_t index)
+    JsonFieldReader::Segment::Segment(JsonFieldReader& decoder, std::size_t index)
         : decoder_(decoder), restore_(decoder.path_.size())
     {
         decoder_.path_.push_back('[');
@@ -68,39 +69,41 @@ namespace SushiProfiler::Detail
         decoder_.path_.push_back(']');
     }
 
-    RecordDecoder::Segment::~Segment()
+    JsonFieldReader::Segment::~Segment()
     {
         decoder_.path_.resize(restore_);
     }
 
-    const std::string& RecordDecoder::error() const noexcept
+    JsonFieldReader::JsonFieldReader(std::string root) : root_(std::move(root))
+    {
+
+    }
+
+    const std::string& JsonFieldReader::error() const noexcept
     {
         return error_;
     }
 
-    bool RecordDecoder::fail(std::string_view reason)
+    bool JsonFieldReader::fail(std::string_view reason)
     {
         if (error_.empty())
         {
-            error_ = path_.empty() ? std::string("record") : path_;
+            error_ = path_.empty() ? root_ : path_;
             error_.append(": ");
             error_.append(reason);
         }
         return false;
     }
 
-    const JsonValue& RecordDecoder::member(const JsonValue& object, std::string_view key) noexcept
+    const JsonValue& JsonFieldReader::member(const JsonValue& object, std::string_view key) noexcept
     {
         return *object.find(key);
     }
 
-    bool RecordDecoder::object(const JsonValue& value, std::initializer_list<std::string_view> keys)
+    bool JsonFieldReader::known_keys(const std::vector<JsonMember>& members,
+                                     std::initializer_list<std::string_view> keys)
     {
-        const std::vector<JsonMember>* const members = value.as_object();
-        if (members == nullptr)
-            return fail(std::string("an object was expected, found ") +
-                        std::string(kind_name(value.kind())));
-        for (const JsonMember& found : *members)
+        for (const JsonMember& found : members)
         {
             bool known = false;
             for (const std::string_view key : keys)
@@ -108,6 +111,14 @@ namespace SushiProfiler::Detail
             if (!known)
                 return fail("unknown key \"" + found.key + "\"");
         }
+        return true;
+    }
+
+    bool JsonFieldReader::object(const JsonValue& value,
+                                 std::initializer_list<std::string_view> keys)
+    {
+        if (!object_within(value, keys))
+            return false;
         for (const std::string_view key : keys)
         {
             if (value.find(key) == nullptr)
@@ -116,7 +127,22 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    const std::vector<JsonValue>* RecordDecoder::array(const JsonValue& value)
+    bool JsonFieldReader::object_within(const JsonValue& value,
+                                        std::initializer_list<std::string_view> keys)
+    {
+        const std::vector<JsonMember>* const members = value.as_object();
+        if (members == nullptr)
+            return fail(std::string("an object was expected, found ") +
+                        std::string(kind_name(value.kind())));
+        return known_keys(*members, keys);
+    }
+
+    bool JsonFieldReader::has(const JsonValue& object, std::string_view key) noexcept
+    {
+        return object.find(key) != nullptr;
+    }
+
+    const std::vector<JsonValue>* JsonFieldReader::array(const JsonValue& value)
     {
         const std::vector<JsonValue>* const elements = value.as_array();
         if (elements == nullptr)
@@ -125,7 +151,7 @@ namespace SushiProfiler::Detail
         return elements;
     }
 
-    bool RecordDecoder::whole_value(const JsonValue& value, std::uint64_t maximum,
+    bool JsonFieldReader::whole_value(const JsonValue& value, std::uint64_t maximum,
                                     std::uint64_t& out)
     {
         if (value.kind() != JsonKind::Integer && value.kind() != JsonKind::Unsigned)
@@ -136,7 +162,7 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::real_value(const JsonValue& value, double& out)
+    bool JsonFieldReader::real_value(const JsonValue& value, double& out)
     {
         if (const std::string* const word = value.as_string())
         {
@@ -156,7 +182,7 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::text(const JsonValue& object, std::string_view key, std::string& out)
+    bool JsonFieldReader::text(const JsonValue& object, std::string_view key, std::string& out)
     {
         const Segment segment(*this, key);
         const std::string* const value = member(object, key).as_string();
@@ -167,7 +193,7 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::flag(const JsonValue& object, std::string_view key, bool& out)
+    bool JsonFieldReader::flag(const JsonValue& object, std::string_view key, bool& out)
     {
         const Segment segment(*this, key);
         const bool* const value = member(object, key).as_bool();
@@ -178,13 +204,13 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::real(const JsonValue& object, std::string_view key, double& out)
+    bool JsonFieldReader::real(const JsonValue& object, std::string_view key, double& out)
     {
         const Segment segment(*this, key);
         return real_value(member(object, key), out);
     }
 
-    bool RecordDecoder::integers(const JsonValue& object, std::string_view key,
+    bool JsonFieldReader::integers(const JsonValue& object, std::string_view key,
                                  std::int64_t minimum, std::int64_t maximum,
                                  std::vector<std::int64_t>& out)
     {
@@ -207,7 +233,7 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::reals(const JsonValue& object, std::string_view key,
+    bool JsonFieldReader::reals(const JsonValue& object, std::string_view key,
                               std::vector<double>& out)
     {
         const Segment segment(*this, key);
@@ -226,7 +252,7 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::texts(const JsonValue& object, std::string_view key,
+    bool JsonFieldReader::texts(const JsonValue& object, std::string_view key,
                               std::vector<std::string>& out)
     {
         const Segment segment(*this, key);
@@ -245,7 +271,7 @@ namespace SushiProfiler::Detail
         return true;
     }
 
-    bool RecordDecoder::length(std::string_view key, std::size_t actual, std::size_t expected)
+    bool JsonFieldReader::length(std::string_view key, std::size_t actual, std::size_t expected)
     {
         if (actual == expected)
             return true;
@@ -254,7 +280,7 @@ namespace SushiProfiler::Detail
                     std::to_string(expected) + " were expected");
     }
 
-    bool RecordDecoder::below(std::string_view key, std::uint64_t id, std::size_t count,
+    bool JsonFieldReader::below(std::string_view key, std::uint64_t id, std::size_t count,
                               std::string_view table)
     {
         if (id < count)
@@ -262,4 +288,4 @@ namespace SushiProfiler::Detail
         const Segment segment(*this, key);
         return fail(std::to_string(id) + " points past the " + std::string(table) + " table");
     }
-} // namespace SushiProfiler::Detail
+} // namespace SushiProfiler

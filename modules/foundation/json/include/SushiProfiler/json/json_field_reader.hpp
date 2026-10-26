@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* record_decoder.hpp                                                     */
+/* json_field_reader.hpp                                                  */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -20,10 +20,10 @@
 /**************************************************************************/
 
 /**
- * @file record_decoder.hpp
- * @brief Declares the strict field reader the record reader builds on, which tracks a JSON path.
+ * @file json_field_reader.hpp
+ * @brief Declares the strict field reader that names the JSON path of each refusal.
  * @author Mustafa Garip
- * @see docs/reference/RECORD_FORMAT.md
+ * @see modules/foundation/json/README.md
  */
 
 #pragma once
@@ -38,7 +38,7 @@
 #include <string_view>
 #include <vector>
 
-namespace SushiProfiler::Detail
+namespace SushiProfiler
 {
     /**
      * @brief Reads JSON fields by kind and range, keeping the first refusal with its path.
@@ -46,9 +46,12 @@ namespace SushiProfiler::Detail
      * Every read names where it is: a keyed read adds `.key` and an element read adds `[i]` for its
      * duration, so a refusal reads `periods[2].spans.track: <reason>`.
      */
-    class RecordDecoder final
+    class JsonFieldReader final
     {
         public:
+            /// @brief Builds a reader that names the document @p root when the path is empty.
+            explicit JsonFieldReader(std::string root = "document");
+
             /// @brief Returns the first refusal, or an empty string.
             [[nodiscard]] const std::string& error() const noexcept;
 
@@ -58,6 +61,13 @@ namespace SushiProfiler::Detail
             /// @brief Refuses @p value unless it is an object holding exactly @p keys.
             [[nodiscard]] bool object(const JsonValue& value,
                                       std::initializer_list<std::string_view> keys);
+
+            /// @brief Refuses @p value unless it is an object whose keys are all among @p keys.
+            [[nodiscard]] bool object_within(const JsonValue& value,
+                                             std::initializer_list<std::string_view> keys);
+
+            /// @brief Returns whether @p object, which object_within() has checked, has @p key.
+            [[nodiscard]] static bool has(const JsonValue& object, std::string_view key) noexcept;
 
             /// @brief Reads member @p key of @p object as a string.
             [[nodiscard]] bool text(const JsonValue& object, std::string_view key,
@@ -160,10 +170,10 @@ namespace SushiProfiler::Detail
             {
                 public:
                     /// @brief Adds `.key`.
-                    Segment(RecordDecoder& decoder, std::string_view key);
+                    Segment(JsonFieldReader& decoder, std::string_view key);
 
                     /// @brief Adds `[index]`.
-                    Segment(RecordDecoder& decoder, std::size_t index);
+                    Segment(JsonFieldReader& decoder, std::size_t index);
 
                     ~Segment();
 
@@ -174,7 +184,7 @@ namespace SushiProfiler::Detail
 
                 private:
                     /// @brief The decoder whose path grows.
-                    RecordDecoder& decoder_;
+                    JsonFieldReader& decoder_;
 
                     /// @brief The path's length before the segment.
                     std::size_t restore_;
@@ -194,10 +204,17 @@ namespace SushiProfiler::Detail
             /// @brief Reads @p value as a real, or as the format's non-finite word.
             bool real_value(const JsonValue& value, double& out);
 
+            /// @brief Refuses the first key of @p members not among @p keys.
+            bool known_keys(const std::vector<JsonMember>& members,
+                            std::initializer_list<std::string_view> keys);
+
+            /// @brief What an empty path is called in a refusal.
+            std::string root_;
+
             /// @brief The current path.
             std::string path_;
 
             /// @brief The first refusal.
             std::string error_;
     };
-} // namespace SushiProfiler::Detail
+} // namespace SushiProfiler

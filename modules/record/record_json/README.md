@@ -16,8 +16,8 @@ does not define. A record that `read_record` accepts is one the analyses can ind
 checks.
 
 Inside `source/`, `record_names.hpp` maps roles, counter operations, attribute kinds and flow
-points to the format's words, `record_decoder.hpp` reads fields by kind and range while tracking
-the JSON path, and the reader and writer are `record_json_reader.cpp` and
-`record_json_writer.cpp`. The module depends on `record`, and privately on `json` and `sites`.
+points to the format's words, the reader and writer are `record_json_reader.cpp` and
+`record_json_writer.cpp`. The reader reads fields through the `json` module's `JsonFieldReader`.
+The module depends on `record`, and privately on `json` and `sites`.
 
 The tests are in `tests/record/record_json/`.

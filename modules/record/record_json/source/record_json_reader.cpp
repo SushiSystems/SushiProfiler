@@ -32,16 +32,15 @@
 #include <limits>
 #include <utility>
 
+#include <SushiProfiler/json/json_field_reader.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 
-#include "record_decoder.hpp"
 #include "record_names.hpp"
 
 namespace SushiProfiler
 {
     namespace
     {
-        using Detail::RecordDecoder;
 
         /// @brief The largest value a 32-bit field holds.
         constexpr std::int64_t K_INT32_MAX = std::numeric_limits<std::int32_t>::max();
@@ -68,7 +67,7 @@ namespace SushiProfiler
                         return false;
                     if (version != K_RECORD_FORMAT_VERSION)
                     {
-                        const RecordDecoder::Segment segment(decoder_, "sushiprofiler_record");
+                        const JsonFieldReader::Segment segment(decoder_, "sushiprofiler_record");
                         return decoder_.fail("version " + std::to_string(version) +
                                              " is not the version this build reads, " +
                                              std::to_string(K_RECORD_FORMAT_VERSION));
@@ -118,8 +117,8 @@ namespace SushiProfiler
                 /// @brief Reads the clock.
                 bool clock(const JsonValue& root)
                 {
-                    const RecordDecoder::Segment segment(decoder_, "clock");
-                    const JsonValue& clock = RecordDecoder::member(root, "clock");
+                    const JsonFieldReader::Segment segment(decoder_, "clock");
+                    const JsonValue& clock = JsonFieldReader::member(root, "clock");
                     ClockRecord& out = record_->clock;
                     return decoder_.object(clock,
                                            {"source", "nanoseconds_per_tick", "read_cost_ns"}) &&
@@ -159,7 +158,7 @@ namespace SushiProfiler
                 /// @brief Refuses @p word, found under @p key.
                 bool word_refused(std::string_view key, const std::string& word)
                 {
-                    const RecordDecoder::Segment segment(decoder_, key);
+                    const JsonFieldReader::Segment segment(decoder_, key);
                     return decoder_.fail("\"" + word + "\" is not a known word");
                 }
 
@@ -175,7 +174,7 @@ namespace SushiProfiler
                         return false;
                     if (std::binary_search(thread_ids_.begin(), thread_ids_.end(), thread.index))
                     {
-                        const RecordDecoder::Segment segment(decoder_, "index");
+                        const JsonFieldReader::Segment segment(decoder_, "index");
                         return decoder_.fail("thread " + std::to_string(thread.index) +
                                              " appears twice");
                     }
@@ -191,7 +190,7 @@ namespace SushiProfiler
                 {
                     if (std::binary_search(thread_ids_.begin(), thread_ids_.end(), thread))
                         return true;
-                    const RecordDecoder::Segment segment(decoder_, key);
+                    const JsonFieldReader::Segment segment(decoder_, key);
                     return decoder_.fail("thread " + std::to_string(thread) +
                                          " is not in the thread table");
                 }
@@ -199,8 +198,8 @@ namespace SushiProfiler
                 /// @brief Reads the drops.
                 bool drops(const JsonValue& root)
                 {
-                    const RecordDecoder::Segment segment(decoder_, "drops");
-                    const JsonValue& drops = RecordDecoder::member(root, "drops");
+                    const JsonFieldReader::Segment segment(decoder_, "drops");
+                    const JsonValue& drops = JsonFieldReader::member(root, "drops");
                     RecordDrops& out = record_->drops;
                     return decoder_.object(drops, {"outside_periods", "open_at_stop",
                                                    "spans_dropped"}) &&
@@ -239,7 +238,7 @@ namespace SushiProfiler
                         return false;
                     if (period.end_ns < period.begin_ns)
                     {
-                        const RecordDecoder::Segment segment(decoder_, "end_ns");
+                        const JsonFieldReader::Segment segment(decoder_, "end_ns");
                         return decoder_.fail("ends before it begins");
                     }
                     record_->periods.push_back(std::move(period));
@@ -301,8 +300,8 @@ namespace SushiProfiler
                     {
                         if (parent[index] >= static_cast<std::int64_t>(index))
                         {
-                            const RecordDecoder::Segment segment(decoder_, "parent");
-                            const RecordDecoder::Segment at(decoder_, index);
+                            const JsonFieldReader::Segment segment(decoder_, "parent");
+                            const JsonFieldReader::Segment at(decoder_, index);
                             return decoder_.fail("points at no earlier node");
                         }
                         tree.nodes.push_back(ZoneNode{site[index], name[index],
@@ -316,8 +315,8 @@ namespace SushiProfiler
                 /// @brief Reads a period's span columns and attribute columns.
                 bool spans(const JsonValue& period, SpanTable& out)
                 {
-                    const RecordDecoder::Segment segment(decoder_, "spans");
-                    const JsonValue& value = RecordDecoder::member(period, "spans");
+                    const JsonFieldReader::Segment segment(decoder_, "spans");
+                    const JsonValue& value = JsonFieldReader::member(period, "spans");
                     std::vector<std::uint64_t> queued;
                     std::vector<std::uint64_t> start;
                     std::vector<std::uint64_t> end;
@@ -399,7 +398,7 @@ namespace SushiProfiler
                         return false;
                     if (table.attribute(column.key) != nullptr)
                     {
-                        const RecordDecoder::Segment segment(decoder_, "key");
+                        const JsonFieldReader::Segment segment(decoder_, "key");
                         return decoder_.fail("the attribute appears twice");
                     }
                     table.add_column(std::move(column));
@@ -434,8 +433,8 @@ namespace SushiProfiler
                         const std::optional<FlowPoint> point = Detail::point_from(points[index]);
                         if (!point)
                         {
-                            const RecordDecoder::Segment segment(decoder_, "points");
-                            const RecordDecoder::Segment at(decoder_, index);
+                            const JsonFieldReader::Segment segment(decoder_, "points");
+                            const JsonFieldReader::Segment at(decoder_, index);
                             return decoder_.fail("\"" + points[index] + "\" is not a known word");
                         }
                         series.points.push_back(*point);
@@ -457,7 +456,7 @@ namespace SushiProfiler
                 }
 
                 /// @brief The field reader.
-                RecordDecoder decoder_;
+                JsonFieldReader decoder_{"record"};
 
                 /// @brief The record being filled.
                 RunRecord* record_ = nullptr;

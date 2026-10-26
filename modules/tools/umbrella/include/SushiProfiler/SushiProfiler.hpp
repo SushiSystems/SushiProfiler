@@ -53,6 +53,7 @@
 #include <SushiProfiler/compare/compare_records.hpp>
 #include <SushiProfiler/events/ids.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
+#include <SushiProfiler/json/json_field_reader.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 #include <SushiProfiler/json/json_value.hpp>
 #include <SushiProfiler/json/json_writer.hpp>

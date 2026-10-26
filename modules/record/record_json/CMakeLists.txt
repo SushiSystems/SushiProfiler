@@ -7,7 +7,6 @@
 sushiprofiler_add_module(
     NAME record_json TIER record
     SOURCES
-        record_decoder.cpp
         record_json_reader.cpp
         record_json_writer.cpp
         record_names.cpp
