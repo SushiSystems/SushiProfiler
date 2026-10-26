@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — window: Added `Window`, which places each period of the followed timeline in a PyTorch-style schedule and opens the collector only for warm-up and active periods (`modules/session/window/`).
 - 2026-10-26 — config: Added the profiler configuration and its strict reader, which keeps a default for every key left out (`modules/session/config/`, `docs/reference/CONFIG_FORMAT.md`).
 - 2026-10-26 — json: Added `JsonFieldReader`, the strict field reader that names the JSON path of each refusal, moved from the record reader so other file readers share it (`modules/foundation/json/`).
 - 2026-10-26 — checks: Added checks read from JSON, which bound a statistic of a subject, and `check`, which turns a record into pass or fail verdicts with reasons (`modules/record/checks/`).

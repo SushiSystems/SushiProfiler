@@ -9,4 +9,4 @@
 sushiprofiler_add_module(
     NAME umbrella TIER tools
     HEADER_ONLY
-    DEPENDS version clock events sites rings collector zones lock_wait periods json record record_json statistics analysis record_writers compare checks config)
+    DEPENDS version clock events sites rings collector zones lock_wait periods json record record_json statistics analysis record_writers compare checks config window)

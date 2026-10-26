@@ -34,6 +34,7 @@ set(SUSHIPROFILER_MODULE_TIERS
     compare     record
     checks      record
     config      session
+    window      session
     umbrella    tools)
 
 # Consumer, then dependency: the edges allowed between two modules of one tier.
@@ -58,7 +59,8 @@ set(SUSHIPROFILER_SAME_TIER_EDGES
     compare        statistics
     checks         analysis
     checks         record
-    checks         statistics)
+    checks         statistics
+    window         config)
 
 # Sets <out> to the tier of <module>, or to an empty string for a module the table lacks.
 function(sushiprofiler_module_tier module out)
