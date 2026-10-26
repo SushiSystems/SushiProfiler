@@ -31,8 +31,8 @@ namespace `SushiProfiler`. The module depends on `clock`, `collector`, `fold`, `
    counts as late on its thread when the period that holds its begin already closed, and as
    outside the periods otherwise.
 5. A period closes once the drain time less the linger passes its end. Its events are folded
-   with `fold_period`, each source's `collect` adds its spans through a `SpanSink` whose refusals
-   count as dropped spans, the stream writers write it, and the record appends it. A writer that
+   with `fold_period`, each source's `collect` receives the period's steady span and adds its spans
+   through a `SpanSink` whose refusals and late drops count as dropped spans, the stream writers write it, and the record appends it. A writer that
    fails is stopped and named in `problems()`.
 6. At `finish`, a period of the followed timeline without its end mark is not kept and its events
    count as outside; lanes still open count as open at stop, and lane ends with no lane open as

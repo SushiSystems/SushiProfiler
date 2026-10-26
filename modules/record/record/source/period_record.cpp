@@ -54,12 +54,19 @@ namespace SushiProfiler
         return thread == other.thread && lane == other.lane && nodes == other.nodes;
     }
 
+    bool ZoneRun::operator==(const ZoneRun& other) const
+    {
+        return std::tie(thread, lane, site, name, begin_ns, end_ns, depth) ==
+               std::tie(other.thread, other.lane, other.site, other.name, other.begin_ns,
+                        other.end_ns, other.depth);
+    }
+
     bool PeriodRecord::operator==(const PeriodRecord& other) const
     {
         return std::tie(index, timeline, thread, begin_ns, end_ns, warmup, budget_ns, tags, facts,
-                        zones, spans, samples) ==
+                        zones, runs, spans, samples) ==
                std::tie(other.index, other.timeline, other.thread, other.begin_ns, other.end_ns,
                         other.warmup, other.budget_ns, other.tags, other.facts, other.zones,
-                        other.spans, other.samples);
+                        other.runs, other.spans, other.samples);
     }
 } // namespace SushiProfiler

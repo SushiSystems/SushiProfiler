@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- 2026-10-26 — docs: Added the client library guide: the shared or static choice, `register_profiler_parts` and what a source may rely on (`docs/guides/CLIENT_LIBRARY.md`).
+- 2026-10-26 — sources: Changed what `collect` receives to a period span and added late-span counting; every Source implementation must change (`modules/session/sources/`).
+- 2026-10-26 — record: Added each active period's zone runs as record format 2, which refuses version 1 files, and `device_idle` names the host zone over a gap (`docs/reference/RECORD_FORMAT.md`).
 - 2026-10-26 — library: Built `SushiProfiler::SushiProfiler` shared, so every image of a process reaches one collector; `SushiProfiler::SushiProfilerStatic` keeps a collector per plug-in (`cmake/SushiProfilerLibrary.cmake`).
 
 ## v0.1.0 — 2026-10-26

@@ -48,6 +48,7 @@ using SushiProfiler::Span;
 using SushiProfiler::ThreadRecord;
 using SushiProfiler::write_record;
 using SushiProfiler::ZoneNode;
+using SushiProfiler::ZoneRun;
 using SushiProfiler::ZoneTree;
 
 namespace
@@ -98,6 +99,8 @@ namespace
         tree.lane = 2U;
         tree.nodes = {ZoneNode{1U, 0U, -1, 400U, 300U, 1U}, ZoneNode{2U, 3U, 0, 100U, 100U, 2U}};
         busy.zones.push_back(tree);
+        busy.runs = {ZoneRun{7U, 2U, 1U, 0U, 1'000U, 1'400U, 0U},
+                     ZoneRun{7U, 2U, 1U, 3U, 1'100U, 1'200U, 1U}};
         const std::size_t first = busy.spans.append(Span{90U, 100U, 150U, 1U, 3U, 3U, 0U});
         const std::size_t second = busy.spans.append(Span{95U, 200U, 260U, 1U, 3U, 3U, 12U});
         busy.spans.set_integer(first, 5U, -12);
@@ -174,7 +177,7 @@ TEST(Small_RecordJson, ColumnsSitOnOneLine)
 
     EXPECT_NE(text.find("\"parent\": [-1, 0]"), std::string::npos);
     EXPECT_NE(text.find("\"points\": [\"begin\", \"end\"]"), std::string::npos);
-    EXPECT_EQ(text.rfind("{\n  \"sushiprofiler_record\": 1,\n", 0U), 0U);
+    EXPECT_EQ(text.rfind("{\n  \"sushiprofiler_record\": 2,\n", 0U), 0U);
 }
 
 TEST(Small_RecordJson, NonFiniteRealsAreWrittenAsWords)
@@ -194,8 +197,14 @@ TEST(Small_RecordJson, NonFiniteRealsAreWrittenAsWords)
 
 TEST(Small_RecordJson, ANewerVersionIsRefused)
 {
-    EXPECT_EQ(refusal("\"sushiprofiler_record\": 1,", "\"sushiprofiler_record\": 2,"),
-              "sushiprofiler_record: version 2 is not the version this build reads, 1");
+    EXPECT_EQ(refusal("\"sushiprofiler_record\": 2,", "\"sushiprofiler_record\": 3,"),
+              "sushiprofiler_record: version 3 is not the version this build reads, 2");
+}
+
+TEST(Small_RecordJson, TheVersionBeforeZoneRunsIsRefusedByItsNumber)
+{
+    EXPECT_EQ(refusal("\"sushiprofiler_record\": 2,", "\"sushiprofiler_record\": 1,"),
+              "sushiprofiler_record: version 1 is not the version this build reads, 2");
 }
 
 TEST(Small_RecordJson, AnUnknownKeyIsRefusedWithItsPath)
@@ -232,6 +241,24 @@ TEST(Small_RecordJson, ASiteThatPointsNowhereIsRefused)
 {
     EXPECT_EQ(refusal("\"site\": [1, 2]", "\"site\": [1, 99]"),
               "periods[0].zones[0].site[1]: points past the sites table");
+}
+
+TEST(Small_RecordJson, AZoneRunOnASiteThatPointsNowhereIsRefused)
+{
+    EXPECT_EQ(refusal("\"site\": [1, 1]", "\"site\": [1, 99]"),
+              "periods[0].runs.site[1]: points past the sites table");
+}
+
+TEST(Small_RecordJson, AZoneRunThatEndsBeforeItBeginsIsRefused)
+{
+    EXPECT_EQ(refusal("\"end_ns\": [1400, 1200]", "\"end_ns\": [1400, 1050]"),
+              "periods[0].runs.end_ns[1]: ends before it begins");
+}
+
+TEST(Small_RecordJson, AZoneRunOnAThreadOutsideTheTableIsRefused)
+{
+    EXPECT_EQ(refusal("\"thread\": [7, 7]", "\"thread\": [7, 9]"),
+              "periods[0].runs.thread: thread 9 is not in the thread table");
 }
 
 TEST(Small_RecordJson, AParentThatIsNotEarlierIsRefused)

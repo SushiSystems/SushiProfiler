@@ -82,6 +82,16 @@ namespace SushiProfiler
         return refused_;
     }
 
+    void SpanSink::drop_late(std::uint64_t count) noexcept
+    {
+        late_ += count;
+    }
+
+    std::uint64_t SpanSink::late() const noexcept
+    {
+        return late_;
+    }
+
     bool SpanSink::known_name(NameID id) const
     {
         return id <= names_.size();

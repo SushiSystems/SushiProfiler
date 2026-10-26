@@ -84,11 +84,11 @@ Performance budget, measured by benchmarks in this repository before P2 closes:
 | Zone, gate closed | One relaxed load and one branch; under 2 ns |
 | Zone, recording | Under 25 ns: two clock reads and one 24-byte store |
 | Zone thread | No allocation after `register_this_thread` |
-| Drainer while idle | Under one wake-up a second |
+| Drainer while idle | At most one wake-up a second |
 | SushiAI YOLOv5n step with stage zones on | Under 1% slower than with the profiler off |
 
 P1 met the zone rows. P2 measured the idle drainer at one wake-up a second, the bound itself;
-P2b writes the row as "at most one" (RW-5). The YOLOv5n row is P5's to measure.
+P2b set the row to that bound. The YOLOv5n row is P5's to measure.
 
 ## Phases
 

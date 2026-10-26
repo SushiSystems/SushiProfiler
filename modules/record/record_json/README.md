@@ -7,7 +7,8 @@ The run record's file form, in the namespace `SushiProfiler`. The format itself,
   with every column on one line; the same record always gives the same bytes.
   `read_record` returns a `RecordReadResult`: the record, or one refusal that names the JSON path
   and the reason. `K_RECORD_FORMAT_VERSION` is the version this build writes and the only one it
-  reads.
+  reads, and the reader names the number of any other version in its refusal. Version 2 added the
+  zone runs of each period.
 
 The reader refuses an unknown or missing key, a value of the wrong kind or out of its field's
 range, columns of unequal length, an id that points past its table or at an unlisted thread, a

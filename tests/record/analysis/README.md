@@ -40,7 +40,9 @@ and two active periods of 1000 ns. Times are queued, start and end:
 - `test_counters_analysis.cpp`: `bytes` sums to 150 and 200; `peak` peaks at 9, 4 and 7.
 - `test_flows_analysis.cpp`: totals 100 and 90; steps 20, 80, 80 and 10.
 - `test_device_idle_analysis.cpp`: idle 395 and 392 ns; launch gaps 100 and 100, host gaps 295
-  and 292; no spans, no rows.
+  and 292, all `unattributed` with no zone runs; with runs, the innermost zone open on the
+  submitting thread at the gap's start is named, a zone on another thread is not, and a queued
+  span's gap is `launch`; no spans, no rows.
 - `test_top_spans_analysis.cpp`: `gemm` 1200 ns over three spans before `copy` 13 over two; by
   `batch` and cut at two, `gemm` 4 and `gemm` 8 with one group not shown.
 - `test_short_spans_analysis.cpp`: two of five spans under 10 ns, 13 ns of 1213; priced at a

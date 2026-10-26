@@ -4,17 +4,6 @@ Next id: RW-23
 
 ## Session
 
-### RW-4 Attribute a device gap to the host zone open over it
-- State: open
-- Done when: the record keeps each active period's zone runs and `device_idle` names the
-  innermost zone open on the submitting thread at a gap's start
-- Source: `docs/agent/2026_10_26_CLIENT_CONTRACT/SPEC.md`
-
-### RW-5 Write the idle drainer's budget as at most one wake-up a second
-- State: open
-- Done when: the design's budget row reads "At most one wake-up a second"
-- Source: `docs/agent/2026_10_26_CLIENT_CONTRACT/SPEC.md`
-
 ### RW-7 Let a source state a fact of one period
 - State: open
 - Done when: `SpanSink` sets a named fact on the period it fills and the record writes it

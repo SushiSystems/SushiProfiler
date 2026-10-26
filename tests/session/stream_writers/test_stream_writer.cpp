@@ -36,7 +36,7 @@ using SushiProfiler::PeriodRecord;
 using SushiProfiler::RunRecord;
 using SushiProfiler::StreamWriter;
 using SushiProfiler::WriteStatus;
-using SushiProfiler::ZoneInstance;
+using SushiProfiler::ZoneRun;
 
 namespace
 {
@@ -55,7 +55,7 @@ namespace
             /// @brief Notes the period's index and how many runs came with it.
             [[nodiscard]] WriteStatus write_period(
                 const RunRecord& record, const PeriodRecord& period,
-                const std::vector<ZoneInstance>& instances) override
+                const std::vector<ZoneRun>& instances) override
             {
                 static_cast<void>(record);
                 calls += std::to_string(period.index) + ":" + std::to_string(instances.size()) +
@@ -86,7 +86,7 @@ TEST(Small_StreamWriter, ReceivesBeginEachPeriodAndEnd)
     second.index = 4U;
 
     EXPECT_EQ(writer.begin(record), WriteStatus::Written);
-    EXPECT_EQ(writer.write_period(record, first, {ZoneInstance{}}), WriteStatus::Written);
+    EXPECT_EQ(writer.write_period(record, first, {ZoneRun{}}), WriteStatus::Written);
     EXPECT_EQ(writer.write_period(record, second, {}), WriteStatus::Written);
     EXPECT_EQ(writer.end(record), WriteStatus::Written);
 

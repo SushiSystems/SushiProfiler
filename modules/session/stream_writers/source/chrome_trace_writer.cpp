@@ -130,7 +130,7 @@ namespace SushiProfiler
 
     WriteStatus ChromeTraceWriter::write_period(const RunRecord& record,
                                                 const PeriodRecord& period,
-                                                const std::vector<ZoneInstance>& instances)
+                                                const std::vector<ZoneRun>& instances)
     {
         if (!file_.is_open())
             return WriteStatus::StreamFailed;
@@ -148,7 +148,7 @@ namespace SushiProfiler
         marker.end_object();
         marker.end_object();
         emit(marker.text());
-        for (const ZoneInstance& instance : instances)
+        for (const ZoneRun& instance : instances)
         {
             const SiteRecord* const site = record.site(instance.site);
             const std::string name = instance.name != 0U

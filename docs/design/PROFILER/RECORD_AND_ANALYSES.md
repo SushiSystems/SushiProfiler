@@ -29,7 +29,7 @@ Generic, in SushiProfiler:
 | Name | Answers |
 | --- | --- |
 | `breakdown` | Per period, self time per group on the timeline's thread, plus time no zone covered |
-| `device_idle` | Per period, device busy and idle time; each idle gap attributed to the host zone open on the submitting thread during the gap, else to "launch" if the next span was queued before the gap began, else "unattributed". The record holds no zone runs yet, so gaps split into `launch` and `host` only (RW-4) |
+| `device_idle` | Per period, device busy and idle time; each idle gap attributed to the host zone open on the submitting thread during the gap, else to "launch" if the next span was queued before the gap began, else "unattributed". The record keeps each active period's zone runs; the table adds `blamed_zone` and `blamed_share`, and the cause shares still split gaps into `launch` and `host` |
 | `top_spans` | Spans grouped by name and by any attribute the configuration names, with count, total, median and share |
 | `short_spans` | Count and total of spans under a threshold (10 µs by default) against the launch floor when one is known |
 | `overhead` | Events and bytes recorded, drops, and the cost of the profiler measured against a baseline record |

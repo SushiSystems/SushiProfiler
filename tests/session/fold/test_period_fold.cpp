@@ -38,7 +38,7 @@ using SushiProfiler::PeriodFold;
 using SushiProfiler::SampleSeries;
 using SushiProfiler::SiteID;
 using SushiProfiler::ThreadEvents;
-using SushiProfiler::ZoneInstance;
+using SushiProfiler::ZoneRun;
 using SushiProfiler::ZoneNode;
 using SushiProfiler::ZoneTree;
 

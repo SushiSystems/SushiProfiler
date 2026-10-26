@@ -28,7 +28,6 @@
 
 #pragma once
 
-#include <SushiProfiler/fold/period_fold.hpp>
 #include <SushiProfiler/record/period_record.hpp>
 #include <SushiProfiler/record/run_record.hpp>
 #include <SushiProfiler/record_writers/record_writer.hpp>
@@ -55,7 +54,7 @@ namespace SushiProfiler
             /// @brief Writes @p period and the zone runs it folded from.
             [[nodiscard]] virtual WriteStatus write_period(
                 const RunRecord& record, const PeriodRecord& period,
-                const std::vector<ZoneInstance>& instances) = 0;
+                const std::vector<ZoneRun>& instances) = 0;
 
             /// @brief Finishes and closes the output.
             [[nodiscard]] virtual WriteStatus end(const RunRecord& record) = 0;

@@ -1,6 +1,6 @@
 # SushiProfiler v0.2.0: plan
 
-**Status:** Open — written 2026-10-26; runs inline in hierarchy order, the orchestrator builds after each task.
+**Status:** Open — written 2026-10-26; C1 and C2 built and committed, C3 to C5 written and not built; the owner moved every build to the end of the programme.
 
 Spec: `SPEC.md` in this folder. Every task closes on one `sp.sh build` and `sp.sh test`, all tests
 passing, and `tools/checking/check_all.py` clean.

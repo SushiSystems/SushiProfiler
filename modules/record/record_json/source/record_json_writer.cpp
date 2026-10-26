@@ -248,6 +248,7 @@ namespace SushiProfiler
                     for (const ZoneTree& tree : period.zones)
                         zone_tree(tree);
                     out_.end_array();
+                    runs(period.runs);
                     spans(period.spans);
                     out_.key("samples");
                     out_.begin_array();
@@ -288,6 +289,38 @@ namespace SushiProfiler
                     column("inclusive_ns", inclusive);
                     column("self_ns", self);
                     column("calls", calls);
+                    out_.end_object();
+                }
+
+                /// @brief Writes a period's zone runs as columns.
+                void runs(const std::vector<ZoneRun>& runs)
+                {
+                    std::vector<std::uint64_t> thread;
+                    std::vector<std::uint64_t> lane;
+                    std::vector<std::uint64_t> site;
+                    std::vector<std::uint64_t> name;
+                    std::vector<std::uint64_t> begin;
+                    std::vector<std::uint64_t> end;
+                    std::vector<std::uint64_t> depth;
+                    for (const ZoneRun& run : runs)
+                    {
+                        thread.push_back(run.thread);
+                        lane.push_back(run.lane);
+                        site.push_back(run.site);
+                        name.push_back(run.name);
+                        begin.push_back(run.begin_ns);
+                        end.push_back(run.end_ns);
+                        depth.push_back(run.depth);
+                    }
+                    out_.key("runs");
+                    out_.begin_object();
+                    column("thread", thread);
+                    column("lane", lane);
+                    column("site", site);
+                    column("name", name);
+                    column("begin_ns", begin);
+                    column("end_ns", end);
+                    column("depth", depth);
                     out_.end_object();
                 }
 

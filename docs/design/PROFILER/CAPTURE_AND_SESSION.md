@@ -202,7 +202,7 @@ class Source
         virtual ~Source() = default;
         [[nodiscard]] virtual std::string_view name() const noexcept = 0;
         virtual SourceStatus begin(SourceContext& context) = 0;   // tracks, keys, clock
-        virtual void collect(std::uint64_t period, SpanSink& sink) = 0;
+        virtual void collect(const PeriodSpan& period, SpanSink& sink) = 0;
         virtual void end() = 0;
 };
 ```
@@ -210,10 +210,11 @@ class Source
 A source that receives its data on another thread, as SushiRuntime's does after each run, queues
 it and hands it over in `collect`. `collect` runs on the consumer thread.
 
-A span's period is the index of the configured timeline's current period when the work was
-submitted: the source reads `PeriodTimeline::current()` (one relaxed load) when it is handed a
-run, so the two runs of one anchor-free step both land in that step. `collect(period)` returns
-every span tagged with that period; a span tagged with a later period waits for it. A repeated
+A span's period is the one whose steady-clock span holds the work's start: `collect` receives the
+closed period's `PeriodSpan` (index, start, end), and the source hands over the work that started
+inside it, so the source needs no handle to a timeline. Work that started before the span it is
+given arrived too late for its period; the source drops it with `SpanSink::drop_late`, which the
+run's drop count records. A repeated
 dispatch of one node keeps its `invocation` as an attribute, so no two dispatches collapse.
 
 An `EnvironmentContributor` adds named facts to the record's `environment` when the session

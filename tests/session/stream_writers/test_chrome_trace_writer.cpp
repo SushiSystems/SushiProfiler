@@ -49,7 +49,7 @@ using SushiProfiler::SiteRole;
 using SushiProfiler::Span;
 using SushiProfiler::ThreadRecord;
 using SushiProfiler::WriteStatus;
-using SushiProfiler::ZoneInstance;
+using SushiProfiler::ZoneRun;
 
 namespace
 {
@@ -113,9 +113,9 @@ namespace
     std::vector<JsonValue> written_events(const std::string& path)
     {
         const RunRecord record = trace_record();
-        const std::vector<ZoneInstance> instances = {
-            ZoneInstance{0U, 0U, 1U, 0U, 1'000U, 2'500U, 0U},
-            ZoneInstance{0U, 2U, 1U, 5U, 1'200U, 1'300U, 0U}};
+        const std::vector<ZoneRun> instances = {
+            ZoneRun{0U, 0U, 1U, 0U, 1'000U, 2'500U, 0U},
+            ZoneRun{0U, 2U, 1U, 5U, 1'200U, 1'300U, 0U}};
         ChromeTraceWriter writer(path);
         EXPECT_EQ(writer.begin(record), WriteStatus::Written);
         EXPECT_EQ(writer.write_period(record, trace_period(), instances), WriteStatus::Written);

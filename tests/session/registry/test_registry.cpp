@@ -30,20 +30,33 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+#include <mutex>
 #include <sstream>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
+#include <SushiProfiler/environment/record_facts.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
+#include <SushiProfiler/record/span_table.hpp>
+#include <SushiProfiler/sites/name_table.hpp>
 
 using SushiProfiler::EnvironmentContributor;
 using SushiProfiler::JsonValue;
 using SushiProfiler::Made;
+using SushiProfiler::NameTable;
 using SushiProfiler::RecordFacts;
 using SushiProfiler::RecordWriter;
 using SushiProfiler::Registry;
+using SushiProfiler::PeriodSpan;
 using SushiProfiler::Source;
 using SushiProfiler::SourceContext;
 using SushiProfiler::SourceStatus;
+using SushiProfiler::Span;
 using SushiProfiler::SpanSink;
+using SushiProfiler::SpanTable;
 using SushiProfiler::StreamWriter;
 
 namespace
@@ -72,7 +85,7 @@ namespace
             }
 
             /// @brief Adds nothing.
-            void collect(std::uint64_t period, SpanSink& sink) override
+            void collect(const PeriodSpan& period, SpanSink& sink) override
             {
                 static_cast<void>(period);
                 static_cast<void>(sink);
@@ -95,6 +108,146 @@ namespace
                 static_cast<void>(facts);
             }
     };
+
+    /// @brief The work a fake device library has queued, shared with its source.
+    class FakeDeviceQueue final
+    {
+        public:
+            /// @brief Queues one piece of work that started at steady time @p start_ns.
+            void push(std::uint64_t start_ns)
+            {
+                const std::lock_guard<std::mutex> lock(mutex_);
+                starts_.push_back(start_ns);
+            }
+
+            /// @brief Returns and forgets the work queued so far.
+            [[nodiscard]] std::vector<std::uint64_t> take()
+            {
+                const std::lock_guard<std::mutex> lock(mutex_);
+                return std::exchange(starts_, {});
+            }
+
+        private:
+            std::mutex mutex_;                  /**< Guards starts_ against the library threads. */
+            std::vector<std::uint64_t> starts_; /**< The steady start of each piece of work. */
+    };
+
+    /// @brief The fake library's source: hands each period the work that started inside it.
+    class FakeDeviceSource final : public Source
+    {
+        public:
+            /// @brief Builds a source that reads @p queue, which must outlive it.
+            explicit FakeDeviceSource(FakeDeviceQueue& queue) : queue_(queue)
+            {
+
+            }
+
+            /// @brief Returns `fake_device`.
+            [[nodiscard]] std::string_view name() const noexcept override
+            {
+                return "fake_device";
+            }
+
+            /// @brief Adds the track `fake_device.queue` and the span name `kernel`.
+            [[nodiscard]] SourceStatus begin(SourceContext& context) override
+            {
+                track_ = context.add_track("fake_device.queue");
+                kernel_ = context.intern("kernel");
+                return SourceStatus{};
+            }
+
+            /// @brief Adds the work inside @p period, drops older work as late, keeps newer work.
+            void collect(const PeriodSpan& period, SpanSink& sink) override
+            {
+                for (const std::uint64_t start : queue_.take())
+                    pending_.push_back(start);
+                for (auto start = pending_.begin(); start != pending_.end();)
+                {
+                    if (*start >= period.end_steady_ns)
+                    {
+                        ++start;
+                        continue;
+                    }
+                    if (*start < period.start_steady_ns)
+                    {
+                        sink.drop_late(1U);
+                    }
+                    else
+                    {
+                        Span span;
+                        span.queued_ns = *start;
+                        span.start_ns = *start;
+                        span.end_ns = *start + 10U;
+                        span.track = track_;
+                        span.name = kernel_;
+                        static_cast<void>(sink.append(span));
+                    }
+                    start = pending_.erase(start);
+                }
+            }
+
+            /// @brief Ends.
+            void end() override
+            {
+
+            }
+
+        private:
+            FakeDeviceQueue& queue_;                /**< The library's queue. */
+            std::vector<std::uint64_t> pending_;    /**< Work taken but not yet placed. */
+            std::uint32_t track_ = 0U;              /**< The device track. */
+            SushiProfiler::NameID kernel_ = 0U;     /**< The span name. */
+    };
+
+    /// @brief The fake library's contribution to the record's environment.
+    class FakeDeviceContributor final : public EnvironmentContributor
+    {
+        public:
+            /// @brief Sets the fact `fake_device` to the library's version.
+            void contribute(RecordFacts& facts) const override
+            {
+                SushiProfiler::set_fact(facts.environment, "fake_device", "1.0");
+            }
+    };
+
+    /// @brief What the fake library registers: it owns the queue and the contributor.
+    class FakeDeviceProfilerParts final
+    {
+        public:
+            /// @brief Registers the source `fake_device` and the contributor in @p registry.
+            explicit FakeDeviceProfilerParts(Registry& registry)
+            {
+                const auto make_source = [this](const JsonValue& settings)
+                {
+                    static_cast<void>(settings);
+                    return Made<Source>{std::make_unique<FakeDeviceSource>(queue_), ""};
+                };
+                registry.add_source("fake_device", make_source);
+                registry.add_contributor(contributor_);
+            }
+
+            FakeDeviceProfilerParts(const FakeDeviceProfilerParts&) = delete;
+            FakeDeviceProfilerParts& operator=(const FakeDeviceProfilerParts&) = delete;
+            FakeDeviceProfilerParts(FakeDeviceProfilerParts&&) = delete;
+            FakeDeviceProfilerParts& operator=(FakeDeviceProfilerParts&&) = delete;
+            ~FakeDeviceProfilerParts() = default;
+
+            /// @brief Returns the queue the library pushes its work to.
+            [[nodiscard]] FakeDeviceQueue& queue() noexcept
+            {
+                return queue_;
+            }
+
+        private:
+            FakeDeviceQueue queue_;               /**< The work the source reads. */
+            FakeDeviceContributor contributor_;   /**< Held by the registry by reference. */
+    };
+
+    /// @brief Registers the fake library's parts in @p registry and returns what owns them.
+    [[nodiscard]] FakeDeviceProfilerParts register_profiler_parts(Registry& registry)
+    {
+        return FakeDeviceProfilerParts(registry);
+    }
 
     /// @brief Returns a registry with the built-in writers over @p terminal and source `quiet`.
     Registry registry_with_builtins(std::ostream& terminal)
@@ -122,6 +275,37 @@ TEST(Small_Registry, MakesASourceByNameAndRefusesAnUnknownOne)
     EXPECT_EQ(quiet.part->name(), "quiet");
     EXPECT_EQ(missing.part, nullptr);
     EXPECT_EQ(missing.error, "unknown source \"gpu\"; known: quiet");
+}
+
+TEST(Small_Registry, ALibraryRegistersItsSourceAndContributorThroughItsParts)
+{
+    Registry registry;
+    FakeDeviceProfilerParts parts = register_profiler_parts(registry);
+    NameTable names;
+    std::vector<std::string> tracks;
+    SourceContext context(names, tracks, 0U);
+    SpanTable table;
+    SpanSink sink(table, names, tracks);
+
+    Made<Source> made = registry.make_source("fake_device", parsed("{}"));
+    ASSERT_NE(made.part, nullptr);
+    ASSERT_TRUE(made.part->begin(context).ok());
+    parts.queue().push(50U);
+    parts.queue().push(150U);
+    parts.queue().push(250U);
+    made.part->collect(PeriodSpan{0U, 100U, 200U}, sink);
+    made.part->collect(PeriodSpan{1U, 200U, 300U}, sink);
+    made.part->end();
+
+    ASSERT_EQ(table.size(), 2U);
+    EXPECT_EQ(table.span(0U).start_ns, 150U);
+    EXPECT_EQ(table.span(1U).start_ns, 250U);
+    EXPECT_EQ(sink.late(), 1U);
+    EXPECT_EQ(tracks, std::vector<std::string>{"fake_device.queue"});
+    const SushiProfiler::RecordFacts facts = SushiProfiler::gather_facts(registry.contributors());
+    ASSERT_FALSE(facts.environment.empty());
+    EXPECT_EQ(facts.environment.back().name, "fake_device");
+    EXPECT_EQ(facts.environment.back().value, "1.0");
 }
 
 TEST(Small_Registry, ANameIsTakenOnce)

@@ -31,6 +31,7 @@
 #include <gtest/gtest.h>
 
 #include <string>
+#include <vector>
 
 using SushiProfiler::AssemblySettings;
 using SushiProfiler::CounterOp;
@@ -47,6 +48,7 @@ using SushiProfiler::SiteHandle;
 using SushiProfiler::SiteID;
 using SushiProfiler::SiteRegistry;
 using SushiProfiler::SiteRole;
+using SushiProfiler::PeriodSpan;
 using SushiProfiler::Source;
 using SushiProfiler::SourceContext;
 using SushiProfiler::SourceStatus;
@@ -55,10 +57,11 @@ using SushiProfiler::SpanSink;
 using SushiProfiler::StreamWriter;
 using SushiProfiler::ThreadDrain;
 using SushiProfiler::TraceEvent;
+using SushiProfiler::TrackID;
 using SushiProfiler::Window;
 using SushiProfiler::WindowSchedule;
 using SushiProfiler::WriteStatus;
-using SushiProfiler::ZoneInstance;
+using SushiProfiler::ZoneRun;
 
 namespace
 {
@@ -115,10 +118,10 @@ namespace
             }
 
             /// @brief Adds a 5 ns span 10 ns after the period's index times 100.
-            void collect(std::uint64_t period, SpanSink& sink) override
+            void collect(const PeriodSpan& period, SpanSink& sink) override
             {
                 Span span;
-                span.start_ns = period * 100U + 110U;
+                span.start_ns = period.index * 100U + 110U;
                 span.queued_ns = span.start_ns;
                 span.end_ns = span.start_ns + 5U;
                 span.track = track_;
@@ -140,6 +143,74 @@ namespace
             NameID kernel_ = 0U;       /**< The span name. */
     };
 
+    /// @brief A source that places queued work by start time and names each period's span.
+    class PlacingSource final : public Source
+    {
+        public:
+            /// @brief Builds a source holding work that started at the steady times @p starts.
+            explicit PlacingSource(std::vector<std::uint64_t> starts) : starts_(std::move(starts))
+            {
+
+            }
+
+            /// @brief Returns `placing`.
+            [[nodiscard]] std::string_view name() const noexcept override
+            {
+                return "placing";
+            }
+
+            /// @brief Keeps @p context, which collect() adds names and tracks through.
+            [[nodiscard]] SourceStatus begin(SourceContext& context) override
+            {
+                context_ = &context;
+                return SourceStatus{};
+            }
+
+            /// @brief Adds work that starts in @p period, drops what started before it.
+            void collect(const PeriodSpan& period, SpanSink& sink) override
+            {
+                spans.push_back(period);
+                const NameID name = context_->intern("work_" + std::to_string(period.index));
+                const TrackID track =
+                    context_->add_track("device_" + std::to_string(period.index));
+                for (auto start = starts_.begin(); start != starts_.end();)
+                {
+                    if (*start >= period.end_steady_ns)
+                    {
+                        ++start;
+                        continue;
+                    }
+                    if (*start < period.start_steady_ns)
+                    {
+                        sink.drop_late(1U);
+                    }
+                    else
+                    {
+                        Span span;
+                        span.queued_ns = *start;
+                        span.start_ns = *start;
+                        span.end_ns = *start + 5U;
+                        span.track = track;
+                        span.name = name;
+                        static_cast<void>(sink.append(span));
+                    }
+                    start = starts_.erase(start);
+                }
+            }
+
+            /// @brief Ends.
+            void end() override
+            {
+
+            }
+
+            std::vector<PeriodSpan> spans; /**< The spans collect() received, in order. */
+
+        private:
+            std::vector<std::uint64_t> starts_; /**< The steady start of each piece of work. */
+            SourceContext* context_ = nullptr;  /**< The context begin() received. */
+    };
+
     /// @brief A stream writer that notes each period's index and fails when told to.
     class NotingWriter final : public StreamWriter
     {
@@ -154,7 +225,7 @@ namespace
             /// @brief Notes the period and its runs, or fails.
             [[nodiscard]] WriteStatus write_period(
                 const RunRecord& record, const PeriodRecord& period,
-                const std::vector<ZoneInstance>& instances) override
+                const std::vector<ZoneRun>& instances) override
             {
                 static_cast<void>(record);
                 periods += std::to_string(period.index) + ":" + std::to_string(instances.size()) +
@@ -333,6 +404,84 @@ TEST_F(Small_PeriodAssembler, AsksSourcesForEachPeriodsSpans)
     ASSERT_EQ(record_.periods[1].spans.size(), 1U);
     EXPECT_EQ(record_.periods[1].spans.span(0U).start_ns, 210U);
     EXPECT_EQ(record_.drops.spans_dropped, 2U);
+}
+
+TEST_F(Small_PeriodAssembler, GivesSourcesEachPeriodsSteadySpan)
+{
+    PlacingSource source({});
+    SourceContext context(names_, record_.tracks, 1'000U);
+    ASSERT_TRUE(source.begin(context).ok());
+    AssemblySettings settings = follow(warm_one_active_two(), 0U);
+    settings.origin = {1'000U, 1'000U};
+    PeriodAssembler assembler(settings, record_, names_, sites_, {&source}, {});
+
+    assembler.add(batch_at(1'500U, {drain_of(0U, {mark(0U, 1'100U), mark(1U, 1'200U),
+                                                   mark(2U, 1'300U)})}));
+    assembler.finish();
+
+    ASSERT_EQ(source.spans.size(), 2U);
+    EXPECT_EQ(source.spans[0].index, 0U);
+    EXPECT_EQ(source.spans[0].start_steady_ns, 1'100U);
+    EXPECT_EQ(source.spans[0].end_steady_ns, 1'200U);
+    EXPECT_EQ(source.spans[1].index, 1U);
+    EXPECT_EQ(source.spans[1].start_steady_ns, 1'200U);
+    EXPECT_EQ(source.spans[1].end_steady_ns, 1'300U);
+}
+
+TEST_F(Small_PeriodAssembler, ASourceInternsANameAndAddsATrackWhileCollecting)
+{
+    PlacingSource source({150U});
+    SourceContext context(names_, record_.tracks, 0U);
+    ASSERT_TRUE(source.begin(context).ok());
+    PeriodAssembler assembler(follow(warm_one_active_two(), 0U), record_, names_, sites_,
+                              {&source}, {});
+
+    assembler.add(batch_at(500U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U)})}));
+    assembler.finish();
+
+    ASSERT_EQ(record_.periods[0].spans.size(), 1U);
+    EXPECT_EQ(record_.names[record_.periods[0].spans.span(0U).name], "work_0");
+    EXPECT_EQ(record_.tracks[record_.periods[0].spans.span(0U).track], "device_0");
+    EXPECT_EQ(record_.drops.spans_dropped, 0U);
+}
+
+TEST_F(Small_PeriodAssembler, PlacesWorkInThePeriodHoldingItsStartAndCountsOlderWorkAsDropped)
+{
+    PlacingSource source({50U, 150U, 250U});
+    SourceContext context(names_, record_.tracks, 0U);
+    ASSERT_TRUE(source.begin(context).ok());
+    PeriodAssembler assembler(follow(warm_one_active_two(), 0U), record_, names_, sites_,
+                              {&source}, {});
+
+    assembler.add(batch_at(500U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U)})}));
+    assembler.finish();
+
+    ASSERT_EQ(record_.periods.size(), 2U);
+    ASSERT_EQ(record_.periods[0].spans.size(), 1U);
+    EXPECT_EQ(record_.periods[0].spans.span(0U).start_ns, 150U);
+    ASSERT_EQ(record_.periods[1].spans.size(), 1U);
+    EXPECT_EQ(record_.periods[1].spans.span(0U).start_ns, 250U);
+    EXPECT_EQ(record_.drops.spans_dropped, 1U);
+}
+
+TEST_F(Small_PeriodAssembler, KeepsTheZoneRunsOfAnActivePeriodButNotOfAWarmupOne)
+{
+    PeriodAssembler assembler(follow(warm_one_active_two(), 0U), record_, names_, sites_, {}, {});
+
+    assembler.add(batch_at(500U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U)}),
+                                  drain_of(1U, {zone(110U, 120U), zone(250U, 280U),
+                                                zone(255U, 270U)})}));
+    assembler.finish();
+
+    ASSERT_EQ(record_.periods.size(), 2U);
+    EXPECT_TRUE(record_.periods[0].runs.empty());
+    ASSERT_EQ(record_.periods[1].runs.size(), 2U);
+    EXPECT_EQ(record_.periods[1].runs[0].thread, 1U);
+    EXPECT_EQ(record_.periods[1].runs[0].site, 1U);
+    EXPECT_EQ(record_.periods[1].runs[0].begin_ns, 250U);
+    EXPECT_EQ(record_.periods[1].runs[0].end_ns, 280U);
+    EXPECT_EQ(record_.periods[1].runs[0].depth, 0U);
+    EXPECT_EQ(record_.periods[1].runs[1].depth, 1U);
 }
 
 TEST_F(Small_PeriodAssembler, StreamsPeriodsInOrderAndStopsAFailingWriter)

@@ -139,7 +139,7 @@ namespace SushiProfiler
                 node.inclusive_ns += zone.length();
                 node.self_ns += zone.length() - std::min(zone.length(), nesting.children_ns[index]);
                 node_of[index] = found->second;
-                out.instances.push_back(ZoneInstance{thread, lane, zone.site, zone.name,
+                out.instances.push_back(ZoneRun{thread, lane, zone.site, zone.name,
                                                      zone.begin, zone.end, nesting.depth[index]});
             }
             out.zones.push_back(std::move(tree));

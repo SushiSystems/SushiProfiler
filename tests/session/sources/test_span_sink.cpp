@@ -94,6 +94,16 @@ TEST_F(Small_SpanSink, RefusesSpansTheRecordCannotHold)
     EXPECT_EQ(sink_.refused(), 4U);
 }
 
+TEST_F(Small_SpanSink, CountsLateSpansASourceDroppedApartFromRefusedOnes)
+{
+    sink_.drop_late(2U);
+    sink_.drop_late(3U);
+
+    EXPECT_EQ(sink_.late(), 5U);
+    EXPECT_EQ(sink_.refused(), 0U);
+    EXPECT_EQ(table_.size(), 0U);
+}
+
 TEST_F(Small_SpanSink, RefusesAttributesOnABadRowKeyValueOrKind)
 {
     const std::size_t row = *sink_.append(conv_span());

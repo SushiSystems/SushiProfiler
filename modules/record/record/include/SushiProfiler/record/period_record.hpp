@@ -85,6 +85,21 @@ namespace SushiProfiler
         [[nodiscard]] bool operator==(const ZoneTree& other) const;
     };
 
+    /// @brief One run of one zone on one thread, its times on the record's clock.
+    struct SUSHIPROFILER_API ZoneRun
+    {
+        std::uint32_t thread = 0U;   /**< The thread's index. */
+        NameID lane = 0U;            /**< The lane, or 0. */
+        SiteID site = 0U;            /**< The zone's site. */
+        NameID name = 0U;            /**< Its dynamic name, or 0. */
+        std::uint64_t begin_ns = 0U; /**< When it began. */
+        std::uint64_t end_ns = 0U;   /**< When it ended. */
+        std::uint32_t depth = 0U;    /**< How many zones of the lane were open around it. */
+
+        /// @brief Returns whether every field is equal.
+        [[nodiscard]] bool operator==(const ZoneRun& other) const;
+    };
+
     /// @brief One period of a timeline, as recorded.
     struct SUSHIPROFILER_API PeriodRecord
     {
@@ -98,6 +113,7 @@ namespace SushiProfiler
         std::vector<Tag> tags;         /**< The tags attached to it. */
         std::vector<Fact> facts;       /**< Facts its sources reported for it. */
         std::vector<ZoneTree> zones;   /**< One tree per thread and lane that ran zones. */
+        std::vector<ZoneRun> runs;     /**< Every zone run of an active period; none if warm-up. */
         SpanTable spans;               /**< The spans its sources reported. */
         std::vector<SampleSeries> samples; /**< One series per site and thread. */
 

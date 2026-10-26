@@ -23,8 +23,8 @@ The module depends on `clock`, `events` and `record`.
     before their children.
   - one `SampleSeries` per site and thread, in that order: counters and values with their
     values, instants with times alone, flow points with item and place.
-  - every zone run as a `ZoneInstance` with its depth, for writers that draw a timeline. The
-    record does not keep them.
+  - every zone run as a `ZoneRun` (defined in `record`) with its depth, for writers that draw a
+    timeline; the consumer keeps the runs of an active period in the record.
   - the unmatched zones per thread: a zone that ends after the zone open around it becomes that
     zone's sibling, and a zone that ends before it begins is dropped; both are counted.
 

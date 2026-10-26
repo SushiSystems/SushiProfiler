@@ -82,6 +82,12 @@ namespace SushiProfiler
             /// @brief Returns how many spans and attributes were refused.
             [[nodiscard]] std::uint64_t refused() const noexcept;
 
+            /// @brief Counts @p count spans the source dropped because their period had closed.
+            void drop_late(std::uint64_t count) noexcept;
+
+            /// @brief Returns how many spans drop_late() counted.
+            [[nodiscard]] std::uint64_t late() const noexcept;
+
         private:
             /// @brief Returns whether @p id is an interned name.
             [[nodiscard]] bool known_name(NameID id) const;
@@ -100,6 +106,9 @@ namespace SushiProfiler
 
             /// @brief Spans and attributes refused so far.
             std::uint64_t refused_ = 0U;
+
+            /// @brief Spans the source dropped as late.
+            std::uint64_t late_ = 0U;
     };
 } // namespace SushiProfiler
 SUSHIPROFILER_DLL_WARNINGS_POP

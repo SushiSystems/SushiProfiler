@@ -17,7 +17,9 @@ are the same value.
   timeline, marking thread, begin and end, warm-up flag, budget, `Tag`s, `Fact`s, one `ZoneTree`
   per thread and lane, a `SpanTable` and the `SampleSeries`. A `ZoneTree` lists `ZoneNode`s, each
   after its parent; a node merges every call of one site and name under one parent, with its
-  inclusive time, self time and call count.
+  inclusive time, self time and call count. `runs` holds every zone run of an active period as
+  a `ZoneRun`, its thread, lane, site, name, begin, end and depth, by thread, lane and begin;
+  a warm-up period keeps none.
 - `SushiProfiler/record/span_table.hpp`: `SpanTable`, a period's `Span`s as columns, plus one
   `AttributeColumn` per attribute key holding integers, reals or interned names. Every column has
   one entry per span: a column added late marks earlier spans absent, and a span added late is

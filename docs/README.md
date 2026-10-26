@@ -9,6 +9,11 @@ checks, and the record tool behind `sp record`.
 - [`getting_started/BUILD_AND_TEST.md`](getting_started/BUILD_AND_TEST.md): installing `sp`,
   building, testing and checking.
 
+## Guides
+
+- [`guides/CLIENT_LIBRARY.md`](guides/CLIENT_LIBRARY.md): linking SushiProfiler from a library,
+  registering its parts and what a source may rely on.
+
 ## Architecture
 
 - [`architecture/ARCHITECTURE.md`](architecture/ARCHITECTURE.md): the tiers, the dependency

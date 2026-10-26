@@ -60,7 +60,7 @@ namespace SushiProfiler
             /// @brief Writes the period, its zone runs, samples and spans.
             [[nodiscard]] WriteStatus write_period(
                 const RunRecord& record, const PeriodRecord& period,
-                const std::vector<ZoneInstance>& instances) override;
+                const std::vector<ZoneRun>& instances) override;
 
             /// @brief Closes the event array and the file.
             [[nodiscard]] WriteStatus end(const RunRecord& record) override;

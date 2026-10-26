@@ -285,8 +285,10 @@ namespace SushiProfiler
         for (Source* const source : sources_)
         {
             SpanSink sink(period.spans, names_, record_.tracks);
-            source->collect(period.index, sink);
-            record_.drops.spans_dropped += sink.refused();
+            const PeriodSpan span{period.index, settings_.origin.steady_ns + period.begin_ns,
+                                  settings_.origin.steady_ns + period.end_ns};
+            source->collect(span, sink);
+            record_.drops.spans_dropped += sink.refused() + sink.late();
         }
         copy_tables();
         for (auto writer = writers_.begin(); writer != writers_.end();)
@@ -301,6 +303,8 @@ namespace SushiProfiler
                                 std::to_string(period.index) + " and was stopped");
             writer = writers_.erase(writer);
         }
+        if (!period.warmup)
+            period.runs = std::move(fold.instances);
         closed_.emplace_back(period.begin_ns, period.end_ns);
         record_.periods.push_back(std::move(period));
     }

@@ -32,6 +32,7 @@
 
 using SushiProfiler::PeriodRecord;
 using SushiProfiler::ZoneNode;
+using SushiProfiler::ZoneRun;
 using SushiProfiler::ZoneTree;
 
 TEST(Small_PeriodRecord, DurationIsEndLessBegin)
@@ -60,5 +61,22 @@ TEST(Small_PeriodRecord, EqualityReachesTreesTagsAndSpans)
     EXPECT_FALSE(first == second);
     second = first;
     second.tags[0].value = 3U;
+    EXPECT_FALSE(first == second);
+}
+
+TEST(Small_PeriodRecord, EqualityReachesEveryFieldOfAZoneRun)
+{
+    PeriodRecord first;
+    first.runs.push_back(ZoneRun{1U, 2U, 3U, 4U, 5U, 6U, 7U});
+    PeriodRecord second = first;
+
+    EXPECT_EQ(first, second);
+    second.runs[0].depth = 8U;
+    EXPECT_FALSE(first == second);
+    second = first;
+    second.runs[0].begin_ns = 0U;
+    EXPECT_FALSE(first == second);
+    second = first;
+    second.runs.clear();
     EXPECT_FALSE(first == second);
 }

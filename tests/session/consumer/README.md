@@ -17,6 +17,9 @@
   - A period without its end mark is not kept, and its events count as outside.
   - A budget sets the period its mark opened, and a tag joins the period it falls in.
   - A source's span joins each period, and spans on an unknown track count as dropped.
+  - A source gets each period's steady span, interns a name and adds a track while collecting,
+    and work is placed by its start time, work older than the span counting as dropped.
+  - An active period keeps its zone runs with their depth; a warm-up period keeps none.
   - Stream writers get each period in order with its zone runs; a failing writer is stopped and
     named.
   - Lanes split zone trees; a lane left open counts at stop and an end of a lane not open is

@@ -39,7 +39,7 @@
 namespace SushiProfiler
 {
     /// @brief The version of the record format this build writes and reads.
-    inline constexpr std::uint32_t K_RECORD_FORMAT_VERSION = 1U;
+    inline constexpr std::uint32_t K_RECORD_FORMAT_VERSION = 2U;
 
     /// @brief A record read from text, or why it was refused.
     struct RecordReadResult

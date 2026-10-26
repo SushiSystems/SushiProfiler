@@ -28,7 +28,7 @@ its line and column.
 
 | Key | Kind | Holds |
 | --- | --- | --- |
-| `sushiprofiler_record` | whole | The format version, `1`. Any other version is refused. |
+| `sushiprofiler_record` | whole | The format version, `2`. Any other version is refused, naming its number; version 1, which held no zone runs, is among them. |
 | `environment` | pairs | The host, the libraries and the configuration, as `[name, value]` strings. |
 | `build` | pairs | Build type, optimisation and sanitisers. |
 | `tags` | pairs | The run's own tags. |
@@ -57,12 +57,19 @@ and `op` as one of `add`, `set`, `max` and `min`.
 | `tags` | pairs | `[key, value]` NameIDs. |
 | `facts` | pairs | `[name, value]` strings its sources reported. |
 | `zones` | objects | One zone tree per thread and lane. |
+| `runs` | object | Every zone run of the period, as columns; see below. |
 | `spans` | object | The span columns and their attributes. |
 | `samples` | objects | One series per site and thread. |
 
 A zone tree holds `thread`, `lane` (a NameID, `0` outside any lane) and six columns, one entry
 per node: `site`, `name`, `parent`, `inclusive_ns`, `self_ns` and `calls`. `parent` is `-1` at a
 root and otherwise the index of an earlier node.
+
+`runs` holds seven columns, one entry per zone run: `thread`, `lane`, `site`, `name`, `begin_ns`,
+`end_ns` and `depth`. A run may not end before it begins, its thread must be one `threads` lists,
+and `depth` counts the zones of its thread and lane open around it. The writer lists runs by
+thread, lane and begin. A warm-up period holds none, and `device_idle` reads them to name the
+host zone open over a device gap.
 
 `spans` holds seven columns, one entry per span: `queued_ns`, `start_ns`, `end_ns`, `track`,
 `name`, `submit_thread` and `uncertainty_ns`. `attributes` lists one column per key: `key` (a
@@ -78,7 +85,7 @@ per time; `items`, empty or one per time; and `points`, one of `begin`, `step` a
 
 ```json
 {
-  "sushiprofiler_record": 1,
+  "sushiprofiler_record": 2,
   "environment": [
     ["os", "Windows"]
   ],
@@ -118,6 +125,15 @@ per time; `items`, empty or one per time; and `points`, one of `begin`, `step` a
           "calls": [1]
         }
       ],
+      "runs": {
+        "thread": [0],
+        "lane": [0],
+        "site": [1],
+        "name": [0],
+        "begin_ns": [1000],
+        "end_ns": [4001000],
+        "depth": [0]
+      },
       "spans": {
         "queued_ns": [],
         "start_ns": [],

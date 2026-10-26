@@ -8,5 +8,5 @@ sushiprofiler_add_module(
     NAME stream_writers TIER session
     SOURCES
         chrome_trace_writer.cpp
-    DEPENDS version fold record record_writers
+    DEPENDS version record record_writers
     PRIVATE_DEPENDS json sites)

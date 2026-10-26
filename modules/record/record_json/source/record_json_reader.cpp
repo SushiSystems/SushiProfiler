@@ -224,7 +224,7 @@ namespace SushiProfiler
                     };
                     if (!decoder_.object(value, {"index", "timeline", "thread", "begin_ns",
                                                  "end_ns", "warmup", "budget_ns", "tags", "facts",
-                                                 "zones", "spans", "samples"}) ||
+                                                 "zones", "runs", "spans", "samples"}) ||
                         !decoder_.whole(value, "index", period.index) ||
                         !decoder_.whole(value, "timeline", period.timeline) ||
                         !decoder_.below("timeline", period.timeline, names(), "names") ||
@@ -235,7 +235,8 @@ namespace SushiProfiler
                         !decoder_.flag(value, "warmup", period.warmup) ||
                         !decoder_.whole(value, "budget_ns", period.budget_ns) ||
                         !tags(value, period.tags) || !facts(value, "facts", period.facts) ||
-                        !decoder_.each(value, "zones", tree) || !spans(value, period.spans) ||
+                        !decoder_.each(value, "zones", tree) || !runs(value, period) ||
+                        !spans(value, period.spans) ||
                         !decoder_.each(value, "samples", series))
                         return false;
                     if (period.end_ns < period.begin_ns)
@@ -311,6 +312,55 @@ namespace SushiProfiler
                                                       inclusive[index], self[index], calls[index]});
                     }
                     out.push_back(std::move(tree));
+                    return true;
+                }
+
+                /// @brief Reads a period's zone run columns.
+                bool runs(const JsonValue& period, PeriodRecord& out)
+                {
+                    const JsonFieldReader::Segment segment(decoder_, "runs");
+                    const JsonValue& value = JsonFieldReader::member(period, "runs");
+                    std::vector<std::uint32_t> thread;
+                    std::vector<NameID> lane;
+                    std::vector<SiteID> site;
+                    std::vector<NameID> name;
+                    std::vector<std::uint64_t> begin;
+                    std::vector<std::uint64_t> end;
+                    std::vector<std::uint32_t> depth;
+                    if (!decoder_.object(value, {"thread", "lane", "site", "name", "begin_ns",
+                                                 "end_ns", "depth"}) ||
+                        !decoder_.wholes(value, "thread", thread) ||
+                        !decoder_.wholes(value, "lane", lane) ||
+                        !decoder_.wholes(value, "site", site) ||
+                        !decoder_.wholes(value, "name", name) ||
+                        !decoder_.wholes(value, "begin_ns", begin) ||
+                        !decoder_.wholes(value, "end_ns", end) ||
+                        !decoder_.wholes(value, "depth", depth))
+                        return false;
+                    const std::size_t count = thread.size();
+                    if (!decoder_.length("lane", lane.size(), count) ||
+                        !decoder_.length("site", site.size(), count) ||
+                        !decoder_.length("name", name.size(), count) ||
+                        !decoder_.length("begin_ns", begin.size(), count) ||
+                        !decoder_.length("end_ns", end.size(), count) ||
+                        !decoder_.length("depth", depth.size(), count) ||
+                        !decoder_.all_below("lane", lane, names(), "names") ||
+                        !decoder_.all_below("site", site, sites(), "sites") ||
+                        !decoder_.all_below("name", name, names(), "names"))
+                        return false;
+                    for (std::size_t row = 0U; row < count; ++row)
+                    {
+                        if (!known_thread("thread", thread[row]))
+                            return false;
+                        if (end[row] < begin[row])
+                        {
+                            const JsonFieldReader::Segment at(decoder_, "end_ns");
+                            const JsonFieldReader::Segment index(decoder_, row);
+                            return decoder_.fail("ends before it begins");
+                        }
+                        out.runs.push_back(ZoneRun{thread[row], lane[row], site[row], name[row],
+                                                   begin[row], end[row], depth[row]});
+                    }
                     return true;
                 }
 

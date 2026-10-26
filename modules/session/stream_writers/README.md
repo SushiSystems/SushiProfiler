@@ -1,14 +1,14 @@
 # stream_writers
 
 Writers the session feeds one period at a time, in the namespace `SushiProfiler`, so memory holds
-one window of periods, not the run. The module depends on `fold`, `record` and `record_writers`,
+one window of periods, not the run. The module depends on `record` and `record_writers`,
 and privately on `json` and `sites`.
 
 - `SushiProfiler/stream_writers/stream_writer.hpp`: `StreamWriter` is the interface. The session
   calls `begin(record)` once, `write_period(record, period, instances)` once per recorded period
   in order, and `end(record)` once; each returns a `WriteStatus`. `record` is the run so far, and
-  `instances` are the zone runs `fold_period` produced for the period, which the record does not
-  keep.
+  `instances` are the zone runs `fold_period` produced for the period, for a warm-up period too;
+  the record keeps the runs of an active period in `PeriodRecord::runs`.
 - `SushiProfiler/stream_writers/chrome_trace_writer.hpp`: `ChromeTraceWriter(path)` streams the
   run as Chrome trace JSON, which Perfetto and `chrome://tracing` open. The file is one object,
   `{"displayTimeUnit": "ns", "traceEvents": [...]}`, one event per line. Times are microseconds

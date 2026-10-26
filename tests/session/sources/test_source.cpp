@@ -32,6 +32,7 @@
 
 using SushiProfiler::NameID;
 using SushiProfiler::NameTable;
+using SushiProfiler::PeriodSpan;
 using SushiProfiler::Source;
 using SushiProfiler::SourceContext;
 using SushiProfiler::SourceStatus;
@@ -70,10 +71,10 @@ namespace
             }
 
             /// @brief Adds the 40 ns span of @p period.
-            void collect(std::uint64_t period, SpanSink& sink) override
+            void collect(const PeriodSpan& period, SpanSink& sink) override
             {
                 Span span;
-                span.queued_ns = start_ns_ + period * 100U;
+                span.queued_ns = start_ns_ + period.index * 100U;
                 span.start_ns = span.queued_ns;
                 span.end_ns = span.start_ns + 40U;
                 span.track = track_;
@@ -113,7 +114,7 @@ TEST(Small_Source, BeginsCollectsEachPeriodAndEnds)
     ASSERT_TRUE(as_source.begin(context).ok());
     SpanTable period_two;
     SpanSink sink(period_two, names, tracks);
-    as_source.collect(2U, sink);
+    as_source.collect(PeriodSpan{2U, 1'200U, 1'300U}, sink);
     as_source.end();
 
     EXPECT_EQ(as_source.name(), "test.queue");

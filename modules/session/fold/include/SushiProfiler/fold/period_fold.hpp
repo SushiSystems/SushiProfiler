@@ -21,7 +21,7 @@
 
 /**
  * @file period_fold.hpp
- * @brief Declares the fold of one period's events into zone trees, samples and zone instances.
+ * @brief Declares the fold of one period's events into zone trees, samples and zone runs.
  * @author Mustafa Garip
  * @see modules/session/fold/README.md
  */
@@ -53,18 +53,6 @@ namespace SushiProfiler
         std::vector<FoldEvent> events; /**< Its events that begin in the period. */
     };
 
-    /// @brief One run of one zone, kept for writers that draw a timeline.
-    struct ZoneInstance
-    {
-        std::uint32_t thread = 0U;   /**< The thread's index. */
-        NameID lane = 0U;            /**< The lane, or 0. */
-        SiteID site = 0U;            /**< The zone's site. */
-        NameID name = 0U;            /**< Its dynamic name, or 0. */
-        std::uint64_t begin_ns = 0U; /**< When it began. */
-        std::uint64_t end_ns = 0U;   /**< When it ended. */
-        std::uint32_t depth = 0U;    /**< How many zones of the period were open around it. */
-    };
-
     /// @brief How many of one thread's events a fold could not place.
     struct ThreadCount
     {
@@ -77,12 +65,12 @@ namespace SushiProfiler
     {
         std::vector<ZoneTree> zones;         /**< One tree per thread and lane, in that order. */
         std::vector<SampleSeries> samples;   /**< One series per site and thread, in that order. */
-        std::vector<ZoneInstance> instances; /**< Every zone run, by thread, lane and begin. */
+        std::vector<ZoneRun> instances; /**< Every zone run, by thread, lane and begin. */
         std::vector<ThreadCount> unmatched;  /**< Zones that did not nest, per thread with any. */
     };
 
     /**
-     * @brief Folds @p threads into zone trees, sample series and zone instances.
+     * @brief Folds @p threads into zone trees, sample series and zone runs.
      *
      * Zones nest by time within a thread and lane; calls of one site and name under one parent
      * merge into one node, and self time is the zone's time outside its children. A zone that

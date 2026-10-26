@@ -18,6 +18,8 @@ The factories a configuration names and the contributors every session runs, in 
 | `record` | record | `path` of the record file, joined to the output folder when relative |
 | `chrome_trace` | stream | `path` of the trace file, joined to the output folder when relative |
 
-A contributor is held by reference and must outlive every session started with the registry.
+A contributor is held by reference and must outlive every session started with the registry. A
+client library therefore returns one object that owns its contributor and what its source reads;
+`docs/guides/CLIENT_LIBRARY.md` states the pattern.
 
 The tests are in `tests/session/registry/`.
