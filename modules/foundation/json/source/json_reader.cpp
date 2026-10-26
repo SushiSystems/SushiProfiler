@@ -39,7 +39,8 @@ namespace SushiProfiler
     namespace
     {
         /// @brief The refusal of a high surrogate that no low surrogate follows.
-        constexpr const char* K_LONE_HIGH_SURROGATE = "a high surrogate with no low surrogate after it";
+        constexpr const char* K_LONE_HIGH_SURROGATE =
+            "a high surrogate with no low surrogate after it";
 
         /// @brief Returns whether @p character is JSON whitespace.
         bool is_space(char character) noexcept
