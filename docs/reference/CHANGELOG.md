@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-26 — deps: Moved the sushicore pin to 0.9.6 (`cli/pyproject.toml`).
 - 2026-10-26 — cli: Added `sp build --build-dir` and `--lean`, the contract of a consumer's package build (`cli.py`, `project.py`).
 - 2026-10-26 — cli: Registered the shared `package` command from sushicore (`cli.py`).
 - 2026-10-26 — cli: Made `sp` honour `SUSHISTACK_CXX` over its configured compiler (`config.py`).
