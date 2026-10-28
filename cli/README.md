@@ -3,7 +3,7 @@
 The `sp` command line interface. `sushiprofiler/cli.py` parses the four commands, `build`, `test`,
 `bench` and `check`, and the `record` group, registers the shared `package` command, and `sushiprofiler/services/project.py` does the work. The `docs` group, with its one command
 `bundle`, the config loader, the console, the process runner and the CMake driver come from
-sushicore 0.9.2. `tests/` is the pytest suite:
+sushicore, at the version `pyproject.toml` pins. `tests/` is the pytest suite:
 `cd cli && python -m pytest tests -q`.
 
 ## config.py
@@ -13,6 +13,11 @@ Configuration is layered, lowest precedence first: built-in defaults, `config.to
 toolchain: `sp` builds with the pinned `cxx`, else a clang++ on PATH, else CMake's platform
 default. A found compiler with a found ninja takes the Ninja generator; with no compiler CMake
 chooses its own.
+
+Inside a SushiHub workspace the workspace's shared configuration is layered into this one. The
+workspace is the folder `SUSHISTACK_HOME` names, else the one the module's `[link]` pointer
+names, else the nearest parent holding `.sushistack`. A standalone checkout has none and reads
+only its own files.
 
 ## Package contract
 

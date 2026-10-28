@@ -6,6 +6,8 @@ checks, and the record tool behind `sp record`.
 
 ## Getting started
 
+- [`getting_started/INSTALL.md`](getting_started/INSTALL.md): the two ways to install, standalone
+  and with SushiHub.
 - [`getting_started/BUILD_AND_TEST.md`](getting_started/BUILD_AND_TEST.md): installing `sp`,
   building, testing and checking.
 

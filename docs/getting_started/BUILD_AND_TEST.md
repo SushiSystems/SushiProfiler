@@ -1,6 +1,7 @@
 # Building and testing
 
-`sp` builds, tests and checks SushiProfiler. Install it from the checkout:
+`sp` builds, tests and checks SushiProfiler. Install it from the checkout, or through SushiHub as
+[`INSTALL.md`](INSTALL.md) describes:
 
 ```bash
 pip install -e ./cli

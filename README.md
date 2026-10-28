@@ -16,11 +16,20 @@ sp record check run.sprec.json budgets.json
 
 ## Build
 
+Standalone, with Git, Python 3.11, CMake and a C++17 compiler:
+
 ```bash
+git clone https://github.com/SushiSystems/SushiProfiler.git
+cd SushiProfiler
 pip install -e ./cli
 sp build --type release
 sp test --label small --label medium --package
 ```
+
+With SushiHub: `hub add sushiprofiler` and `hub install-cli sushiprofiler`, or
+`hub link sushiprofiler <path>` for a checkout you already have.
+[`docs/getting_started/INSTALL.md`](docs/getting_started/INSTALL.md) has the prerequisites for
+both.
 
 In PowerShell `sp` is a built-in alias; type `sushiprofiler` there. Every build and test goes
 through `sp`.
