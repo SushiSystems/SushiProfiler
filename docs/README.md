@@ -26,7 +26,7 @@ checks, and the record tool behind `sp record`.
 ## Reference
 
 - [`reference/CHANGELOG.md`](reference/CHANGELOG.md)
-- [`reference/KNOWN_ISSUES.md`](reference/KNOWN_ISSUES.md)
+- [`backlog/README.md`](backlog/README.md)
 - [`reference/GLOSSARY.md`](reference/GLOSSARY.md)
 - [`reference/CONFIG_FORMAT.md`](reference/CONFIG_FORMAT.md): the profiler configuration's JSON form, key by key
 - [`reference/RECORD_FORMAT.md`](reference/RECORD_FORMAT.md): the run record's JSON form, key by key
@@ -35,7 +35,7 @@ checks, and the record tool behind `sp record`.
 
 - [`CONTRIBUTING.md`](CONTRIBUTING.md): what a change contains and how it lands.
 - [`DOCUMENTATION_STYLE_GUIDE.md`](DOCUMENTATION_STYLE_GUIDE.md)
-- [`design/README.md`](design/README.md) and [`design/REMAINING_WORK.md`](design/REMAINING_WORK.md)
+- [`design/README.md`](design/README.md) and [`backlog/README.md`](backlog/README.md)
 - The tests: [`tests`](../tests/README.md); the CLI: [`cli`](../cli/README.md); the checkers:
   [`tools`](../tools/README.md); the programs: [`applications`](../applications/README.md) and
   [`sp_record`](../applications/sp_record/README.md).

@@ -8,7 +8,7 @@ The three wave-1 analyses (SushiRuntime, SushiDSP and SushiTrack, each in its ow
 `docs/agent/2026_10_26_PROFILER_AND_LOG_ADOPTION/SPEC.md`) found that v0.1.0 cannot serve a library
 that is itself a shared library, nor a source whose data arrives after `begin()`. This release
 closes the gaps that block SushiRuntime's device source, which every later phase (P3 to P6) and
-SushiAI's inference profile wait on. The other gaps they found go to `docs/design/REMAINING_WORK.md`.
+SushiAI's inference profile wait on. The other gaps they found go to `docs/backlog/README.md`.
 
 ## Decisions
 
@@ -29,7 +29,7 @@ holds as the stack grows.
 Not in this release, because no inference-path client needs them: a per-period fact from a source
 (G2; SushiRuntime writes its execution layer as a span attribute instead), knowing ahead whether a
 period will be recorded (G5; SushiRuntime keeps device timing on for the whole session), and every
-DSP and SushiTrack gap. Each has its entry in `docs/design/REMAINING_WORK.md`.
+DSP and SushiTrack gap. Each has its entry in `docs/backlog/README.md`.
 
 ## The version
 

@@ -12,8 +12,8 @@
 # in SP_QUARANTINED_TESTS keeps its size and gains the quarantined label.
 # `sp test --label <size>` runs one label.
 
-# Suite.Case names of the intermittent tests, each with its entry in
-# docs/reference/KNOWN_ISSUES.md.
+# Suite.Case names of the intermittent tests, each with its known issue
+# in docs/backlog/.
 set(SP_QUARANTINED_TESTS "")
 
 if(NOT SP_BUILD_TESTS)

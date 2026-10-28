@@ -1,10 +1,7 @@
-# Known issues
+# KI-1 In PowerShell `sp build` runs Set-ItemProperty instead of building
 
-Next id: KI-2
+The row of this entry is in `docs/backlog/COMMAND_LINE.md`. This file holds what did not fit the row.
 
-## Command line
-
-### KI-1 In PowerShell `sp build` runs Set-ItemProperty instead of building
 - Origin: own
 - Where: `cli/pyproject.toml`
 - Cause: `sp` is PowerShell's built-in alias of `Set-ItemProperty`

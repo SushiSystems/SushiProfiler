@@ -1,0 +1,7 @@
+[work]
+next = 23
+closed = "1-2,4-5"
+
+[issue]
+next = 2
+closed = ""

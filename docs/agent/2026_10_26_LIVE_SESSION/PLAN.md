@@ -712,7 +712,7 @@ void reset() noexcept;      // the next mark opens period 0 again; current() is 
 
 ### L15: Release v0.3.0 (orchestrator)
 
-**Files:** `CMakeLists.txt` (`project(... VERSION 0.3.0)`), `cmake/SushiProfilerLibrary.cmake` (SOVERSION 0.3), `docs/reference/CHANGELOG.md`, `docs/design/PROFILER/README.md`, `docs/design/PROFILER/CAPTURE_AND_SESSION.md`, `docs/design/REMAINING_WORK.md`, `docs/README.md`, root `README.md` Status, this work folder's status line.
+**Files:** `CMakeLists.txt` (`project(... VERSION 0.3.0)`), `cmake/SushiProfilerLibrary.cmake` (SOVERSION 0.3), `docs/reference/CHANGELOG.md`, `docs/design/PROFILER/README.md`, `docs/design/PROFILER/CAPTURE_AND_SESSION.md`, `docs/backlog/README.md`, `docs/README.md`, root `README.md` Status, this work folder's status line.
 
 **Steps:**
 1. Write the decisions of D1 to D18 that are behaviour into `CAPTURE_AND_SESSION.md`: the session surface, the window's `"all"`, the two gate reasons, the live view and its lag, retention, the delay rule, named counters; update its "The session" signatures and its configuration example. Mark P2c built with the date in the phase table and the status line; `docs/README.md` says P1, P2 and P2c are built.

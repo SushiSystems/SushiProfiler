@@ -40,7 +40,7 @@ Design phases P1 and P2 are built: the capture layer, the session that turns a w
 into a run record, the analyses, comparison and checks over a record, the Chrome trace, and the
 record tool behind `sp record`. No library of the stack records through it yet; SushiRuntime's
 device source is phase P3. The open work is in
-[`docs/design/REMAINING_WORK.md`](docs/design/REMAINING_WORK.md).
+[`docs/backlog/README.md`](docs/backlog/README.md).
 
 ## Documentation
 
