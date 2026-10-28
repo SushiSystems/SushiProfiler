@@ -15,7 +15,9 @@ from __future__ import annotations
 from typing import Any, Optional
 
 import typer
+from sushicore.backlog import register_backlog_commands
 from sushicore.docs_bundle import register_docs_commands
+from sushicore.design import register_design_commands
 from sushicore.entry import run as run_app
 from sushicore.provision.commands import ModuleProvision
 from sushicore.provision.package_command import register_package_command
@@ -279,6 +281,20 @@ register_docs_commands(
     panel=K_PANEL,
     project_root=find_project_root,
     report=lambda line: console.success(line),
+    group_cls=_help_group,
+)
+register_backlog_commands(
+    app,
+    program=K_PROGRAM,
+    panel=K_PANEL,
+    project_root=find_project_root,
+    group_cls=_help_group,
+)
+register_design_commands(
+    app,
+    program=K_PROGRAM,
+    panel=K_PANEL,
+    project_root=find_project_root,
     group_cls=_help_group,
 )
 
