@@ -24,6 +24,6 @@ endif()
 # Debug host code keeps line tables only: a stack trace gets its files and lines at a fraction of
 # full debug information's compile memory, object size and link time. CMake states -g for Debug;
 # the later -gline-tables-only overrides it. RelWithDebInfo carries full debug information.
-if(NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND NOT CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
     add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:CXX>>:-gline-tables-only>")
 endif()
