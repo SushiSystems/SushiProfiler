@@ -39,11 +39,15 @@ folder first on PATH and, on Windows with `vs_vcvars` set, the Visual Studio env
 
 ## services/project.py
 
-Each sanitizer has its own build tree: `build/`, `build-asan/` and `build-tsan/`, so switching
-does not rebuild the plain tree. `sp test` leaves the quarantined tests out. `sp test --package`
+Debug is the default type; `sp bench` runs the release one. A tree is `build/<name>-<type>`,
+with the names `default`, `asan` and `tsan`, so each sanitizer and each type has a tree of its own
+and switching rebuilds nothing. A configure refuses a tree configured as another type, and a
+`-D CMAKE_BUILD_TYPE`; it also refuses a tree whose builds the owner stopped, and installs the
+memory gate of sushicore (`build_admission`) with the compiler cache. The compile runs at the
+hardware thread count. `sp build --report` prints and writes the report of the build. `sp test` leaves the quarantined tests out. `sp test --package`
 installs the tree, builds `tests/package/` against the install and runs its test. `sp build
 --benchmarks` turns on `SP_BUILD_BENCHMARKS`, and `sp bench` runs every `sp_bench_*` program in
-`build/benchmarks/<config>/` in name order. `sp record show|compare|check|validate` runs `sp_record` from
-`build/applications/<config>/` in the current folder, so relative record paths work, and exits
+`build/default-release/benchmarks/Release/` in name order. `sp record show|compare|check|validate` runs `sp_record` from
+`build/default-<type>/applications/<Config>/` in the current folder, so relative record paths work, and exits
 with its code. `sp check` runs the nine shared checkers and, with
 `--rule`, only those whose `--list-rules` names the rule.

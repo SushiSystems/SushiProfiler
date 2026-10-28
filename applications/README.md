@@ -1,7 +1,7 @@
 # applications
 
 The programs, one folder each. `SP_BUILD_APPLICATIONS`, on when SushiProfiler is the top-level
-project, builds them into `build/applications/<config>/`.
+project, builds them into `build/default-<type>/applications/<Config>/`.
 
 | Program | Does |
 | --- | --- |

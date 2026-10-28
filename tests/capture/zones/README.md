@@ -5,7 +5,7 @@
 - `allocation_counter.hpp`, `allocation_counter.cpp`: replace the program's global `operator new`
   and `delete` with `malloc` and `free` that count each thread's allocations;
   `allocations_on_this_thread()` reads the count.
-- `benchmark_zones.cpp`: the program `sp_bench_zones`, built with `sp build --benchmarks` and run
+- `benchmark_zones.cpp`: the program `sp_bench_zones`, built with `sp build --benchmarks --type release` and run
   by `sp bench`. It prints the median nanoseconds of 31 runs of 1,000,000 iterations, after 3
   warm-up runs, for a zone compiled out, with the gate closed, at a disabled site and recording,
   a counter recording, and one read of each clock.

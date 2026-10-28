@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-10-28 — cli: Changed `sp` to build Debug by default, in a tree per build type at `build/default-<type>/` instead of `build/`, behind the memory gate (`cli/sushiprofiler/`).
+
 ## v0.3.2 — 2026-10-27
 
 - 2026-10-27 — session: Fixed the SourceContext a source receives in begin(), which the session now keeps until every begun end() returns, so collect() may use it (`modules/session/session/`).

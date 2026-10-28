@@ -17,13 +17,21 @@ Configures the tree when it needs it, then builds the library target, the tests 
 checks.
 
 ```bash
-sp build                      # the type the tree carries, else debug
-sp build --type release
-sp build --sanitize address   # ASan and UBSan, in build-asan/
-sp build --sanitize thread    # ThreadSanitizer, in build-tsan/
+sp build                      # debug, in build/default-debug/
+sp build --type release       # its own tree, build/default-release/
+sp build --sanitize address   # ASan and UBSan, in build/asan-debug/
+sp build --sanitize thread    # ThreadSanitizer, in build/tsan-debug/
 sp build -D SP_BUILD_TESTS=OFF
 sp build --clean
+sp build --report             # also times the edges and the memory the build used
 ```
+
+Every build type has a tree of its own, so switching types never recompiles one. A configure
+of a tree under another type than its own is refused. Each configure installs the memory gate
+of sushicore, and the compile runs at the hardware thread count; `--report` prints the edges
+per kind, the slowest ones and the lowest free memory, and writes `build_report.json` into the
+tree. Benchmarks measure the type that ships: `sp build --benchmarks --type release`, then
+`sp bench`.
 
 ## sp test
 
@@ -37,7 +45,7 @@ sp test --jobs 4                       # four tests at once
 sp test --package                      # also the consumer of the installed package
 ```
 
-`--package` installs the tree under `build/package-prefix/`, builds `tests/package/` against it
+`--package` installs the tree under its `package-prefix/` folder, builds `tests/package/` against it
 and runs its one program.
 
 ## sp check

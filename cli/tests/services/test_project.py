@@ -15,6 +15,9 @@ from pathlib import Path
 
 import pytest
 
+from sushicore import build_admission
+from sushicore.errors import ConfigError
+
 from sushiprofiler.services import project as project_service
 from sushiprofiler.services.project import BuildType, Sanitizer, Size
 
@@ -34,6 +37,95 @@ def _is_compile(command: list[str]) -> bool:
 def _value_after(command: list[str], flag: str) -> str:
     """Returns the argument that follows *flag* in *command*."""
     return command[command.index(flag) + 1]
+
+
+def test_the_default_build_type_is_debug():
+    assert project_service.K_DEFAULT_TYPE == BuildType.DEBUG
+    assert project_service.resolve_build_type(None) == BuildType.DEBUG
+    assert project_service.resolve_build_type(BuildType.RELEASE) == BuildType.RELEASE
+
+
+def test_a_build_without_a_type_configures_the_debug_tree(project):
+    assert project_service.build() == 0
+
+    configure, compile_ = project.runner.commands
+    assert "-DCMAKE_BUILD_TYPE=Debug" in configure
+    assert Path(_value_after(configure, "-B")) == project.tree_of("Debug")
+    assert Path(_value_after(compile_, "--build")) == project.tree_of("Debug")
+
+
+@pytest.mark.parametrize("build_type, folder", [
+    (BuildType.DEBUG, "default-debug"),
+    (BuildType.RELEASE, "default-release"),
+    (BuildType.RELWITHDEBINFO, "default-relwithdebinfo"),
+])
+def test_each_build_type_has_a_tree_of_its_own(project, build_type, folder):
+    assert project_service.build(build_type) == 0
+
+    assert Path(_value_after(project.runner.commands[0], "-B")) == project.root / "build" / folder
+
+
+def test_a_configure_of_another_type_into_a_tree_is_refused(project):
+    project.configure_tree("Debug")
+
+    with pytest.raises(ConfigError, match="Debug tree"):
+        project_service.build(BuildType.RELEASE, defines=["A=1"], tree_path="build/default-debug")
+
+    assert project.runner.commands == []
+
+
+def test_a_define_of_the_build_type_is_refused(project):
+    with pytest.raises(ConfigError, match="CMAKE_BUILD_TYPE"):
+        project_service.build(defines=["CMAKE_BUILD_TYPE=Release"])
+
+    assert project.runner.commands == []
+
+
+def test_a_stopped_gate_refuses_the_configure(project):
+    stop = build_admission.stop_file(project.tree_of("Debug"))
+    stop.parent.mkdir(parents=True)
+    stop.write_text("", encoding="utf-8")
+
+    with pytest.raises(build_admission.BuildStoppedError):
+        project_service.build()
+
+    assert project.runner.commands == []
+
+
+def test_a_configure_carries_both_launcher_entries(project):
+    assert project_service.build() == 0
+
+    configure = project.runner.commands[0]
+    entries = [part for part in configure if part.startswith("-DCMAKE_CXX_")]
+    assert sorted(entry.split("=", 1)[0] for entry in entries) == [
+        "-DCMAKE_CXX_COMPILER", "-DCMAKE_CXX_COMPILER_LAUNCHER", "-DCMAKE_CXX_LINKER_LAUNCHER"]
+    assert all(str(build_admission.state_dir(project.tree_of("Debug")).as_posix()) in entry
+               for entry in entries if "LAUNCHER" in entry)
+
+
+def test_the_compile_runs_at_the_hardware_thread_count(project, monkeypatch):
+    monkeypatch.setattr(build_admission, "hardware_threads", lambda: 7)
+
+    assert project_service.build() == 0
+
+    assert _value_after(project.runner.commands[-1], "--parallel") == "7"
+
+
+def test_a_build_with_a_report_prints_it_and_writes_it_into_the_tree(project):
+    tree = project.configure_tree("Debug")
+
+    assert project_service.build(report=True) == 0
+
+    assert any(line.startswith("Report: ") for line in project.console.of("info"))
+    assert (tree / "build_report.json").is_file()
+
+
+def test_a_build_without_a_report_prints_none(project):
+    tree = project.configure_tree("Debug")
+
+    assert project_service.build() == 0
+
+    assert not (tree / "build_report.json").exists()
 
 
 def test_build_configures_an_empty_tree_then_compiles(project):
@@ -67,14 +159,14 @@ def test_build_with_a_sanitizer_uses_its_own_tree(project):
     assert project_service.build(BuildType.DEBUG, sanitizer=Sanitizer.THREAD) == 0
 
     configure = project.runner.commands[0]
-    assert Path(_value_after(configure, "-B")).name == "build-tsan"
+    assert Path(_value_after(configure, "-B")) == project.tree_of("Debug", "tsan")
     assert "-DSP_SANITIZE=thread" in configure
 
 
 def test_build_with_benchmarks_switches_them_on_and_reconfigures(project):
     project.configure_tree("Release")
 
-    assert project_service.build(benchmarks=True) == 0
+    assert project_service.build(BuildType.RELEASE, benchmarks=True) == 0
 
     configure = project.runner.commands[0]
     assert _is_configure(configure) and _value_after(configure, "-D") == "SP_BUILD_BENCHMARKS=ON"
@@ -83,14 +175,14 @@ def test_build_with_benchmarks_switches_them_on_and_reconfigures(project):
 def test_build_without_benchmarks_switches_them_off(project):
     project.configure_tree("Release")
 
-    assert project_service.build(benchmarks=False) == 0
+    assert project_service.build(BuildType.RELEASE, benchmarks=False) == 0
 
     assert _value_after(project.runner.commands[0], "-D") == "SP_BUILD_BENCHMARKS=OFF"
 
 
 def test_bench_runs_every_benchmark_program_in_name_order(project):
     project.configure_tree("Release")
-    folder = project.tree / "benchmarks" / "Release"
+    folder = project.tree_of("Release") / "benchmarks" / "Release"
     folder.mkdir(parents=True)
     for name in ("sp_bench_zones.exe", "sp_bench_clock.exe", "sp_zones_tests.exe"):
         (folder / name).write_text("", encoding="utf-8")
@@ -102,29 +194,41 @@ def test_bench_runs_every_benchmark_program_in_name_order(project):
 
 
 def test_bench_without_a_benchmark_program_fails_and_says_so(project):
-    project.configure_tree("Debug")
-
     assert project_service.bench() == 1
 
     (message,) = project.console.of("error")
-    assert "sp build --benchmarks" in message and project.runner.commands == []
+    assert "sp build --benchmarks --type release" in message and project.runner.commands == []
 
 
-def test_record_runs_sp_record_of_the_trees_type_with_the_arguments(project):
-    project.configure_tree("Release")
-    folder = project.tree / "applications" / "Release"
+def test_bench_looks_in_the_release_tree_unless_told_another(project):
+    folder = project.configure_tree("Debug") / "benchmarks" / "Debug"
+    folder.mkdir(parents=True)
+    (folder / "sp_bench_zones.exe").write_text("", encoding="utf-8")
+
+    assert project_service.bench() == 1
+    assert project_service.bench(BuildType.DEBUG) == 0
+
+
+def test_record_runs_sp_record_of_the_asked_type_with_the_arguments(project):
+    folder = project.configure_tree("Release") / "applications" / "Release"
     folder.mkdir(parents=True)
     (folder / "sp_record.exe").write_text("", encoding="utf-8")
 
-    assert project_service.record(["validate", "run.json"]) == 0
+    assert project_service.record(["validate", "run.json"], BuildType.RELEASE) == 0
 
     (command,) = project.runner.commands
     assert Path(command[0]).name == "sp_record.exe" and command[1:] == ["validate", "run.json"]
 
 
-def test_record_without_the_program_fails_and_says_so(project):
-    project.configure_tree("Debug")
+def test_record_defaults_to_the_debug_tree(project):
+    folder = project.configure_tree("Debug") / "applications" / "Debug"
+    folder.mkdir(parents=True)
+    (folder / "sp_record.exe").write_text("", encoding="utf-8")
 
+    assert project_service.record(["validate", "run.json"]) == 0
+
+
+def test_record_without_the_program_fails_and_says_so(project):
     assert project_service.record(["validate", "run.json"]) == 1
 
     (message,) = project.console.of("error")
@@ -164,6 +268,7 @@ def test_test_with_package_installs_then_builds_and_runs_the_consumer(project):
     assert f"-DCMAKE_PREFIX_PATH={prefix}" in configure
     assert _is_compile(compile_)
     assert Path(_value_after(ctest, "--test-dir")).name == "package"
+    assert any(part.startswith("-DCMAKE_CXX_COMPILER_LAUNCHER=") for part in configure)
 
 
 def test_check_runs_every_checker_with_the_root(project):
@@ -202,8 +307,7 @@ def test_rules_of_reads_the_list_rules_flag(tmp_path):
     assert project_service.rules_of(checker) == frozenset({"rule_a", "rule_b"})
 
 
-def test_resolve_build_type_reads_the_tree_when_none_is_asked(project):
+def test_resolve_build_type_ignores_the_type_a_tree_carries(project):
     project.configure_tree("RelWithDebInfo")
 
-    assert project_service.resolve_build_type(None, project.tree) == BuildType.RELWITHDEBINFO
-    assert project_service.resolve_build_type(BuildType.DEBUG, project.tree) == BuildType.DEBUG
+    assert project_service.resolve_build_type(None) == BuildType.DEBUG

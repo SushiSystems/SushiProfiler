@@ -5,8 +5,9 @@
 # Commercial use requires a licence from Sushi Systems.
 """Drives SushiProfiler's build, test, bench, record and check steps.
 
-Holds the build policy: the build tree of each sanitizer, the test sizes and their CTest labels,
-the benchmark programs and sp_record, the install the package test builds against, and the checkers. cmake and ctest run through
+Holds the build policy: the build tree of each sanitizer and build type, the memory gate every
+configure installs, the test sizes and their CTest labels, the benchmark programs and sp_record,
+the install the package test builds against, and the checkers. cmake and ctest run through
 ``sushicore.cmake_driver.CMakeDriver`` under the environment ``sushiprofiler.env`` assembles.
 """
 
@@ -18,7 +19,8 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
-from sushicore import cmake_cache
+from sushicore import build_admission, build_report, cmake_cache
+from sushicore.build_tree import K_DEFAULT_BUILD_TYPE, refuse_another_build_type, tree_dir
 from sushicore.cmake_driver import CMakeDriver
 from sushicore.proc import Runner
 from sushicore.toolchain_args import c_compiler_for
@@ -57,7 +59,12 @@ K_CMAKE_BUILD_TYPE = {
     BuildType.RELWITHDEBINFO: "RelWithDebInfo",
 }
 
-K_BUILD_FOLDER = {None: "build", Sanitizer.ADDRESS: "build-asan", Sanitizer.THREAD: "build-tsan"}
+#: The name of the tree of each sanitizer; ``tree_dir`` appends the build type.
+K_TREE_NAME = {None: "default", Sanitizer.ADDRESS: "asan", Sanitizer.THREAD: "tsan"}
+
+#: The type a command builds when it is not told one, and the type a benchmark runs in.
+K_DEFAULT_TYPE = BuildType(K_DEFAULT_BUILD_TYPE.lower())
+K_BENCHMARK_TYPE = BuildType.RELEASE
 
 K_PACKAGE_SOURCE = Path("tests", "package")
 
@@ -85,11 +92,15 @@ _RUNNER = Runner(console, PROFILE.program)
 _DRIVER = CMakeDriver(console, _RUNNER)
 
 
-def build_dir(root: Path, sanitizer: Sanitizer | None, requested: str | None = None) -> Path:
-    """Returns the build tree: *requested* below *root* when given, else the one of *sanitizer*."""
+def build_dir(root: Path, sanitizer: Sanitizer | None, build_type: BuildType,
+              requested: str | None = None) -> Path:
+    """Returns the build tree: *requested* below *root* when given, else the one of *sanitizer*.
+
+    The default tree is ``build/<name>-<type>``, so each build type has a tree of its own.
+    """
     if requested:
         return root / requested
-    return root / K_BUILD_FOLDER[sanitizer]
+    return tree_dir(root, K_TREE_NAME[sanitizer], K_CMAKE_BUILD_TYPE[build_type])
 
 
 def tree_switches(lean: bool) -> dict[str, str]:
@@ -112,15 +123,10 @@ def size_label_regex(sizes: Sequence[Size]) -> str | None:
     return "^(" + "|".join(sorted({size.value for size in sizes})) + ")$"
 
 
-def resolve_build_type(requested: BuildType | None, tree: Path) -> BuildType:
-    """Returns *requested*, else the type the tree at *tree* carries, else debug."""
-    if requested is not None:
-        return requested
-    cached = cmake_cache.cached_value(tree, "CMAKE_BUILD_TYPE")
-    for build_type, name in K_CMAKE_BUILD_TYPE.items():
-        if name == cached:
-            return build_type
-    return BuildType.DEBUG
+def resolve_build_type(requested: BuildType | None,
+                       default: BuildType = K_DEFAULT_TYPE) -> BuildType:
+    """Returns *requested*, else *default*; the type picks the tree, so no tree is asked."""
+    return default if requested is None else requested
 
 
 def benchmarks_defines(benchmarks: bool | None) -> list[str]:
@@ -158,6 +164,31 @@ def _compiler_arguments(cfg: Config) -> list[str]:
     return arguments
 
 
+def _gate_arguments(cfg: Config, tree: Path) -> list[str]:
+    """Returns the `-D` arguments that run every compile and link of *tree* through the gate."""
+    cache = build_admission.compiler_cache(cfg.ccache_exe)
+    return [f"-D{entry}" for entry in build_admission.launcher_defines(tree, cache)]
+
+
+def _configure(cfg: Config, tree: Path, cmake_type: str, command: list[str],
+               defines: Sequence[str], root: Path, env: dict[str, str]) -> int:
+    """Configures *tree* with *command* and the gate, once the tree is known to be its own.
+
+    Raises:
+        sushicore.errors.ConfigError: *tree* is configured as another build type than *cmake_type*.
+        sushicore.build_admission.BuildStoppedError: the owner stopped builds of *tree*.
+    """
+    refuse_another_build_type(tree, cmake_type, defines)
+    build_admission.refuse_a_stopped_gate(tree)
+    return _DRIVER.configure([*command, *_gate_arguments(cfg, tree)], cwd=root, env=env)
+
+
+def _compile(cfg: Config, tree: Path, root: Path, env: dict[str, str], config: str) -> int:
+    """Compiles *tree* at the hardware thread count; the gate holds each edge back until it fits."""
+    return _DRIVER.compile(cfg, tree, cwd=root, env=env, config=config,
+                           jobs=build_admission.hardware_threads())
+
+
 def _needs_configure(cfg: Config, tree: Path, build_type: BuildType,
                      sanitizer: Sanitizer | None, switches: dict[str, str]) -> bool:
     """Returns whether *tree* must be configured before it is compiled."""
@@ -175,17 +206,20 @@ def _needs_configure(cfg: Config, tree: Path, build_type: BuildType,
 def build(build_type: BuildType | None = None, clean: bool = False,
           defines: Sequence[str] = (), sanitizer: Sanitizer | None = None,
           benchmarks: bool | None = None, lean: bool = False,
-          tree_path: str | None = None) -> int:
-    """Configures the tree of *sanitizer* when it needs it or *defines* are given, then compiles it.
+          tree_path: str | None = None, report: bool = False) -> int:
+    """Configures the tree of *sanitizer* and *build_type* when it needs it or *defines* are
+    given, then compiles it.
 
     Args:
         clean: Removes the tree first.
         defines: `VAR=VALUE` cache variables; any of them reconfigures a configured tree.
-        sanitizer: Builds in that sanitizer's own tree, build-asan/ or build-tsan/.
+        build_type: The type to build; debug when None. Each type has its own tree.
+        sanitizer: Builds in that sanitizer's own tree, build/asan-<type>/ or build/tsan-<type>/.
         benchmarks: True builds the benchmark programs, False stops building them, None keeps
             what the tree has.
         lean: Builds no tests, applications or benchmarks; what a library package is built as.
         tree_path: The tree to build in, below the project root, in place of the default one.
+        report: Measures the build, then prints its report and writes it into the tree.
 
     Returns:
         The exit code; 2 when *lean* and ``benchmarks=True`` ask for opposite things.
@@ -197,10 +231,10 @@ def build(build_type: BuildType | None = None, clean: bool = False,
     switches = tree_switches(lean)
     root = find_project_root()
     cfg = load_config()
-    tree = build_dir(root, sanitizer, tree_path)
+    build_type = resolve_build_type(build_type)
+    tree = build_dir(root, sanitizer, build_type, tree_path)
     if clean:
         _DRIVER.clean_tree(tree)
-    build_type = resolve_build_type(build_type, tree)
     env = load_build_env(cfg, tree)
 
     if defines or _needs_configure(cfg, tree, build_type, sanitizer, switches):
@@ -211,11 +245,24 @@ def build(build_type: BuildType | None = None, clean: bool = False,
                    *_compiler_arguments(cfg)]
         for define in defines:
             command += ["-D", define]
-        rc = _DRIVER.configure(command, cwd=root, env=env)
+        rc = _configure(cfg, tree, K_CMAKE_BUILD_TYPE[build_type], command, defines, root, env)
         if rc != 0:
             return rc
 
-    return _DRIVER.compile(cfg, tree, cwd=root, env=env, config=K_CMAKE_BUILD_TYPE[build_type])
+    offset = build_report.ninja_log_offset(tree)
+    rc = _compile(cfg, tree, root, env, K_CMAKE_BUILD_TYPE[build_type])
+    if report:
+        _print_report(tree, offset)
+    return rc
+
+
+def _print_report(tree: Path, offset: int) -> None:
+    """Prints the report of the build that appended to the log of *tree* from *offset*, and
+    writes it into *tree*."""
+    measured = build_report.of_build(tree, offset, build_admission.state_dir(tree))
+    for line in measured.lines():
+        console.info(line)
+    console.info(f"Report: {measured.write(tree)}")
 
 
 def test(build_type: BuildType | None = None, sizes: Sequence[Size] = (), clean: bool = False,
@@ -231,14 +278,15 @@ def test(build_type: BuildType | None = None, sizes: Sequence[Size] = (), clean:
         package: Also installs the tree, builds tests/package/ against the install and runs
             its test.
     """
+    build_type = resolve_build_type(build_type)
     rc = build(build_type, clean=clean, sanitizer=sanitizer)
     if rc != 0:
         return rc
 
     root = find_project_root()
     cfg = load_config()
-    tree = build_dir(root, sanitizer)
-    config = K_CMAKE_BUILD_TYPE[resolve_build_type(build_type, tree)]
+    tree = build_dir(root, sanitizer, build_type)
+    config = K_CMAKE_BUILD_TYPE[build_type]
     env = load_build_env(cfg, tree)
     rc = _DRIVER.ctest_run(cfg, tree, env, label_regex=size_label_regex(sizes),
                            exclude_label_regex="quarantined", filter=filter, jobs=jobs,
@@ -257,13 +305,14 @@ def _test_package(root: Path, cfg: Config, tree: Path, env: dict[str, str], conf
                       "--prefix", str(prefix)], root, env)
     if rc != 0:
         return rc
-    rc = _DRIVER.configure([_DRIVER.cmake(cfg), "-S", str(root / K_PACKAGE_SOURCE),
-                            "-B", str(consumer), f"-DCMAKE_BUILD_TYPE={config}",
-                            f"-DCMAKE_PREFIX_PATH={prefix}", *_compiler_arguments(cfg)],
-                           cwd=root, env=env)
+    rc = _configure(cfg, consumer, config,
+                    [_DRIVER.cmake(cfg), "-S", str(root / K_PACKAGE_SOURCE),
+                     "-B", str(consumer), f"-DCMAKE_BUILD_TYPE={config}",
+                     f"-DCMAKE_PREFIX_PATH={prefix}", *_compiler_arguments(cfg)],
+                    (), root, env)
     if rc != 0:
         return rc
-    rc = _DRIVER.compile(cfg, consumer, cwd=root, env=env, config=config)
+    rc = _compile(cfg, consumer, root, env, config)
     if rc != 0:
         return rc
     return _DRIVER.ctest_run(cfg, consumer, env, config=config)
@@ -272,17 +321,21 @@ def _test_package(root: Path, cfg: Config, tree: Path, env: dict[str, str], conf
 def bench(build_type: BuildType | None = None) -> int:
     """Runs every built benchmark program of the plain tree in name order.
 
+    Args:
+        build_type: The build whose programs run; release when None, the type that ships.
+
     Returns:
         The first non-zero exit code among the programs, or 1 when the tree has none.
     """
     root = find_project_root()
     cfg = load_config()
-    tree = build_dir(root, None)
-    config = K_CMAKE_BUILD_TYPE[resolve_build_type(build_type, tree)]
+    build_type = resolve_build_type(build_type, K_BENCHMARK_TYPE)
+    tree = build_dir(root, None, build_type)
+    config = K_CMAKE_BUILD_TYPE[build_type]
     programs = benchmark_programs(tree / K_BENCHMARK_FOLDER / config)
     if not programs:
         console.error(f"no benchmark program in {tree / K_BENCHMARK_FOLDER / config}; "
-                      f"run {PROFILE.program} build --benchmarks first")
+                      f"run {PROFILE.program} build --benchmarks --type release first")
         return 1
     env = load_build_env(cfg, tree)
     code = 0
@@ -305,15 +358,16 @@ def record(arguments: Sequence[str], build_type: BuildType | None = None) -> int
 
     Args:
         arguments: The command, then its arguments, as sp_record takes them.
-        build_type: The build whose program runs; the tree's type when None.
+        build_type: The build whose program runs; debug when None.
 
     Returns:
         sp_record's exit code, or 1 when the tree holds no sp_record.
     """
     root = find_project_root()
     cfg = load_config()
-    tree = build_dir(root, None)
-    folder = tree / K_APPLICATION_FOLDER / K_CMAKE_BUILD_TYPE[resolve_build_type(build_type, tree)]
+    build_type = resolve_build_type(build_type)
+    tree = build_dir(root, None, build_type)
+    folder = tree / K_APPLICATION_FOLDER / K_CMAKE_BUILD_TYPE[build_type]
     program = record_program(folder)
     if program is None:
         console.error(f"no {K_RECORD_PROGRAM} in {folder}; run {PROFILE.program} build first")

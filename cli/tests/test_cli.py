@@ -49,7 +49,15 @@ def test_build_passes_type_sanitizer_and_defines(calls):
     (name, args, kwargs), = calls
     assert name == "build" and args == (BuildType.RELEASE,)
     assert kwargs == {"clean": False, "defines": ["A=1"], "sanitizer": Sanitizer.ADDRESS,
-                      "benchmarks": None, "lean": False, "tree_path": None}
+                      "benchmarks": None, "lean": False, "tree_path": None, "report": False}
+
+
+def test_build_passes_the_report_flag(calls):
+    result = _RUNNER.invoke(cli.app, ["build", "--report"])
+
+    assert result.exit_code == 0
+    (name, args, kwargs), = calls
+    assert args == (None,) and kwargs["report"] is True
 
 
 def test_build_passes_benchmarks(calls):

@@ -31,8 +31,10 @@ K_PROGRAM = "sp"
 K_DISTRIBUTION = "sushiprofiler-cli"
 K_PANEL = "Build"
 
-K_TYPE_HELP = ("Build type: debug | release | relwithdebinfo. "
-               "Defaults to the type the build tree carries, else debug.")
+K_TYPE_HELP = ("Build type: debug | release | relwithdebinfo. Defaults to debug. "
+               "Each type has its own tree.")
+K_BENCH_TYPE_HELP = ("Build type of the programs: debug | release | relwithdebinfo. "
+                     "Defaults to release, the type that ships.")
 
 _help_group = help_group(console.current)
 
@@ -47,9 +49,9 @@ app = typer.Typer(
 )
 
 
-def _type_option() -> Any:
-    """Returns the default of a `--type/-t` parameter."""
-    return typer.Option(None, "--type", "-t", case_sensitive=False, help=K_TYPE_HELP)
+def _type_option(help: str = K_TYPE_HELP) -> Any:
+    """Returns the default of a `--type/-t` parameter whose help reads *help*."""
+    return typer.Option(None, "--type", "-t", case_sensitive=False, help=help)
 
 
 def _sanitize_option() -> Any:
@@ -62,7 +64,7 @@ def _sanitize_option() -> Any:
 def _build_dir_option() -> Any:
     """Returns the default of a `--build-dir` parameter."""
     return typer.Option(None, "--build-dir", metavar="PATH",
-                        help="Build in this tree, below the checkout, instead of build/.")
+                        help="Build in this tree, below the checkout, instead of build/default-<type>/.")
 
 
 def _lean_option() -> Any:
@@ -81,9 +83,10 @@ def _clean_option() -> Any:
     "build",
     rich_help_panel=K_PANEL,
     epilog="sp build\n"
-           "sp build --type release\n"
+           "sp build --type release  # In build/default-release/\n"
            "sp build --benchmarks --type release  # Also build the benchmark programs\n"
-           "sp build --sanitize address  # ASan and UBSan, in build-asan/\n"
+           "sp build --sanitize address  # ASan and UBSan, in build/asan-debug/\n"
+           "sp build --report  # Also time the edges and the memory the build used\n"
            "sp build --build-dir build/pkg-x --lean  # What a consumer's package build runs",
 )
 def build(
@@ -99,11 +102,16 @@ def build(
              "When omitted the tree keeps its setting."),
     build_dir: Optional[str] = _build_dir_option(),
     lean: bool = _lean_option(),
+    report: bool = typer.Option(
+        False, "--report",
+        help="Print the edges, times and memory of this build and write build_report.json "
+             "into the tree."),
 ) -> None:
     """Configure when needed, then build the library and the tests."""
     raise typer.Exit(project_service.build(type, clean=clean, defines=define or (),
                                            sanitizer=sanitize, benchmarks=benchmarks,
-                                           lean=lean, tree_path=build_dir))
+                                           lean=lean, tree_path=build_dir,
+                                           report=report))
 
 
 @app.command(
@@ -141,11 +149,11 @@ def test(
     epilog="sp build --benchmarks --type release\n"
            "sp bench --type release  # Every benchmark program, in name order",
 )
-def bench(type: Optional[BuildType] = _type_option()) -> None:
+def bench(type: Optional[BuildType] = _type_option(K_BENCH_TYPE_HELP)) -> None:
     """Run every built benchmark program.
 
     A benchmark measures and does not pass or fail, so it is not a test. Build the programs
-    with sp build --benchmarks first.
+    with sp build --benchmarks --type release first; bench runs the release ones.
     """
     raise typer.Exit(project_service.bench(type))
 

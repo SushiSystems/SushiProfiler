@@ -5,5 +5,5 @@ and nothing else, refuses a target that hands it SushiProfiler's warnings or san
 builds `consumer.cpp` against `SushiProfiler::SushiProfiler`. The program includes the umbrella
 header and fails unless the version it reads equals the one the tree builds.
 
-`sp test --package` installs the build tree under `build/package-prefix/`, builds this project
-in `build/package/` against it and runs the program as a test.
+`sp test --package` installs the build tree under `build/default-<type>/package-prefix/`, builds this project
+in `build/default-<type>/package/` against it and runs the program as a test.

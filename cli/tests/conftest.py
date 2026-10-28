@@ -77,23 +77,27 @@ class Project:
     root: Path
     runner: RecordingRunner
     console: RecordingConsole
-    tree: Path = field(init=False)
 
-    def __post_init__(self) -> None:
-        """Derives the plain build tree from the root."""
-        self.tree = self.root / "build"
+    def tree_of(self, build_type: str = "Debug", name: str = "default") -> Path:
+        """Returns the tree `build/<name>-<type>` of *build_type*, the way sushicore names it."""
+        return self.root / "build" / f"{name}-{build_type.lower()}"
 
     def configure_tree(self, build_type: str = "Debug", sanitize: str = "",
-                       folder: str = "build", tests: str = "ON") -> None:
-        """Plants the files a finished Ninja configure of *build_type* leaves behind."""
-        tree = self.root / folder
-        tree.mkdir(exist_ok=True)
+                       name: str = "default", tests: str = "ON") -> Path:
+        """Plants the files a finished Ninja configure of *build_type* leaves behind.
+
+        Returns:
+            The tree, `build/<name>-<type>`.
+        """
+        tree = self.tree_of(build_type, name)
+        tree.mkdir(parents=True, exist_ok=True)
         (tree / "build.ninja").write_text("", encoding="utf-8")
         (tree / "CMakeCache.txt").write_text(
             f"CMAKE_BUILD_TYPE:STRING={build_type}\nCMAKE_GENERATOR:INTERNAL=Ninja\n"
             f"SP_SANITIZE:STRING={sanitize}\nSP_BUILD_TESTS:BOOL={tests}\n"
             f"SP_BUILD_APPLICATIONS:BOOL={tests}\n",
             encoding="utf-8")
+        return tree
 
 
 @pytest.fixture

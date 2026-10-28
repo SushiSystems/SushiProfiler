@@ -2,7 +2,7 @@
 
 The record tool as a program: it passes its arguments to `run_record_tool` from
 `modules/tools/record_tool/` and returns its exit code. `sp build` builds it into
-`build/applications/<config>/`, and `sp record` runs it.
+`build/default-<type>/applications/<Config>/`, and `sp record` runs it.
 
 ```bash
 sp record validate build/profiles/run.sprec.json

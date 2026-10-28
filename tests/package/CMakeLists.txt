@@ -15,6 +15,14 @@ project(SushiProfilerPackageConsumer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# The installed library is built under the release C runtime and no iterator checking in every
+# build type (cmake/SushiProfilerAbiPinning.cmake); the consumer takes the same.
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL")
+set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG Release RelWithDebInfo MinSizeRel "")
+if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+    add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:_ITERATOR_DEBUG_LEVEL=0>")
+endif()
+
 # The version is the one this tree builds, so the test follows each release without an edit.
 file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/../../CMakeLists.txt" project_line
     REGEX "^project[(]SushiProfiler VERSION [0-9.]+")
