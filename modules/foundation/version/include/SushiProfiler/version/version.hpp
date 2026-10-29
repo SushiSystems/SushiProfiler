@@ -36,12 +36,12 @@ namespace SushiProfiler
     inline constexpr int K_VERSION_MAJOR = 0;
 
     /// @brief Minor number of the library version.
-    inline constexpr int K_VERSION_MINOR = 3;
+    inline constexpr int K_VERSION_MINOR = 4;
 
     /// @brief Patch number of the library version.
-    inline constexpr int K_VERSION_PATCH = 2;
+    inline constexpr int K_VERSION_PATCH = 1;
 
     /// @brief The library version as dotted numbers; the configure step compares it with the
     ///        version `project()` declares in CMakeLists.txt.
-    inline constexpr std::string_view K_VERSION_STRING = "0.3.2";
+    inline constexpr std::string_view K_VERSION_STRING = "0.4.1";
 } // namespace SushiProfiler
