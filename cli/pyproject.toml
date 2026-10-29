@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sushiprofiler-cli"
-version = "0.3.2"
+version = "0.4.0"
 description = "SushiProfiler developer CLI (build / test / check)"
 authors = [{ name = "Mustafa Garip", email = "mustafagarip@sushisystems.io" }]
 license = { text = "PolyForm-Noncommercial-1.0.0" }
