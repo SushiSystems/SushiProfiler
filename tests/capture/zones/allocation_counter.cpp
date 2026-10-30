@@ -36,11 +36,17 @@ namespace
     /// @brief The calling thread's calls to the global operator new.
     thread_local std::uint64_t t_allocations = 0U;
 
+    /// @brief Counts one allocation and returns @p size bytes from malloc, or null when it fails.
+    void* counted_allocate_or_null(std::size_t size) noexcept
+    {
+        ++t_allocations;
+        return std::malloc(size != 0U ? size : 1U);
+    }
+
     /// @brief Counts one allocation and returns @p size bytes from malloc.
     void* counted_allocate(std::size_t size)
     {
-        ++t_allocations;
-        void* const memory = std::malloc(size != 0U ? size : 1U);
+        void* const memory = counted_allocate_or_null(size);
         if (memory == nullptr)
             throw std::bad_alloc();
         return memory;
@@ -67,6 +73,19 @@ void* operator new[](std::size_t size)
     return counted_allocate(size);
 }
 
+/// @brief Counts and allocates one object, returning null when it fails. A sanitizer runtime
+/// provides this form itself, so it is replaced too, or its memory would meet our free.
+void* operator new(std::size_t size, const std::nothrow_t&) noexcept
+{
+    return counted_allocate_or_null(size);
+}
+
+/// @brief Counts and allocates one array, returning null when it fails.
+void* operator new[](std::size_t size, const std::nothrow_t&) noexcept
+{
+    return counted_allocate_or_null(size);
+}
+
 /// @brief Frees one object.
 void operator delete(void* memory) noexcept
 {
@@ -87,6 +106,18 @@ void operator delete(void* memory, std::size_t) noexcept
 
 /// @brief Frees one array of a known size.
 void operator delete[](void* memory, std::size_t) noexcept
+{
+    std::free(memory);
+}
+
+/// @brief Frees one object whose nothrow allocation was followed by a throwing constructor.
+void operator delete(void* memory, const std::nothrow_t&) noexcept
+{
+    std::free(memory);
+}
+
+/// @brief Frees one array whose nothrow allocation was followed by a throwing constructor.
+void operator delete[](void* memory, const std::nothrow_t&) noexcept
 {
     std::free(memory);
 }
