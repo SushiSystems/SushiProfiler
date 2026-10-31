@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-10-31 — cli: Ran `sp test` through the shared test options and `run_tests` of sushicore, so it runs small and medium by default and prints the budget line (RW-24, `4cb86b8`).
 - 2026-10-30 — continuous_integration: Turn the red CI green: checkers, package test, and the sanitizer allocation counter (RW-23, `799daf1`).
 - 2026-10-29 — build: Let a Debug tree link an imported package built as `None`, such as Ubuntu's GTest (`cmake/`).
 ## v0.4.1 — 2026-10-29
