@@ -36,13 +36,16 @@ tree. Benchmarks measure the type that ships: `sp build --benchmarks --type rele
 
 ## sp test
 
-Builds when needed, then runs the tests. The quarantined ones are left out.
+Builds when needed, then runs the tests. The quarantined ones are left out. Without a label it runs `small`
+and `medium`; `large` needs `--filter` or `--all`. CTest writes a JUnit file under the tree's `Testing` folder,
+and a repository that carries the shared budget reader prints one budget line after the run.
 
 ```bash
-sp test                                # every size
+sp test                                # small and medium
 sp test --label small --label medium   # what a pull request runs
 sp test --filter 'Small_Version.*'     # ctest -R over Suite.Case
 sp test --jobs 4                       # four tests at once
+sp test --all                          # every size; the large ones need real hardware
 sp test --package                      # also the consumer of the installed package
 ```
 

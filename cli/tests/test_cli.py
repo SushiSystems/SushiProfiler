@@ -13,7 +13,8 @@ import pytest
 from typer.testing import CliRunner
 
 from sushiprofiler import cli
-from sushiprofiler.services.project import BuildType, Sanitizer, Size
+from sushicore.testing import TestLabel
+from sushiprofiler.services.project import BuildType, Sanitizer
 
 pytestmark = pytest.mark.small
 
@@ -81,7 +82,7 @@ def test_test_passes_labels_jobs_filter_and_package(calls):
 
     assert result.exit_code == 0
     (name, args, kwargs), = calls
-    assert name == "test" and args == (None, [Size.SMALL, Size.MEDIUM])
+    assert name == "test" and args == (None, [TestLabel.SMALL, TestLabel.MEDIUM])
     assert kwargs["jobs"] == 3 and kwargs["filter"] == "X.*" and kwargs["package"] is True
 
 
