@@ -12,7 +12,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | Job | Files | Waits on | Status |
 | --- | --- | --- | --- |
 | T1 | `tests/support/tolerance.hpp` copied from SushiSkills, and `expect_row` moved onto it |  | todo |
-| T2 | The collector seam | owner decision 1 | todo |
+| T2 | The collector seam |  | todo |
 | T3 | In-memory adapters beside `StreamWriter`, `Source`, `RecordWriter`, `EnvironmentContributor` |  | todo |
 | T4 | The CLI's `project` fixture replaced by sushicore's in-memory runner and console | sushicore T1 | todo |
 | T5 | The defects of this report, each with a test that fails first |  | todo |
