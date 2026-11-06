@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-06 — tools: Deleted the leftover `check_test_additions.py` and its test, which the shared tools no longer carry, and recopied the shared tools (RW-25).
 - 2026-11-06 — licence: Relicensed SushiProfiler under the Apache License 2.0 and removed `COMMERCIAL.md`; every source file's licence block follows (`LICENSE`, `tools/settings.py`).
 - 2026-11-05 — tools: Took the shared checkers of 2026-11-05 with a baseline of the findings they meet, which RW-25 clears.
 - 2026-10-31 — cli: Ran `sp test` through the shared test options and `run_tests` of sushicore, so it runs small and medium by default and prints the budget line (RW-24, `4cb86b8`).
