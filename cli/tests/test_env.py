@@ -7,17 +7,18 @@
 from __future__ import annotations
 
 import os
+import shutil
 
 import pytest
 
 from sushiprofiler import env
 from sushiprofiler.config import Config
 
-pytestmark = pytest.mark.small
+pytestmark = pytest.mark.medium
 
 
 def test_without_a_compiler_the_environment_is_a_copy(tmp_path, monkeypatch):
-    monkeypatch.setattr(Config, "resolved_compiler", lambda self: "")
+    monkeypatch.setattr(shutil, "which", lambda name: None)
 
     built = env.load_build_env(Config(), tmp_path)
 
@@ -25,10 +26,9 @@ def test_without_a_compiler_the_environment_is_a_copy(tmp_path, monkeypatch):
     assert built is not os.environ
 
 
-def test_a_found_compiler_comes_first_on_path(tmp_path, monkeypatch):
+def test_a_found_compiler_comes_first_on_path(tmp_path):
     compiler = tmp_path / "bin" / "clang++"
-    monkeypatch.setattr(Config, "resolved_compiler", lambda self: str(compiler))
 
-    built = env.load_build_env(Config(platform="linux"), tmp_path / "build")
+    built = env.load_build_env(Config(cxx=str(compiler), platform="linux"), tmp_path / "build")
 
     assert built["PATH"].split(os.pathsep)[0] == str(compiler.parent)

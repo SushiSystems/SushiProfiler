@@ -9,10 +9,15 @@ Each test carries exactly one size mark, which gives it its pytest-timeout.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+from sushicore.console_memory import RecordingConsole
+from sushicore.proc_memory import RecordingRunner
+
+from sushiprofiler.config import Config
+from sushiprofiler.services.project import Workspace
 
 K_SIZE_TIMEOUTS = {"small": 60, "medium": 300, "large": 900}
 
@@ -32,43 +37,6 @@ def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
         item.add_marker(pytest.mark.timeout(K_SIZE_TIMEOUTS[_sizes_of(item)[0]]))
 
 
-class RecordingRunner:
-    """Records every command line it is handed and starts none of them."""
-
-    def __init__(self) -> None:
-        """Starts with no command recorded."""
-        self.commands: list[list[str]] = []
-
-    def resolve_exe(self, name: str, env: dict[str, str] | None = None) -> str:
-        """Returns the name unchanged."""
-        return name
-
-    def run(self, cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> int:
-        """Records the command and reports success."""
-        self.commands.append([str(part) for part in cmd])
-        return 0
-
-    def run_drained(self, cmd: list[str], cwd: Path, env: dict[str, str] | None = None) -> int:
-        """Records the command and reports success."""
-        return self.run(cmd, cwd, env)
-
-
-class RecordingConsole:
-    """Records every line a service prints, keyed by the helper that printed it."""
-
-    def __init__(self) -> None:
-        """Starts with no line recorded."""
-        self.lines: list[tuple[str, str]] = []
-
-    def __getattr__(self, kind: str):
-        """Returns a printer that records its text under the helper's name."""
-        return lambda text="": self.lines.append((kind, str(text)))
-
-    def of(self, kind: str) -> list[str]:
-        """Returns the texts printed through one helper, in order."""
-        return [text for printed, text in self.lines if printed == kind]
-
-
 @dataclass
 class Project:
     """Holds a scratch checkout and what the project service did to it."""
@@ -76,6 +44,12 @@ class Project:
     root: Path
     runner: RecordingRunner
     console: RecordingConsole
+    workspace: Workspace
+
+    @property
+    def commands(self) -> list[list[str]]:
+        """Returns the argv of every command the runner was handed, in order."""
+        return [list(command.argv) for command in self.runner.commands]
 
     def tree_of(self, build_type: str = "Debug", name: str = "default") -> Path:
         """Returns the tree `build/<name>-<type>` of *build_type*, the way sushicore names it."""
@@ -100,20 +74,11 @@ class Project:
 
 
 @pytest.fixture
-def project(tmp_path, monkeypatch) -> Project:
-    """Returns a scratch checkout whose project service records argv and starts nothing."""
-    from sushicore.cmake_driver import CMakeDriver
-
-    from sushiprofiler.config import Config
-    from sushiprofiler.services import project as project_service
-
+def project(tmp_path) -> Project:
+    """Returns a scratch checkout whose workspace records argv and starts nothing."""
     (tmp_path / "CMakeLists.txt").write_text("project(x)\n", encoding="utf-8")
-    runner, console = RecordingRunner(), RecordingConsole()
+    console = RecordingConsole()
+    runner = RecordingRunner(console)
     cfg = Config(cxx="clang++", generator="Ninja", ninja_exe="ninja")
-    monkeypatch.setattr(project_service, "find_project_root", lambda: tmp_path)
-    monkeypatch.setattr(project_service, "load_config", lambda: cfg)
-    monkeypatch.setattr(project_service, "load_build_env", lambda cfg, tree: {})
-    monkeypatch.setattr(project_service, "console", console)
-    monkeypatch.setattr(project_service, "_RUNNER", runner)
-    monkeypatch.setattr(project_service, "_DRIVER", CMakeDriver(console, runner))
-    return Project(tmp_path, runner, console)
+    workspace = Workspace(tmp_path, cfg, console, runner, environment={})
+    return Project(tmp_path, runner, console, workspace)

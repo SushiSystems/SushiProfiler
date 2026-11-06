@@ -56,3 +56,7 @@ installs the tree, builds `tests/package/` against the install and runs its test
 `build/default-<type>/applications/<Config>/` in the current folder, so relative record paths work, and exits
 with its code. `sp check` runs the nine shared checkers and, with
 `--rule`, only those whose `--list-rules` names the rule.
+Each of `build`, `test`, `bench`, `record` and `check` takes a `Workspace`: the root, the configuration,
+the console, the command runner and, when given, the environment the commands run under. `sp`
+passes the checkout it runs in; a test passes a scratch checkout over sushicore's `RecordingRunner`
+and `RecordingConsole`, which start nothing.

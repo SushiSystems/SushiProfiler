@@ -5,8 +5,9 @@
 """Declares the commands of `sp`, the SushiProfiler developer CLI.
 
 A thin Typer layer: each command parses its arguments and delegates to
-``sushiprofiler.services.project``. The root options, the `docs` group and the entry point come from
-sushicore.
+``sushiprofiler.services.project``, handing it the context object as its workspace; `sp` leaves
+the object unset, so the service works on the checkout it runs in. The root options, the `docs`
+group and the entry point come from sushicore.
 """
 
 from __future__ import annotations
@@ -93,6 +94,7 @@ def _clean_option() -> Any:
            "sp build --build-dir build/pkg-x --lean  # What a consumer's package build runs",
 )
 def build(
+    ctx: typer.Context,
     type: Optional[BuildType] = _type_option(),
     clean: bool = _clean_option(),
     define: Optional[list[str]] = typer.Option(
@@ -114,7 +116,7 @@ def build(
     raise typer.Exit(project_service.build(type, clean=clean, defines=define or (),
                                            sanitizer=sanitize, benchmarks=benchmarks,
                                            lean=lean, tree_path=build_dir,
-                                           report=report))
+                                           report=report, workspace=ctx.obj))
 
 
 @app.command(
@@ -127,6 +129,7 @@ def build(
            "sp test --package  # Also build tests/package/ against the install",
 )
 def test(
+    ctx: typer.Context,
     type: Optional[BuildType] = _type_option(),
     label: Optional[list[TestLabel]] = label_option(),
     filter: Optional[str] = filter_option(),
@@ -142,7 +145,8 @@ def test(
     """Build when needed, then run the tests of the sizes and the filter, then print the budget line."""
     raise typer.Exit(project_service.test(type, label or (), clean=clean, filter=filter,
                                           sanitizer=sanitize, jobs=jobs, package=package,
-                                          repeat=repeat, every_size=all_sizes))
+                                          repeat=repeat, every_size=all_sizes,
+                                          workspace=ctx.obj))
 
 
 @app.command(
@@ -151,13 +155,16 @@ def test(
     epilog="sp build --benchmarks --type release\n"
            "sp bench --type release  # Every benchmark program, in name order",
 )
-def bench(type: Optional[BuildType] = _type_option(K_BENCH_TYPE_HELP)) -> None:
+def bench(
+    ctx: typer.Context,
+    type: Optional[BuildType] = _type_option(K_BENCH_TYPE_HELP),
+) -> None:
     """Run every built benchmark program.
 
     A benchmark measures and does not pass or fail, so it is not a test. Build the programs
     with sp build --benchmarks --type release first; bench runs the release ones.
     """
-    raise typer.Exit(project_service.bench(type))
+    raise typer.Exit(project_service.bench(type, workspace=ctx.obj))
 
 
 @app.command(
@@ -168,11 +175,12 @@ def bench(type: Optional[BuildType] = _type_option(K_BENCH_TYPE_HELP)) -> None:
            "sp check --rule rule_console_output  # One rule",
 )
 def check(
+    ctx: typer.Context,
     report: bool = typer.Option(False, "--report", "-r", help="Report counts without failing."),
     rule: Optional[str] = typer.Option(None, "--rule", help="Run only this rule."),
 ) -> None:
     """Run the shared checkers under tools/."""
-    raise typer.Exit(project_service.check(report=report, rule=rule))
+    raise typer.Exit(project_service.check(report=report, rule=rule, workspace=ctx.obj))
 
 
 K_RECORD_PANEL = "Records"
@@ -203,6 +211,7 @@ def _repeated(option: str, values: Optional[list[str]]) -> list[str]:
            "sp record show run.sprec.json --analysis overhead --baseline off.sprec.json",
 )
 def record_show(
+    ctx: typer.Context,
     record: str = typer.Argument(..., help="The record file."),
     analysis: Optional[list[str]] = typer.Option(
         None, "--analysis", "-a", help="An analysis to run; repeat for more. Default: six."),
@@ -220,7 +229,7 @@ def record_show(
         arguments += ["--top", str(top)]
     if baseline is not None:
         arguments += ["--baseline", baseline]
-    raise typer.Exit(project_service.record(arguments, type))
+    raise typer.Exit(project_service.record(arguments, type, workspace=ctx.obj))
 
 
 @record_app.command(
@@ -229,6 +238,7 @@ def record_show(
            "sp record compare release.sprec.json debug.sprec.json --allow-build-mismatch",
 )
 def record_compare(
+    ctx: typer.Context,
     baseline: str = typer.Argument(..., help="The record compared against."),
     candidate: str = typer.Argument(..., help="The record compared."),
     allow_build_mismatch: bool = typer.Option(
@@ -239,7 +249,7 @@ def record_compare(
     arguments = ["compare", baseline, candidate]
     if allow_build_mismatch:
         arguments.append("--allow-build-mismatch")
-    raise typer.Exit(project_service.record(arguments, type))
+    raise typer.Exit(project_service.record(arguments, type, workspace=ctx.obj))
 
 
 @record_app.command(
@@ -247,12 +257,14 @@ def record_compare(
     epilog="sp record check run.sprec.json budgets.json",
 )
 def record_check(
+    ctx: typer.Context,
     record: str = typer.Argument(..., help="The record file."),
     checks: str = typer.Argument(..., help="The check file, a JSON array of checks."),
     type: Optional[BuildType] = _type_option(),
 ) -> None:
     """Check a record against bounds; exit 1 when a check fails."""
-    raise typer.Exit(project_service.record(["check", record, checks], type))
+    raise typer.Exit(project_service.record(["check", record, checks], type,
+                                           workspace=ctx.obj))
 
 
 @record_app.command(
@@ -260,11 +272,12 @@ def record_check(
     epilog="sp record validate run.sprec.json",
 )
 def record_validate(
+    ctx: typer.Context,
     record: str = typer.Argument(..., help="The record file."),
     type: Optional[BuildType] = _type_option(),
 ) -> None:
     """Read a record strictly; exit 1 when it is refused."""
-    raise typer.Exit(project_service.record(["validate", record], type))
+    raise typer.Exit(project_service.record(["validate", record], type, workspace=ctx.obj))
 
 
 register_package_command(app, ModuleProvision(
