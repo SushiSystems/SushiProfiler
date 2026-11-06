@@ -3,6 +3,9 @@
 SushiProfiler is Copyright (c) 2026-present Mustafa Garip & Sushi Systems and licensed under the
 Apache License 2.0; see `LICENSE`.
 
+Every version of SushiProfiler published under the PolyForm Noncommercial License 1.0.0 is also
+licensed, from 2026-11-06 on, under the Apache License 2.0.
+
 SushiProfiler holds no third-party code. No source is vendored in this repository, no file is
 ported from third-party code, and the library links the C++ standard library and Threads only.
 
