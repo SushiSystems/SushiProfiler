@@ -1,8 +1,7 @@
 # facts_cli.py
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Answers where a fact lives and who cites it, and rewrites the quotes of a fact from its home.
 
 Usage: python tools/documentation/facts_cli.py [--root ROOT] list | where ID | cited-by ID | apply

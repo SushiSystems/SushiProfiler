@@ -1,8 +1,7 @@
 # SushiProfilerRuntimeFiles.cmake
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 
 # Copies the shared libraries an executable loads beside it, so it starts without a search path.
 

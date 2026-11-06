@@ -49,5 +49,5 @@ The manual starts at [`docs/README.md`](docs/README.md); contributors read
 
 ## Licence
 
-SushiProfiler is source-available under the PolyForm Noncommercial License 1.0.0; see
-[`LICENSE`](LICENSE), [`COMMERCIAL.md`](COMMERCIAL.md) and [`NOTICE.md`](NOTICE.md).
+SushiProfiler is open source under the Apache License 2.0; see [`LICENSE`](LICENSE) and
+[`NOTICE.md`](NOTICE.md).

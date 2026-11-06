@@ -7,7 +7,7 @@ name = "sushiprofiler-cli"
 version = "0.4.1"
 description = "SushiProfiler developer CLI (build / test / check)"
 authors = [{ name = "Mustafa Garip", email = "mustafagarip@sushisystems.io" }]
-license = { text = "PolyForm-Noncommercial-1.0.0" }
+license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
 dependencies = [
     "sushicore>=0.10.9,<0.11",

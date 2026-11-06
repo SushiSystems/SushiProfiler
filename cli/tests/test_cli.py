@@ -1,8 +1,7 @@
 # test_cli.py
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Tests that each `sp` command parses its options and hands them to the project service."""
 
 from __future__ import annotations

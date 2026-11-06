@@ -1,8 +1,7 @@
 # SushiProfilerModule.cmake
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 
 # One function declares a module. A module is an INTERFACE target carrying its include root
 # and those of the modules it depends on; its sources are recorded for the library targets that

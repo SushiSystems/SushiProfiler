@@ -1,8 +1,7 @@
 # env.py
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Assembles the environment cmake and ctest run under for the compiler `sp` found.
 
 What a found clang++ needs on Windows and how the snapshot is cached are in cli/README.md, "env.py".

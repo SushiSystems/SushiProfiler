@@ -21,7 +21,7 @@ The owner's rulings of 2026-10-26:
 
 1. The profiler serves every library, not SushiAI alone; what SushiRuntime and SushiBLAS gain
    stays there.
-2. SushiEngine's trace layer moves into this repository, under PolyForm Noncommercial 1.0.0, and
+2. SushiEngine's trace layer moves into this repository, under the Apache License 2.0, and
    becomes the profiler of every Sushi library.
 3. SushiProfiler is general purpose and configurable. It is shaped by no client: any C++17
    program, in the stack or outside it, profiles itself with it, and it knows no model, kernel,

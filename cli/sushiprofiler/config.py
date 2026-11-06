@@ -1,8 +1,7 @@
 # config.py
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Loads the layered configuration of `sp` and finds the compiler and generator it builds with.
 
 The layers and the compiler search order are in cli/README.md, "config.py".

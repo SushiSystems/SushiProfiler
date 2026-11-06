@@ -1,8 +1,7 @@
 # check_logging.py
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Checks the log calls, categories and console writes of library code, from `logging`.
 
 Usage: python tools/logs/check_logging.py [repository root] [--report] [--rule NAME]

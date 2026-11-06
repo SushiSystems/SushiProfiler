@@ -1,8 +1,7 @@
 # SushiProfilerTests.cmake
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 
 # One function builds the test program of a module. The tests of a module sit in
 # tests/<tier>/<module>/, the mirror of its folder under modules/, and build one program there.

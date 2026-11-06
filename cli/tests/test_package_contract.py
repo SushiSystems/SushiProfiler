@@ -1,8 +1,7 @@
 # test_package_contract.py
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
-# Licensed under PolyForm Noncommercial 1.0.0. See LICENSE.
-# Commercial use requires a licence from Sushi Systems.
+# Licensed under the Apache License 2.0. See LICENSE.
 """Tests the contract a consumer's package build runs `sp` under.
 
 The contract is `build --build-dir --lean`, `package` and the compiler `SUSHISTACK_CXX` names.
