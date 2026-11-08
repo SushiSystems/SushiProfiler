@@ -20,4 +20,8 @@ depends on `analysis` and `record`, and privately on `record_json`.
   are the same on every platform. The tables are not saved; `sp record show` makes them again
   from the file.
 
+`SushiProfiler/record_writers/memory_record_writer.hpp`: `MemoryRecordWriter`, the in-memory record
+writer. It keeps a copy of each record and its tables; `fail_with(status)` makes every later write
+return that status and keep nothing.
+
 The tests are in `tests/record/record_writers/`.

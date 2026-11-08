@@ -5,5 +5,7 @@
   `main / voice` row; the period sits on its timeline row; a counter carries its unit and value,
   an instant and a flow's begin and end carry their item; a span sits on its device track's row
   with its queue time and attributes; an unwritable path is reported and every later call fails.
-- `test_stream_writer.cpp`: a writer driven through the interface receives `begin`, each period
-  in order with its zone runs, and `end`.
+
+`test_stream_writer.cpp` checks the `StreamWriter` port's promise on `MemoryStreamWriter`.
+`test_memory_stream_writer.cpp` checks that it keeps periods and runs in order, that a failing write
+returns its status, keeps nothing and still counts, and that it counts begins and ends.

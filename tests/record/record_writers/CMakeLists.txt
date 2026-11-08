@@ -6,6 +6,7 @@
 sushiprofiler_add_module_tests(
     MODULE record_writers
     SOURCES
+        test_memory_record_writer.cpp
         test_record_file_writer.cpp
         test_record_writer.cpp
         test_terminal_writer.cpp)

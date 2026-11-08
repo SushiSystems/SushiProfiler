@@ -26,3 +26,6 @@
   - Every-period windows record all periods after the warm-up; a restart reads a second record
     that holds none of the first; a source's fact survives the record file; control calls from
     one thread against `stop` and `restart` from another return only what the contract names.
+
+`test_session.cpp` keeps two sources of its own, which read the collector's wish for sources inside
+`begin`, `collect` and `end`; `MemorySource` cannot see the collector.

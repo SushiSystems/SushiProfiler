@@ -6,6 +6,7 @@
 sushiprofiler_add_module(
     NAME record_writers TIER record
     SOURCES
+        memory_record_writer.cpp
         record_file_writer.cpp
         terminal_writer.cpp
     DEPENDS version analysis record

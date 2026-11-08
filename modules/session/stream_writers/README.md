@@ -27,4 +27,9 @@ call `begin` until the writer is first switched on, so no file exists before tha
 A path that cannot be opened is `PathUnwritable` from `begin`; every later call then returns
 `StreamFailed`.
 
+`SushiProfiler/stream_writers/memory_stream_writer.hpp`: `MemoryStreamWriter`, the in-memory stream
+writer. It keeps a copy of each period and its zone runs in the order written and counts `begins()`,
+`writes()` and `ends()`; `fail_with(status)` makes every later call return that status, and a period
+whose write fails is not kept.
+
 The tests are in `tests/session/stream_writers/`.

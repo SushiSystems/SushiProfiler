@@ -30,58 +30,24 @@
 
 #include <SushiProfiler/consumer/stream_writer_set.hpp>
 
+#include <SushiProfiler/stream_writers/memory_stream_writer.hpp>
+
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <cstdint>
 #include <string>
 #include <thread>
 #include <vector>
 
+using SushiProfiler::MemoryStreamWriter;
 using SushiProfiler::PeriodRecord;
 using SushiProfiler::RunRecord;
-using SushiProfiler::StreamWriter;
 using SushiProfiler::StreamWriterSet;
 using SushiProfiler::WriteStatus;
-using SushiProfiler::ZoneRun;
 
 namespace
 {
-    /// @brief A writer that logs its calls and can fail to begin or to write.
-    class LoggingWriter final : public StreamWriter
-    {
-        public:
-            /// @brief Logs `begin` and fails when told to.
-            [[nodiscard]] WriteStatus begin(const RunRecord& record) override
-            {
-                static_cast<void>(record);
-                calls += "b";
-                return fail_begin ? WriteStatus::PathUnwritable : WriteStatus::Written;
-            }
-
-            /// @brief Logs `w` and the period index; fails when told to.
-            [[nodiscard]] WriteStatus write_period(const RunRecord& record,
-                                                   const PeriodRecord& period,
-                                                   const std::vector<ZoneRun>& runs) override
-            {
-                static_cast<void>(record);
-                static_cast<void>(runs);
-                calls += "w" + std::to_string(period.index);
-                return fail_write ? WriteStatus::StreamFailed : WriteStatus::Written;
-            }
-
-            /// @brief Logs `e`.
-            [[nodiscard]] WriteStatus end(const RunRecord& record) override
-            {
-                static_cast<void>(record);
-                calls += "e";
-                return WriteStatus::Written;
-            }
-
-            std::string calls;          /**< The calls so far, one letter or letter and index each. */
-            bool fail_begin = false;    /**< Whether begin fails. */
-            bool fail_write = false;    /**< Whether write_period fails. */
-    };
-
     /// @brief Returns a period of @p index.
     PeriodRecord period_of(std::uint64_t index)
     {
@@ -89,30 +55,50 @@ namespace
         period.index = index;
         return period;
     }
+
+    /// @brief Returns the index of each period @p writer kept, in the order written.
+    std::vector<std::uint64_t> indices_of(const MemoryStreamWriter& writer)
+    {
+        std::vector<std::uint64_t> indices;
+        for (const PeriodRecord& period : writer.periods())
+            indices.push_back(period.index);
+        return indices;
+    }
+
+    /// @brief Returns whether every index in @p indices is larger than the one before it.
+    bool rises(const std::vector<std::uint64_t>& indices)
+    {
+        for (std::size_t index = 1U; index < indices.size(); ++index)
+        {
+            if (indices[index] <= indices[index - 1U])
+                return false;
+        }
+        return true;
+    }
 } // namespace
 
 TEST(Small_StreamWriterSet, ADisabledWriterIsNotBegunUntilEnabled)
 {
-    LoggingWriter writer;
+    MemoryStreamWriter writer;
     StreamWriterSet set({{"trace", &writer, false}});
     const RunRecord record;
     std::vector<std::string> problems;
-
     EXPECT_EQ(set.begin_enabled(record), "");
     set.write_period(record, period_of(0U), {}, problems);
-    EXPECT_EQ(writer.calls, "");
+    ASSERT_EQ(writer.begins(), 0U);
 
     ASSERT_TRUE(set.request("trace", true));
     set.apply_requests(record, problems);
     set.write_period(record, period_of(1U), {}, problems);
 
-    EXPECT_EQ(writer.calls, "bw1");
+    EXPECT_EQ(writer.begins(), 1U);
+    EXPECT_EQ(indices_of(writer), std::vector<std::uint64_t>{1U});
     EXPECT_TRUE(problems.empty());
 }
 
 TEST(Small_StreamWriterSet, ARequestAppliesOnlyInApplyRequests)
 {
-    LoggingWriter writer;
+    MemoryStreamWriter writer;
     StreamWriterSet set({{"trace", &writer, true}});
     const RunRecord record;
     std::vector<std::string> problems;
@@ -123,12 +109,12 @@ TEST(Small_StreamWriterSet, ARequestAppliesOnlyInApplyRequests)
     set.apply_requests(record, problems);
     set.write_period(record, period_of(1U), {}, problems);
 
-    EXPECT_EQ(writer.calls, "bw0");
+    EXPECT_EQ(indices_of(writer), std::vector<std::uint64_t>{0U});
 }
 
 TEST(Small_StreamWriterSet, TurningOffStopsPeriodsButKeepsTheOutputOpenUntilEnd)
 {
-    LoggingWriter writer;
+    MemoryStreamWriter writer;
     StreamWriterSet set({{"trace", &writer, true}});
     const RunRecord record;
     std::vector<std::string> problems;
@@ -140,13 +126,14 @@ TEST(Small_StreamWriterSet, TurningOffStopsPeriodsButKeepsTheOutputOpenUntilEnd)
     set.write_period(record, period_of(1U), {}, problems);
     set.end_all(record, problems);
 
-    EXPECT_EQ(writer.calls, "bw0e");
+    EXPECT_EQ(indices_of(writer), std::vector<std::uint64_t>{0U});
+    EXPECT_EQ(writer.ends(), 1U);
 }
 
 TEST(Small_StreamWriterSet, AWriterThatFailsToBeginWhenEnabledIsStoppedAndNamed)
 {
-    LoggingWriter writer;
-    writer.fail_begin = true;
+    MemoryStreamWriter writer;
+    writer.fail_with(WriteStatus::PathUnwritable);
     StreamWriterSet set({{"trace", &writer, false}});
     const RunRecord record;
     std::vector<std::string> problems;
@@ -158,32 +145,33 @@ TEST(Small_StreamWriterSet, AWriterThatFailsToBeginWhenEnabledIsStoppedAndNamed)
 
     ASSERT_EQ(problems.size(), 1U);
     EXPECT_EQ(problems[0], "writer \"trace\" did not start when enabled: its file could not be opened");
-    EXPECT_EQ(writer.calls, "b");
+    EXPECT_EQ(writer.writes(), 0U);
+    EXPECT_EQ(writer.ends(), 0U);
 }
 
 TEST(Small_StreamWriterSet, AFailedWriterIgnoresLaterRequests)
 {
-    LoggingWriter writer;
-    writer.fail_write = true;
+    MemoryStreamWriter writer;
     StreamWriterSet set({{"trace", &writer, true}});
     const RunRecord record;
     std::vector<std::string> problems;
     ASSERT_EQ(set.begin_enabled(record), "");
+    writer.fail_with(WriteStatus::StreamFailed);
     set.write_period(record, period_of(0U), {}, problems);
 
     ASSERT_TRUE(set.request("trace", true));
     set.apply_requests(record, problems);
     set.write_period(record, period_of(1U), {}, problems);
 
-    EXPECT_EQ(writer.calls, "bw0");
+    EXPECT_EQ(writer.writes(), 1U);
     ASSERT_EQ(problems.size(), 1U);
     EXPECT_EQ(problems[0], "writer \"trace\" failed on period 0 and was stopped");
 }
 
 TEST(Small_StreamWriterSet, EndAllEndsEveryBegunWriterOnceAndNoOther)
 {
-    LoggingWriter begun;
-    LoggingWriter never;
+    MemoryStreamWriter begun;
+    MemoryStreamWriter never;
     StreamWriterSet set({{"begun", &begun, true}, {"never", &never, false}});
     const RunRecord record;
     std::vector<std::string> problems;
@@ -192,13 +180,14 @@ TEST(Small_StreamWriterSet, EndAllEndsEveryBegunWriterOnceAndNoOther)
     set.end_all(record, problems);
     set.end_all(record, problems);
 
-    EXPECT_EQ(begun.calls, "be");
-    EXPECT_EQ(never.calls, "");
+    EXPECT_EQ(begun.ends(), 1U);
+    EXPECT_EQ(never.begins(), 0U);
+    EXPECT_EQ(never.ends(), 0U);
 }
 
 TEST(Small_StreamWriterSet, AnUnknownNameIsRefused)
 {
-    LoggingWriter writer;
+    MemoryStreamWriter writer;
     StreamWriterSet set({{"trace", &writer, true}});
 
     EXPECT_FALSE(set.request("other", true));
@@ -208,21 +197,21 @@ TEST(Small_StreamWriterSet, AnUnknownNameIsRefused)
 
 TEST(Small_StreamWriterSet, BeginEnabledStopsAtTheFirstFailure)
 {
-    LoggingWriter first;
-    first.fail_begin = true;
-    LoggingWriter second;
+    MemoryStreamWriter first;
+    first.fail_with(WriteStatus::PathUnwritable);
+    MemoryStreamWriter second;
     StreamWriterSet set({{"first", &first, true}, {"second", &second, true}});
     const RunRecord record;
 
     const std::string error = set.begin_enabled(record);
 
     EXPECT_EQ(error, "writer \"first\" did not start: its file could not be opened");
-    EXPECT_EQ(second.calls, "");
+    EXPECT_EQ(second.begins(), 0U);
 }
 
 TEST(Medium_StreamWriterSet, RequestsFromAnotherThreadNeverTearAPeriod)
 {
-    LoggingWriter writer;
+    MemoryStreamWriter writer;
     StreamWriterSet set({{"trace", &writer, true}});
     const RunRecord record;
     std::vector<std::string> problems;
@@ -249,22 +238,7 @@ TEST(Medium_StreamWriterSet, RequestsFromAnotherThreadNeverTearAPeriod)
     set.end_all(record, problems);
 
     EXPECT_TRUE(problems.empty());
-    ASSERT_FALSE(writer.calls.empty());
-    EXPECT_EQ(writer.calls.front(), 'b');
-    EXPECT_EQ(writer.calls.back(), 'e');
-    EXPECT_EQ(writer.calls.find('b', 1U), std::string::npos);
-    std::size_t last_period = 0U;
-    std::size_t position = 1U;
-    bool first = true;
-    while ((position = writer.calls.find('w', position)) != std::string::npos)
-    {
-        const std::size_t digits = writer.calls.find_first_not_of("0123456789", position + 1U);
-        const std::size_t period =
-            std::stoull(writer.calls.substr(position + 1U, digits - position - 1U));
-        if (!first)
-            EXPECT_GT(period, last_period);
-        last_period = period;
-        first = false;
-        position = digits;
-    }
+    EXPECT_EQ(writer.begins(), 1U);
+    EXPECT_EQ(writer.ends(), 1U);
+    EXPECT_TRUE(rises(indices_of(writer)));
 }

@@ -7,4 +7,5 @@ sushiprofiler_add_module_tests(
     MODULE environment
     SOURCES
         test_environment_contributor.cpp
+        test_memory_contributor.cpp
         test_record_facts.cpp)

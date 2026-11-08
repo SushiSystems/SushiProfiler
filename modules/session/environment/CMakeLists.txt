@@ -7,5 +7,6 @@ sushiprofiler_add_module(
     NAME environment TIER session
     SOURCES
         environment_contributor.cpp
+        memory_contributor.cpp
         record_facts.cpp
     DEPENDS version record)

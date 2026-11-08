@@ -42,4 +42,12 @@ it and hands it over in `collect`. A span's period is the one whose steady span 
 start time. `buffers.linger_ms` is how long a closed period waits for late work, and a source's
 `max_delay_ns` raises that wait for every period.
 
+`SushiProfiler/sources/memory_source.hpp`: `MemorySource`, the in-memory source. Work queued with
+`queue(MemoryWork)`, timed on the steady clock, becomes a span of the period its start lies in, on
+the record's clock; work that started before the period is dropped as late and work that starts
+after it waits for a later period. `state_fact` sets a fact on every period, `refuse_with` makes
+`begin` refuse, and `collected()` and `ends()` say what the session asked of it. Any thread may
+queue while the consumer collects. It is the source every test outside this module uses in place of
+one of its own.
+
 The tests are in `tests/session/sources/`.

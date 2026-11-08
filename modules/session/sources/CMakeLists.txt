@@ -6,6 +6,7 @@
 sushiprofiler_add_module(
     NAME sources TIER session
     SOURCES
+        memory_source.cpp
         source_context.cpp
         span_sink.cpp
     DEPENDS version events record sites)

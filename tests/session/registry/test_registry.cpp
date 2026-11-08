@@ -40,14 +40,18 @@
 #include <utility>
 #include <vector>
 
+#include <SushiProfiler/environment/memory_contributor.hpp>
 #include <SushiProfiler/environment/record_facts.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 #include <SushiProfiler/record/span_table.hpp>
 #include <SushiProfiler/sites/name_table.hpp>
+#include <SushiProfiler/sources/memory_source.hpp>
 
 using SushiProfiler::EnvironmentContributor;
 using SushiProfiler::JsonValue;
 using SushiProfiler::Made;
+using SushiProfiler::MemoryContributor;
+using SushiProfiler::MemorySource;
 using SushiProfiler::NameTable;
 using SushiProfiler::RecordFacts;
 using SushiProfiler::RecordWriter;
@@ -68,48 +72,6 @@ namespace
     {
         return *SushiProfiler::read_json(text).value;
     }
-
-    /// @brief A source that does nothing.
-    class QuietSource final : public Source
-    {
-        public:
-            /// @brief Returns `quiet`.
-            [[nodiscard]] std::string_view name() const noexcept override
-            {
-                return "quiet";
-            }
-
-            /// @brief Starts.
-            [[nodiscard]] SourceStatus begin(SourceContext& context) override
-            {
-                static_cast<void>(context);
-                return SourceStatus{};
-            }
-
-            /// @brief Adds nothing.
-            void collect(const PeriodSpan& period, SpanSink& sink) override
-            {
-                static_cast<void>(period);
-                static_cast<void>(sink);
-            }
-
-            /// @brief Ends.
-            void end() override
-            {
-
-            }
-    };
-
-    /// @brief Contributes nothing.
-    class QuietContributor final : public EnvironmentContributor
-    {
-        public:
-            /// @brief Adds no facts.
-            void contribute(RecordFacts& facts) const override
-            {
-                static_cast<void>(facts);
-            }
-    };
 
     /// @brief The work a fake device library has queued, shared with its source.
     class FakeDeviceQueue final
@@ -258,7 +220,7 @@ namespace
         SushiProfiler::register_builtin_writers(registry, terminal);
         const auto make_quiet = [](const JsonValue&)
         {
-            return Made<Source>{std::make_unique<QuietSource>(), ""};
+            return Made<Source>{std::make_unique<MemorySource>("quiet"), ""};
         };
         EXPECT_TRUE(registry.add_source("quiet", make_quiet));
         return registry;
@@ -357,8 +319,8 @@ TEST(Small_Registry, ReadsTheBuiltInWritersSettings)
 TEST(Small_Registry, KeepsContributorsInOrder)
 {
     Registry registry;
-    const QuietContributor first;
-    const QuietContributor second;
+    const MemoryContributor first;
+    const MemoryContributor second;
 
     registry.add_contributor(first);
     registry.add_contributor(second);

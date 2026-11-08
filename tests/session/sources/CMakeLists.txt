@@ -6,6 +6,7 @@
 sushiprofiler_add_module_tests(
     MODULE sources
     SOURCES
+        test_memory_source.cpp
         test_source.cpp
         test_source_context.cpp
         test_span_sink.cpp)

@@ -23,173 +23,78 @@
 
 /**
  * @file test_source.cpp
- * @brief Tests a source through its interface: begin adds a track, collect adds a period's spans.
+ * @brief Tests the Source port's promises on the in-memory source.
  * @author Mustafa Garip
  * @see tests/session/sources/README.md
  */
 
 #include <SushiProfiler/sources/source.hpp>
 
+#include <SushiProfiler/sources/memory_source.hpp>
+
 #include <gtest/gtest.h>
 
-using SushiProfiler::NameID;
+#include <string>
+#include <vector>
+
+using SushiProfiler::MemorySource;
+using SushiProfiler::MemoryWork;
 using SushiProfiler::NameTable;
 using SushiProfiler::PeriodSpan;
 using SushiProfiler::Source;
 using SushiProfiler::SourceContext;
 using SushiProfiler::SourceStatus;
-using SushiProfiler::Span;
 using SushiProfiler::SpanSink;
 using SushiProfiler::SpanTable;
-using SushiProfiler::TrackID;
 
-namespace
-{
-    /// @brief A source with one span per period, 100 ns apart from steady time 1100.
-    class QueueSource final : public Source
-    {
-        public:
-            /// @brief Builds a source that refuses to start when @p available is false.
-            explicit QueueSource(bool available) noexcept : available_(available)
-            {
-
-            }
-
-            /// @brief Returns `test.queue`.
-            [[nodiscard]] std::string_view name() const noexcept override
-            {
-                return "test.queue";
-            }
-
-            /// @brief Adds the `device` track and the `kernel` name, unless unavailable.
-            [[nodiscard]] SourceStatus begin(SourceContext& context) override
-            {
-                if (!available_)
-                    return SourceStatus{"no device"};
-                track_ = context.add_track("device");
-                kernel_ = context.intern("kernel");
-                start_ns_ = context.to_record_ns(1'100U);
-                return SourceStatus{};
-            }
-
-            /// @brief Adds the 40 ns span of @p period.
-            void collect(const PeriodSpan& period, SpanSink& sink) override
-            {
-                Span span;
-                span.queued_ns = start_ns_ + period.index * 100U;
-                span.start_ns = span.queued_ns;
-                span.end_ns = span.start_ns + 40U;
-                span.track = track_;
-                span.name = kernel_;
-                static_cast<void>(sink.append(span));
-            }
-
-            /// @brief Notes that the source ended.
-            void end() override
-            {
-                ended_ = true;
-            }
-
-            /// @brief Returns whether end() ran.
-            [[nodiscard]] bool ended() const noexcept
-            {
-                return ended_;
-            }
-
-        private:
-            bool available_;              /**< Whether begin() succeeds. */
-            TrackID track_ = 0U;          /**< The device track. */
-            NameID kernel_ = 0U;          /**< The span name. */
-            std::uint64_t start_ns_ = 0U; /**< The first span's start on the record's clock. */
-            bool ended_ = false;          /**< Whether end() ran. */
-    };
-} // namespace
-
-TEST(Small_Source, BeginsCollectsEachPeriodAndEnds)
+TEST(Small_MemorySourceContract, AddsWorkThatStartedInsideThePeriodOnTheRecordsClock)
 {
     NameTable names;
     std::vector<std::string> tracks;
     SourceContext context(names, tracks, 1'000U);
-    QueueSource source(true);
-    Source& as_source = source;
+    MemorySource memory("test.queue");
+    memory.queue(MemoryWork{"device", "kernel", 1'300U, 1'300U, 1'340U});
+    Source& source = memory;
+    ASSERT_TRUE(source.begin(context).ok());
+    SpanTable period_three;
+    SpanSink sink(period_three, names, tracks);
 
-    ASSERT_TRUE(as_source.begin(context).ok());
-    SpanTable period_two;
-    SpanSink sink(period_two, names, tracks);
-    as_source.collect(PeriodSpan{2U, 1'200U, 1'300U}, sink);
-    as_source.end();
+    source.collect(PeriodSpan{3U, 1'300U, 1'400U}, sink);
 
-    EXPECT_EQ(as_source.name(), "test.queue");
+    ASSERT_EQ(period_three.size(), 1U);
+    EXPECT_EQ(period_three.span(0U).start_ns, 300U);
+    EXPECT_EQ(period_three.span(0U).end_ns, 340U);
     EXPECT_EQ(tracks, std::vector<std::string>{"device"});
-    ASSERT_EQ(period_two.size(), 1U);
-    EXPECT_EQ(period_two.span(0U).start_ns, 300U);
-    EXPECT_TRUE(source.ended());
 }
 
-TEST(Small_Source, ASourceThatCannotStartSaysWhy)
+TEST(Small_MemorySourceContract, DropsWorkThatStartedBeforeThePeriodAsLate)
 {
     NameTable names;
     std::vector<std::string> tracks;
     SourceContext context(names, tracks, 0U);
-    QueueSource source(false);
+    MemorySource memory("test.queue");
+    memory.queue(MemoryWork{"device", "kernel", 90U, 90U, 120U});
+    Source& source = memory;
+    ASSERT_TRUE(source.begin(context).ok());
+    SpanTable period;
+    SpanSink sink(period, names, tracks);
 
-    const SourceStatus status = source.begin(context);
+    source.collect(PeriodSpan{1U, 100U, 200U}, sink);
 
-    EXPECT_FALSE(status.ok());
+    EXPECT_EQ(period.size(), 0U);
+    EXPECT_EQ(sink.late(), 1U);
+}
+
+TEST(Small_MemorySourceContract, ASourceThatCannotStartSaysWhyAndAddsNoTrack)
+{
+    NameTable names;
+    std::vector<std::string> tracks;
+    SourceContext context(names, tracks, 0U);
+    MemorySource memory("test.queue");
+    memory.refuse_with("no device");
+
+    const SourceStatus status = static_cast<Source&>(memory).begin(context);
+
     EXPECT_EQ(status.error, "no device");
     EXPECT_TRUE(tracks.empty());
-}
-
-TEST(Small_Source, ASourceStatesNoDelayByDefault)
-{
-    QueueSource source(true);
-
-    EXPECT_EQ(static_cast<const Source&>(source).max_delay_ns(), 0U);
-}
-
-namespace
-{
-    /// @brief A source that states a 50 ms delay.
-    class LateSource final : public Source
-    {
-        public:
-            /// @brief Returns `test.late`.
-            [[nodiscard]] std::string_view name() const noexcept override
-            {
-                return "test.late";
-            }
-
-            /// @brief Starts.
-            [[nodiscard]] SourceStatus begin(SourceContext& context) override
-            {
-                static_cast<void>(context);
-                return SourceStatus{};
-            }
-
-            /// @brief Returns 50 ms.
-            [[nodiscard]] std::uint64_t max_delay_ns() const noexcept override
-            {
-                return 50'000'000U;
-            }
-
-            /// @brief Adds nothing.
-            void collect(const PeriodSpan& period, SpanSink& sink) override
-            {
-                static_cast<void>(period);
-                static_cast<void>(sink);
-            }
-
-            /// @brief Ends.
-            void end() override
-            {
-
-            }
-    };
-} // namespace
-
-TEST(Small_Source, AnOverridingSourceStatesItsDelay)
-{
-    LateSource source;
-
-    EXPECT_EQ(static_cast<const Source&>(source).max_delay_ns(), 50'000'000U);
 }

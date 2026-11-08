@@ -23,7 +23,7 @@
 
 /**
  * @file test_record_writer.cpp
- * @brief Tests that writers of either kind run through the one interface.
+ * @brief Tests the RecordWriter port's promise on the in-memory writer and the terminal writer.
  * @author Mustafa Garip
  * @see tests/record/record_writers/README.md
  */
@@ -32,46 +32,42 @@
 
 #include <gtest/gtest.h>
 
-#include <memory>
 #include <sstream>
 #include <vector>
 
+#include <SushiProfiler/record_writers/memory_record_writer.hpp>
 #include <SushiProfiler/record_writers/terminal_writer.hpp>
 
+using SushiProfiler::MemoryRecordWriter;
 using SushiProfiler::RecordWriter;
 using SushiProfiler::RunRecord;
 using SushiProfiler::Table;
+using SushiProfiler::TerminalWriter;
 using SushiProfiler::WriteStatus;
 
 namespace
 {
-    /// @brief Counts the tables it is given.
-    class CountingWriter final : public RecordWriter
+    /// @brief Expects @p writer to report a record with two tables written.
+    void expect_writes_a_record(RecordWriter& writer)
     {
-        public:
-            WriteStatus write(const RunRecord&, const std::vector<Table>& tables) override
-            {
-                seen += tables.size();
-                return WriteStatus::Written;
-            }
+        Table table;
+        table.name = "t";
 
-            /// @brief The tables seen so far.
-            std::size_t seen = 0U;
-    };
+        EXPECT_EQ(writer.write(RunRecord{}, {table, table}), WriteStatus::Written);
+    }
 } // namespace
 
-TEST(Small_RecordWriter, WritersRunThroughTheInterface)
+TEST(Small_MemoryRecordWriterContract, ReportsARecordWritten)
+{
+    MemoryRecordWriter writer;
+
+    expect_writes_a_record(writer);
+}
+
+TEST(Small_TerminalWriterContract, ReportsARecordWritten)
 {
     std::ostringstream out;
-    CountingWriter counting;
-    std::vector<std::unique_ptr<RecordWriter>> writers;
-    writers.push_back(std::make_unique<SushiProfiler::TerminalWriter>(out));
-    std::vector<RecordWriter*> all = {writers[0].get(), &counting};
-    Table table;
-    table.name = "t";
+    TerminalWriter writer(out);
 
-    for (RecordWriter* const writer : all)
-        EXPECT_EQ(writer->write(RunRecord{}, {table, table}), WriteStatus::Written);
-    EXPECT_EQ(counting.seen, 2U);
-    EXPECT_EQ(out.str().rfind("== t ==\n", 0U), 0U);
+    expect_writes_a_record(writer);
 }

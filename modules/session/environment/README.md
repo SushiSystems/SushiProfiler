@@ -18,4 +18,8 @@ module depends on `record`.
 `compare_records` refuses records whose `build` facts differ, so only facts that change what is
 measured go there.
 
+`SushiProfiler/environment/memory_contributor.hpp`: `MemoryContributor`, the in-memory contributor.
+`state_environment` and `state_build` hold a fact, the last value of a name winning, and
+`contribute` sets every held fact, environment first.
+
 The tests are in `tests/session/environment/`.

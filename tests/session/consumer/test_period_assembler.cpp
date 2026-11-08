@@ -30,8 +30,12 @@
 
 #include <SushiProfiler/consumer/period_assembler.hpp>
 
+#include <SushiProfiler/sources/memory_source.hpp>
+#include <SushiProfiler/stream_writers/memory_stream_writer.hpp>
+
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -41,6 +45,9 @@ using SushiProfiler::AssemblySettings;
 using SushiProfiler::CounterOp;
 using SushiProfiler::DrainBatch;
 using SushiProfiler::EventKind;
+using SushiProfiler::MemorySource;
+using SushiProfiler::MemoryStreamWriter;
+using SushiProfiler::MemoryWork;
 using SushiProfiler::NameID;
 using SushiProfiler::NameTable;
 using SushiProfiler::PeriodAssembler;
@@ -146,108 +153,17 @@ namespace
             NameID kernel_ = 0U;       /**< The span name. */
     };
 
-    /// @brief A source that places queued work by start time and names each period's span.
-    class PlacingSource final : public Source
+    /// @brief Returns each period @p writer kept as `index:runs `, in the order written.
+    std::string written(const MemoryStreamWriter& writer)
     {
-        public:
-            /// @brief Builds a source holding work that started at the steady times @p starts.
-            explicit PlacingSource(std::vector<std::uint64_t> starts) : starts_(std::move(starts))
-            {
-
-            }
-
-            /// @brief Returns `placing`.
-            [[nodiscard]] std::string_view name() const noexcept override
-            {
-                return "placing";
-            }
-
-            /// @brief Keeps @p context, which collect() adds names and tracks through.
-            [[nodiscard]] SourceStatus begin(SourceContext& context) override
-            {
-                context_ = &context;
-                return SourceStatus{};
-            }
-
-            /// @brief Adds work that starts in @p period, drops what started before it.
-            void collect(const PeriodSpan& period, SpanSink& sink) override
-            {
-                spans.push_back(period);
-                const NameID name = context_->intern("work_" + std::to_string(period.index));
-                const TrackID track =
-                    context_->add_track("device_" + std::to_string(period.index));
-                for (auto start = starts_.begin(); start != starts_.end();)
-                {
-                    if (*start >= period.end_steady_ns)
-                    {
-                        ++start;
-                        continue;
-                    }
-                    if (*start < period.start_steady_ns)
-                    {
-                        sink.drop_late(1U);
-                    }
-                    else
-                    {
-                        Span span;
-                        span.queued_ns = *start;
-                        span.start_ns = *start;
-                        span.end_ns = *start + 5U;
-                        span.track = track;
-                        span.name = name;
-                        static_cast<void>(sink.append(span));
-                    }
-                    start = starts_.erase(start);
-                }
-            }
-
-            /// @brief Ends.
-            void end() override
-            {
-
-            }
-
-            std::vector<PeriodSpan> spans; /**< The spans collect() received, in order. */
-
-        private:
-            std::vector<std::uint64_t> starts_; /**< The steady start of each piece of work. */
-            SourceContext* context_ = nullptr;  /**< The context begin() received. */
-    };
-
-    /// @brief A stream writer that notes each period's index and fails when told to.
-    class NotingWriter final : public StreamWriter
-    {
-        public:
-            /// @brief Starts.
-            [[nodiscard]] WriteStatus begin(const RunRecord& record) override
-            {
-                static_cast<void>(record);
-                ++begins;
-                return WriteStatus::Written;
-            }
-
-            /// @brief Notes the period and its runs, or fails.
-            [[nodiscard]] WriteStatus write_period(
-                const RunRecord& record, const PeriodRecord& period,
-                const std::vector<ZoneRun>& instances) override
-            {
-                static_cast<void>(record);
-                periods += std::to_string(period.index) + ":" + std::to_string(instances.size()) +
-                           " ";
-                return fails ? WriteStatus::StreamFailed : WriteStatus::Written;
-            }
-
-            /// @brief Ends.
-            [[nodiscard]] WriteStatus end(const RunRecord& record) override
-            {
-                static_cast<void>(record);
-                return WriteStatus::Written;
-            }
-
-            std::string periods; /**< The periods written so far. */
-            bool fails = false;  /**< Whether writes fail. */
-            int begins = 0;      /**< How many times begin() ran. */
-    };
+        std::string text;
+        for (std::size_t index = 0U; index < writer.periods().size(); ++index)
+        {
+            text += std::to_string(writer.periods()[index].index) + ":" +
+                    std::to_string(writer.instances()[index].size()) + " ";
+        }
+        return text;
+    }
 
     /// @brief Holds the tables, the window and the record an assembler fills.
     class Small_PeriodAssembler : public ::testing::Test
@@ -413,7 +329,7 @@ TEST_F(Small_PeriodAssembler, AsksSourcesForEachPeriodsSpans)
 
 TEST_F(Small_PeriodAssembler, GivesSourcesEachPeriodsSteadySpan)
 {
-    PlacingSource source({});
+    MemorySource source("placing");
     SourceContext context(names_, record_.tracks, 1'000U);
     ASSERT_TRUE(source.begin(context).ok());
     AssemblySettings settings = follow(warm_one_active_two(), 0U);
@@ -424,18 +340,20 @@ TEST_F(Small_PeriodAssembler, GivesSourcesEachPeriodsSteadySpan)
                                                    mark(2U, 1'300U)})}));
     assembler.finish();
 
-    ASSERT_EQ(source.spans.size(), 2U);
-    EXPECT_EQ(source.spans[0].index, 0U);
-    EXPECT_EQ(source.spans[0].start_steady_ns, 1'100U);
-    EXPECT_EQ(source.spans[0].end_steady_ns, 1'200U);
-    EXPECT_EQ(source.spans[1].index, 1U);
-    EXPECT_EQ(source.spans[1].start_steady_ns, 1'200U);
-    EXPECT_EQ(source.spans[1].end_steady_ns, 1'300U);
+    const std::vector<PeriodSpan> spans = source.collected();
+    ASSERT_EQ(spans.size(), 2U);
+    EXPECT_EQ(spans[0].index, 0U);
+    EXPECT_EQ(spans[0].start_steady_ns, 1'100U);
+    EXPECT_EQ(spans[0].end_steady_ns, 1'200U);
+    EXPECT_EQ(spans[1].index, 1U);
+    EXPECT_EQ(spans[1].start_steady_ns, 1'200U);
+    EXPECT_EQ(spans[1].end_steady_ns, 1'300U);
 }
 
 TEST_F(Small_PeriodAssembler, ASourceInternsANameAndAddsATrackWhileCollecting)
 {
-    PlacingSource source({150U});
+    MemorySource source("placing");
+    source.queue(MemoryWork{"device_0", "work_0", 150U, 150U, 155U});
     SourceContext context(names_, record_.tracks, 0U);
     ASSERT_TRUE(source.begin(context).ok());
     const AssemblySettings settings = follow(warm_one_active_two(), 0U);
@@ -452,7 +370,10 @@ TEST_F(Small_PeriodAssembler, ASourceInternsANameAndAddsATrackWhileCollecting)
 
 TEST_F(Small_PeriodAssembler, PlacesWorkInThePeriodHoldingItsStartAndCountsOlderWorkAsDropped)
 {
-    PlacingSource source({50U, 150U, 250U});
+    MemorySource source("placing");
+    source.queue(MemoryWork{"device", "work", 50U, 50U, 55U});
+    source.queue(MemoryWork{"device", "work", 150U, 150U, 155U});
+    source.queue(MemoryWork{"device", "work", 250U, 250U, 255U});
     SourceContext context(names_, record_.tracks, 0U);
     ASSERT_TRUE(source.begin(context).ok());
     const AssemblySettings settings = follow(warm_one_active_two(), 0U);
@@ -492,9 +413,9 @@ TEST_F(Small_PeriodAssembler, KeepsTheZoneRunsOfAnActivePeriodButNotOfAWarmupOne
 
 TEST_F(Small_PeriodAssembler, StreamsPeriodsInOrderAndStopsAFailingWriter)
 {
-    NotingWriter good;
-    NotingWriter bad;
-    bad.fails = true;
+    MemoryStreamWriter good;
+    MemoryStreamWriter bad;
+    bad.fail_with(WriteStatus::StreamFailed);
     rig_.set_writers({{"good", &good, true}, {"bad", &bad, true}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
     const AssemblySettings settings = follow(warm_one_active_two(), 0U);
@@ -504,8 +425,8 @@ TEST_F(Small_PeriodAssembler, StreamsPeriodsInOrderAndStopsAFailingWriter)
                                                  mark(2U, 300U), mark(3U, 400U)})}));
     assembler.finish();
 
-    EXPECT_EQ(good.periods, "0:1 1:0 2:0 ");
-    EXPECT_EQ(bad.periods, "0:1 ");
+    EXPECT_EQ(written(good), "0:1 1:0 2:0 ");
+    EXPECT_EQ(bad.writes(), 1U);
     EXPECT_EQ(assembler.problems(),
               std::vector<std::string>{"writer \"bad\" failed on period 0 and was stopped"});
 }
@@ -562,37 +483,6 @@ namespace
         schedule.active_all = true;
         return schedule;
     }
-
-    /// @brief A source that sets one fact on each period it collects.
-    class FactSource final : public Source
-    {
-        public:
-            /// @brief Returns `facts`.
-            [[nodiscard]] std::string_view name() const noexcept override
-            {
-                return "facts";
-            }
-
-            /// @brief Starts.
-            [[nodiscard]] SourceStatus begin(SourceContext& context) override
-            {
-                static_cast<void>(context);
-                return SourceStatus{};
-            }
-
-            /// @brief Sets `layer` to `graph`.
-            void collect(const PeriodSpan& period, SpanSink& sink) override
-            {
-                static_cast<void>(period);
-                static_cast<void>(sink.set_fact("layer", "graph"));
-            }
-
-            /// @brief Ends.
-            void end() override
-            {
-
-            }
-    };
 
     /// @brief A stream writer that notes what the live channel and the record held at each write.
     class ProbingWriter final : public StreamWriter
@@ -658,7 +548,7 @@ TEST_F(Small_PeriodAssembler, KeepsTheLastNPeriodsAtStop)
 
 TEST_F(Small_PeriodAssembler, KeepsNoPeriodsWhenZeroButStillStreamsThem)
 {
-    NotingWriter writer;
+    MemoryStreamWriter writer;
     rig_.set_writers({{"noting", &writer, true}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
     AssemblySettings settings = follow(every_period(), 0U);
@@ -670,7 +560,7 @@ TEST_F(Small_PeriodAssembler, KeepsNoPeriodsWhenZeroButStillStreamsThem)
     assembler.finish();
 
     EXPECT_TRUE(record_.periods.empty());
-    EXPECT_EQ(writer.periods, "0:0 1:0 2:0 ");
+    EXPECT_EQ(written(writer), "0:0 1:0 2:0 ");
 }
 
 TEST_F(Small_PeriodAssembler, KeepsEveryPeriodWhenAbsent)
@@ -748,7 +638,10 @@ TEST_F(Small_PeriodAssembler, TheRecordsTablesGrowWithoutRecopying)
 
 TEST_F(Small_PeriodAssembler, ASourceFactReachesThePeriodRecord)
 {
-    FactSource source;
+    MemorySource source("facts");
+    source.state_fact("layer", "graph");
+    SourceContext context(names_, record_.tracks, 0U);
+    ASSERT_TRUE(source.begin(context).ok());
     const AssemblySettings settings = follow(every_period(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {&source}, rig_.parts());
 
@@ -803,7 +696,7 @@ TEST_F(Small_PeriodAssembler, ASourceStillCollectsAPausedPeriod)
 {
     rig_.pauses().begin(100U);
     rig_.pauses().end(200U);
-    PlacingSource source({});
+    MemorySource source("placing");
     SourceContext context(names_, record_.tracks, 0U);
     ASSERT_TRUE(source.begin(context).ok());
     const AssemblySettings settings = follow(every_period(), 0U);
@@ -812,8 +705,9 @@ TEST_F(Small_PeriodAssembler, ASourceStillCollectsAPausedPeriod)
     assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U)})}));
     assembler.finish();
 
-    ASSERT_EQ(source.spans.size(), 2U);
-    EXPECT_EQ(source.spans[0].index, 0U);
+    const std::vector<PeriodSpan> spans = source.collected();
+    ASSERT_EQ(spans.size(), 2U);
+    EXPECT_EQ(spans[0].index, 0U);
 }
 
 TEST_F(Small_PeriodAssembler, ALaneOpenAcrossAPauseIsResetAfterResume)
@@ -883,10 +777,10 @@ TEST_F(Small_PeriodAssembler, ARetiredThreadDoesNotHoldBackForgettingAPause)
 
 TEST_F(Small_PeriodAssembler, AWriterEnabledBeforeACloseReceivesThatPeriod)
 {
-    NotingWriter writer;
+    MemoryStreamWriter writer;
     rig_.set_writers({{"noting", &writer, false}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
-    EXPECT_EQ(writer.begins, 0);
+    EXPECT_EQ(writer.begins(), 0U);
     ASSERT_TRUE(rig_.writers().request("noting", true));
     const AssemblySettings settings = follow(every_period(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
@@ -894,13 +788,13 @@ TEST_F(Small_PeriodAssembler, AWriterEnabledBeforeACloseReceivesThatPeriod)
     assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U)})}));
     assembler.finish();
 
-    EXPECT_EQ(writer.begins, 1);
-    EXPECT_EQ(writer.periods, "0:0 ");
+    EXPECT_EQ(writer.begins(), 1U);
+    EXPECT_EQ(written(writer), "0:0 ");
 }
 
 TEST_F(Small_PeriodAssembler, AWriterDisabledBeforeACloseDoesNotReceiveIt)
 {
-    NotingWriter writer;
+    MemoryStreamWriter writer;
     rig_.set_writers({{"noting", &writer, true}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
     ASSERT_TRUE(rig_.writers().request("noting", false));
@@ -910,25 +804,25 @@ TEST_F(Small_PeriodAssembler, AWriterDisabledBeforeACloseDoesNotReceiveIt)
     assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U)})}));
     assembler.finish();
 
-    EXPECT_EQ(writer.periods, "");
-    EXPECT_EQ(writer.begins, 1);
+    EXPECT_TRUE(writer.periods().empty());
+    EXPECT_EQ(writer.begins(), 1U);
 }
 
 TEST_F(Small_PeriodAssembler, ATogglePostedWhileAPeriodIsOpenTakesEffectAtTheNextClose)
 {
-    NotingWriter writer;
+    MemoryStreamWriter writer;
     rig_.set_writers({{"noting", &writer, true}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
     const AssemblySettings settings = follow(every_period(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
     assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U)})}));
-    ASSERT_EQ(writer.periods, "0:0 ");
+    ASSERT_EQ(written(writer), "0:0 ");
 
     ASSERT_TRUE(rig_.writers().request("noting", false));
     assembler.add(batch_at(2'000U, {drain_of(0U, {mark(2U, 300U)})}));
     assembler.finish();
 
-    EXPECT_EQ(writer.periods, "0:0 ");
+    EXPECT_EQ(written(writer), "0:0 ");
 }
 
 TEST_F(Small_PeriodAssembler, PublishesEachClosedPeriodWhenAViewIsWatching)

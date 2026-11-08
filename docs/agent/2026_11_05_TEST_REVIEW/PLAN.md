@@ -13,7 +13,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | --- | --- | --- | --- |
 | T1 | `tests/support/tolerance.hpp` copied from SushiSkills, and `expect_row` moved onto it |  | done |
 | T2 | The collector seam |  | done |
-| T3 | In-memory adapters beside `StreamWriter`, `Source`, `RecordWriter`, `EnvironmentContributor` |  | todo |
+| T3 | In-memory adapters beside `StreamWriter`, `Source`, `RecordWriter`, `EnvironmentContributor` |  | done |
 | T4 | The CLI's `project` fixture replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T5 | The defects of this report, each with a test that fails first |  | todo |
 | T6 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |

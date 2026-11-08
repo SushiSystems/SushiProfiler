@@ -8,3 +8,7 @@
   source collects the work inside each period span and counts older work as late, and its
   contributor's fact reaches the gathered facts. The guide `docs/guides/CLIENT_LIBRARY.md` takes
   its example from this file.
+
+The registry tests use `MemorySource` and `MemoryContributor` where a part does nothing; the fake
+device library keeps its own source and contributor, since it shows how a library wires its parts
+into a registry.

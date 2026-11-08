@@ -47,3 +47,7 @@
   outlives the assembler, publication after the writers and the record, `keep_periods` 0).
 - `test_consumer.cpp` also covers the poll ceiling and a watched consumer's drain rate, and that
   `wake()` ends a long sleep.
+
+The period assembler and stream writer set tests use `MemorySource` and `MemoryStreamWriter`;
+`test_period_assembler.cpp` keeps a source and a writer of its own that the adapters cannot stand in
+for: one appends a span on an unknown track, and one reads the live channel while it writes.
