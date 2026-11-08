@@ -30,6 +30,7 @@
 
 #pragma once
 
+#include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/sites/dynamic_site_table.hpp>
 #include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/zones/records.hpp>
@@ -48,14 +49,15 @@ namespace SushiProfiler
      * allocates, so it is not for a real-time thread. A record that cannot allocate is dropped,
      * as a full ring drops. A table past its name limit drops the record too.
      */
-    inline void record_counter_named(std::string_view name, std::string_view unit, CounterOp op,
-                                     std::uint8_t level, double value) noexcept
+    inline void record_counter_named(Collector& collector, std::string_view name,
+                                     std::string_view unit, CounterOp op, std::uint8_t level,
+                                     double value) noexcept
     {
         try
         {
             SiteHandle* const handle = dynamic_counter_sites().handle(name, unit, op, level);
             if (handle != nullptr)
-                record_counter(*handle, value);
+                record_counter(collector, *handle, value);
         }
         catch (const std::bad_alloc&)
         {
@@ -67,16 +69,24 @@ namespace SushiProfiler
         }
     }
 
+    /// @brief Records @p value at the counter named @p name in the process-wide collector.
+    inline void record_counter_named(std::string_view name, std::string_view unit, CounterOp op,
+                                     std::uint8_t level, double value) noexcept
+    {
+        if (Collector::recording())
+            record_counter_named(Collector::instance(), name, unit, op, level, value);
+    }
+
     /// @brief Records @p value at the value site named @p name; see record_counter_named().
-    inline void record_value_named(std::string_view name, std::string_view unit,
-                                   std::uint8_t level, double value) noexcept
+    inline void record_value_named(Collector& collector, std::string_view name,
+                                   std::string_view unit, std::uint8_t level, double value) noexcept
     {
         try
         {
             SiteHandle* const handle =
                 dynamic_value_sites().handle(name, unit, CounterOp::Add, level);
             if (handle != nullptr)
-                record_value(*handle, value);
+                record_value(collector, *handle, value);
         }
         catch (const std::bad_alloc&)
         {
@@ -86,5 +96,13 @@ namespace SushiProfiler
         {
             return;
         }
+    }
+
+    /// @brief Records @p value at the value site named @p name in the process-wide collector.
+    inline void record_value_named(std::string_view name, std::string_view unit,
+                                   std::uint8_t level, double value) noexcept
+    {
+        if (Collector::recording())
+            record_value_named(Collector::instance(), name, unit, level, value);
     }
 } // namespace SushiProfiler

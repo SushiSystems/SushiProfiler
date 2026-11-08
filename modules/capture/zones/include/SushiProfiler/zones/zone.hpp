@@ -78,16 +78,20 @@ namespace SushiProfiler
     class ScopedZone<true>
     {
         public:
-            /// @brief Starts a zone at @p handle's site, named @p name when it is not 0.
+            /**
+             * @brief Starts a zone at @p handle's site in the process-wide collector, named
+             *        @p name when it is not 0.
+             */
             explicit ScopedZone(SiteHandle& handle, NameID name = 0U) noexcept
             {
-                SiteID site = 0U;
-                ring_ = Detail::admit(handle, site);
-                if (ring_ == nullptr)
-                    return;
-                site_word_ = pack_site(EventKind::Zone, site);
-                name_ = name;
-                begin_ = Collector::now();
+                if (Collector::recording())
+                    start(Collector::instance(), handle, name);
+            }
+
+            /// @brief Starts a zone at @p handle's site in @p collector, named @p name when not 0.
+            ScopedZone(Collector& collector, SiteHandle& handle, NameID name = 0U) noexcept
+            {
+                start(collector, handle, name);
             }
 
             ScopedZone(const ScopedZone&) = delete;
@@ -98,13 +102,29 @@ namespace SushiProfiler
             /// @brief Writes the zone if it started and the collector still records.
             ~ScopedZone()
             {
-                if (ring_ == nullptr || !Collector::recording())
+                if (ring_ == nullptr || !collector_->is_recording())
                     return;
-                const TraceEvent event{begin_, Collector::now(), site_word_, name_};
+                const TraceEvent event{begin_, collector_->stamp(), site_word_, name_};
                 static_cast<void>(ring_->push(event));
             }
 
         private:
+            /// @brief Admits the zone into @p collector and reads its start.
+            void start(Collector& collector, SiteHandle& handle, NameID name) noexcept
+            {
+                SiteID site = 0U;
+                ring_ = Detail::admit(collector, handle, site);
+                if (ring_ == nullptr)
+                    return;
+                collector_ = &collector;
+                site_word_ = pack_site(EventKind::Zone, site);
+                name_ = name;
+                begin_ = collector.stamp();
+            }
+
+            /// @brief The collector the zone records into, set when the ring is.
+            Collector* collector_ = nullptr;
+
             /// @brief The ring to write into, or null when the zone does not record.
             ThreadRing* ring_ = nullptr;
 
@@ -127,10 +147,11 @@ namespace SushiProfiler
     class ScopedLane<false>
     {
         public:
-            /// @brief Ignores @p lane.
-            constexpr explicit ScopedLane(NameID lane) noexcept
+            /// @brief Ignores its arguments.
+            template <class... Arguments>
+            constexpr explicit ScopedLane(const Arguments&...) noexcept
             {
-                static_cast<void>(lane);
+
             }
     };
 
@@ -139,17 +160,17 @@ namespace SushiProfiler
     class ScopedLane<true>
     {
         public:
-            /// @brief Opens lane @p lane, an interned name, if the collector records.
+            /// @brief Opens lane @p lane, an interned name, if the process-wide collector records.
             explicit ScopedLane(NameID lane) noexcept : lane_(lane)
             {
-                if (!Collector::recording())
-                    return;
-                ring_ = Collector::ring();
-                if (ring_ == nullptr)
-                    return;
-                const std::uint64_t now = Collector::now();
-                const TraceEvent event{now, now, pack_site(EventKind::LaneBegin, 0U), lane_};
-                static_cast<void>(ring_->push(event));
+                if (Collector::recording())
+                    start(Collector::instance());
+            }
+
+            /// @brief Opens lane @p lane, an interned name, if @p collector records.
+            ScopedLane(Collector& collector, NameID lane) noexcept : lane_(lane)
+            {
+                start(collector);
             }
 
             ScopedLane(const ScopedLane&) = delete;
@@ -160,14 +181,31 @@ namespace SushiProfiler
             /// @brief Closes the lane if it opened and the collector still records.
             ~ScopedLane()
             {
-                if (ring_ == nullptr || !Collector::recording())
+                if (ring_ == nullptr || !collector_->is_recording())
                     return;
-                const std::uint64_t now = Collector::now();
+                const std::uint64_t now = collector_->stamp();
                 const TraceEvent event{now, now, pack_site(EventKind::LaneEnd, 0U), lane_};
                 static_cast<void>(ring_->push(event));
             }
 
         private:
+            /// @brief Writes the lane's begin into @p collector if it records.
+            void start(Collector& collector) noexcept
+            {
+                if (!collector.is_recording())
+                    return;
+                ring_ = collector.thread_ring();
+                if (ring_ == nullptr)
+                    return;
+                collector_ = &collector;
+                const std::uint64_t now = collector.stamp();
+                const TraceEvent event{now, now, pack_site(EventKind::LaneBegin, 0U), lane_};
+                static_cast<void>(ring_->push(event));
+            }
+
+            /// @brief The collector the lane records into, set when the ring is.
+            Collector* collector_ = nullptr;
+
             /// @brief The ring to write into, or null when the lane did not open.
             ThreadRing* ring_ = nullptr;
 

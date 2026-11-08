@@ -14,7 +14,9 @@
 - `test_zone.cpp`: a zone writes one complete event with its site's name and line; nested zones
   nest by time; a named zone carries its name; a disabled site, a zone that outlives the
   collector's close and a compiled-out zone write nothing; compiled-out zones and lanes are
-  empty types.
+  empty types. A zone given a collector the test owns records into it with the stamps of its
+  `ManualTickSource` and writes nothing while that collector is closed; these tests are small and
+  reach no process-wide collector.
 - `test_records.cpp`: a counter keeps its operation, unit and value; a value keeps its sample;
   an external zone keeps the caller's times past 2^32; an external instant keeps its time; flows
   carry their item; a lane brackets the events inside it; compiled-out records write nothing.

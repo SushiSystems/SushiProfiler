@@ -44,19 +44,21 @@ namespace SushiProfiler
     namespace Detail
     {
         /**
-         * @brief Returns the calling thread's ring when @p handle's site records now, else null.
+         * @brief Returns the calling thread's ring in @p collector when @p handle's site records
+         *        now, else null.
          * @param site Set to the site's id when the ring is returned.
          *
          * The gate is read first, so a closed collector costs one relaxed load. A site's first
          * use registers it, which may allocate; a failure there refuses the record.
          */
-        [[nodiscard]] inline ThreadRing* admit(SiteHandle& handle, SiteID& site) noexcept
+        [[nodiscard]] inline ThreadRing* admit(Collector& collector, SiteHandle& handle,
+                                               SiteID& site) noexcept
         {
-            if (!Collector::recording())
+            if (!collector.is_recording())
                 return nullptr;
             try
             {
-                SiteRegistry& sites = Collector::instance().sites();
+                SiteRegistry& sites = collector.sites();
                 site = sites.id_of(handle);
                 if (!sites.enabled(site))
                     return nullptr;
@@ -69,7 +71,15 @@ namespace SushiProfiler
             {
                 return nullptr;
             }
-            return Collector::ring();
+            return collector.thread_ring();
+        }
+
+        /// @brief Returns admit() on the process-wide collector; a closed one costs two loads.
+        [[nodiscard]] inline ThreadRing* admit(SiteHandle& handle, SiteID& site) noexcept
+        {
+            if (!Collector::recording())
+                return nullptr;
+            return admit(Collector::instance(), handle, site);
         }
     } // namespace Detail
 } // namespace SushiProfiler

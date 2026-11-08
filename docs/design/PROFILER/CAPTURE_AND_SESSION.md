@@ -15,7 +15,7 @@ nothing: every failure returns a status, and drops are counted in the record. Na
 | foundation | `json` | `JsonValue`, its reader and writer, and `JsonFieldReader`, the strict field reader every file reader shares |
 | capture | `sites` | `ZoneSite`, the site registry, the per-site enable bytes, name interning |
 | capture | `rings` | `ThreadRing`, thread registration and retirement |
-| capture | `collector` | The process-wide gate and the drainer handoff (see "The hot path" below) |
+| capture | `collector` | The gate and the drainer handoff, process-wide or passed in (see "The hot path" below) |
 | capture | `zones` | `Zone`, `SP_ZONE`, `SP_ZONE_NAMED`, `SP_COUNTER`, `SP_THREAD_NAME` |
 | capture | `lock_wait` | `ContendedLock` and `SP_ZONE_LOCK_WAIT`: a lock that opens a zone only when it waits |
 | capture | `periods` | `PeriodTimeline` and `mark_period` |
@@ -194,8 +194,10 @@ Stream writers are the only writers that run while the session records.
   closes once a drain is `linger_ms` past its end, or at stop. An event that begins in a closed
   period counts as late for its thread, and one outside every recorded period as outside. A
   period whose end mark never came is not kept at stop, and its events count as outside.
-- Dependencies arrive through `start`; the only process-wide state is the collector, because a
-  macro at any call site must reach it.
+- Dependencies arrive through `start`, the collector among them: `start(config, registry,
+  collector)` records into a collector its caller owns, stamped by that collector's `TickSource`.
+  The only process-wide state is the collector the macros reach, `Collector::instance()`, because
+  a macro at any call site must reach it; `start(config, registry)` records into that one.
 
 ## Sources
 

@@ -42,6 +42,8 @@
 SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
+    class Collector;
+
     /**
      * @brief Divides a run into periods, such as training steps or frames, numbered from 0.
      *
@@ -55,8 +57,19 @@ namespace SushiProfiler
             /// @brief The value of `current()` before the first mark.
             static constexpr std::uint64_t K_NO_PERIOD = ~std::uint64_t{0U};
 
-            /// @brief Builds the timeline @p name, interning it, with @p budget_ns per period or 0.
+            /**
+             * @brief Builds the timeline @p name of the process-wide collector, interning it,
+             *        with @p budget_ns per period or 0.
+             */
             explicit PeriodTimeline(std::string_view name, std::uint64_t budget_ns = 0U);
+
+            /**
+             * @brief Builds the timeline @p name of @p collector, interning it, with @p budget_ns
+             *        per period or 0.
+             * @pre @p collector outlives the timeline.
+             */
+            PeriodTimeline(Collector& collector, std::string_view name,
+                           std::uint64_t budget_ns = 0U);
 
             PeriodTimeline(const PeriodTimeline&) = delete;
             PeriodTimeline& operator=(const PeriodTimeline&) = delete;
@@ -98,6 +111,9 @@ namespace SushiProfiler
         private:
             /// @brief Writes the mark of period @p index, and its budget, if the gate is open.
             void write_mark(std::uint64_t index, std::uint64_t budget_ns) const noexcept;
+
+            /// @brief The collector the marks and tags are written into.
+            Collector& collector_;
 
             /// @brief The timeline's name.
             std::string name_;

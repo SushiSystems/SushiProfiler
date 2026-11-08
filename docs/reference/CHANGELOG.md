@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-11-09 — collector: Let a caller build a `Collector` on a `TickSource` and pass it to zones, records, timelines, the window and `Session::start`; the macros keep the process-wide one (`collector.hpp`, `tick_source.hpp`).
+- 2026-11-09 — tests: Derived every tolerance of the record tests through `tests/support/tolerance.hpp` in place of a typed epsilon.
 - 2026-11-06 — cli: Gave the project service a `Workspace` and moved the CLI tests onto sushicore's in-memory runner and console; the CLI asks for sushicore 0.10.12.
 - 2026-11-06 — tools: Deleted the leftover `check_test_additions.py` and its test, which the shared tools no longer carry, and recopied the shared tools (RW-25).
 - 2026-11-06 — licence: Relicensed SushiProfiler under the Apache License 2.0 and removed `COMMERCIAL.md`; every source file's licence block follows (`LICENSE`, `tools/settings.py`).

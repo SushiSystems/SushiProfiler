@@ -5,7 +5,8 @@ depends on `events`, `rings` and `collector`.
 
 `SushiProfiler/periods/period_timeline.hpp` declares `PeriodTimeline`. A timeline is built with a
 name, such as `train.step` or `engine.frame`, which it interns, and an optional budget in
-nanoseconds.
+nanoseconds. `PeriodTimeline(name, budget_ns)` belongs to the process-wide collector;
+`PeriodTimeline(collector, name, budget_ns)` interns, marks and tags in the collector it is given.
 
 - `mark()` opens the next period and returns its index, from 0. The index advances whether or not
   the collector records. Each recorded mark writes a `PeriodMark` event carrying the index and the
@@ -24,6 +25,6 @@ then `after_mark`. `observe(observer)` installs one, or removes it with null. A 
 opens the gate in `before_mark` and closes it in `after_mark`, so the last recorded period still
 gets its end mark.
 
-Marks are written while `Collector::marking()` holds, so a held gate still writes them; a tag is
-written only while the zone gate is open. Marks and tags have no site. The tests are in
+Marks are written while the collector's `is_marking()` holds, so a held gate still writes them; a
+tag is written only while the zone gate is open. Marks and tags have no site. The tests are in
 `tests/capture/periods/`.

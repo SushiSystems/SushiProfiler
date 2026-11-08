@@ -32,6 +32,10 @@
 
 #include "recording_fixture.hpp"
 
+#include <SushiProfiler/clock/manual_tick_source.hpp>
+#include <SushiProfiler/collector/collector_settings.hpp>
+#include <SushiProfiler/collector/drain_batch.hpp>
+#include <SushiProfiler/sites/site.hpp>
 #include <SushiProfiler/zones/macros.hpp>
 
 #include <gtest/gtest.h>
@@ -40,7 +44,10 @@
 #include <type_traits>
 
 using SushiProfiler::Collector;
+using SushiProfiler::CollectorSettings;
+using SushiProfiler::DrainBatch;
 using SushiProfiler::EventKind;
+using SushiProfiler::ManualTickSource;
 using SushiProfiler::ScopedLane;
 using SushiProfiler::ScopedZone;
 using SushiProfiler::SiteFilter;
@@ -53,6 +60,11 @@ namespace
     class Small_Zone : public SushiProfilerTests::RecordingFixture
     {
     };
+
+    /// @brief The site of the zones recorded into a collector the test owns.
+    constexpr SushiProfiler::Site K_OWNED_SITE{"load", nullptr, __FILE__, __LINE__, 1U,
+                                               SushiProfiler::SiteRole::Zone,
+                                               SushiProfiler::CounterOp::Add, nullptr};
 
     static_assert(std::is_empty_v<ScopedZone<false>>, "a compiled-out zone holds nothing");
     static_assert(std::is_empty_v<ScopedLane<false>>, "a compiled-out lane holds nothing");
@@ -133,4 +145,39 @@ TEST_F(Small_Zone, ACompiledOutZoneIsEmpty)
     }
 
     EXPECT_TRUE(drain_mine().empty());
+}
+
+TEST(Small_ZoneOfAGivenCollector, RecordsIntoItWithTheStampsOfItsClock)
+{
+    ManualTickSource clock(100U);
+    Collector collector(clock);
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
+    SushiProfiler::SiteHandle handle{&K_OWNED_SITE};
+
+    {
+        const ScopedZone<true> zone(collector, handle);
+        clock.advance(25U);
+    }
+
+    DrainBatch batch;
+    collector.drain(batch);
+    ASSERT_EQ(batch.threads.size(), 1U);
+    ASSERT_EQ(batch.threads[0].events.size(), 1U);
+    EXPECT_EQ(batch.threads[0].events[0].begin, 100U);
+    EXPECT_EQ(batch.threads[0].events[0].end, 125U);
+}
+
+TEST(Small_ZoneOfAGivenCollector, WritesNothingWhileItIsClosed)
+{
+    const ManualTickSource clock;
+    Collector collector(clock);
+    SushiProfiler::SiteHandle handle{&K_OWNED_SITE};
+
+    {
+        const ScopedZone<true> zone(collector, handle);
+    }
+
+    DrainBatch batch;
+    collector.drain(batch);
+    EXPECT_TRUE(batch.threads.empty());
 }

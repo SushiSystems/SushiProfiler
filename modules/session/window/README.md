@@ -5,7 +5,8 @@ timeline are recorded and opens the collector's gate only for them, so periods o
 cost what an off profiler costs. The module depends on `config` and `periods`, and privately on
 `collector`.
 
-- `SushiProfiler/window/window.hpp`: `Window` takes a `WindowSchedule` from the configuration.
+- `SushiProfiler/window/window.hpp`: `Window` takes a `WindowSchedule` from the configuration,
+  and the `Collector` it drives; without one it drives the process-wide collector.
   `phase_of(index)` returns the `WindowPhase` of a period: `Skipped` for the first `skip`
   periods, then per cycle `Waiting` for `wait` periods, `Warmup` for `warmup` and `Active` for
   `active`, and `Done` after `repeat` cycles; `repeat` 0 never reaches `Done`. With

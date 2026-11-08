@@ -10,3 +10,5 @@
 - A mark written while the gate is held reaches the drain and a zone in that period does not; a
   tag while held is dropped; a thread that first marks while held registers its ring; `reset`
   starts period 0 again.
+- A timeline built on a collector the test owns marks into that collector, stamped by its
+  `ManualTickSource`, with no process-wide collector involved.

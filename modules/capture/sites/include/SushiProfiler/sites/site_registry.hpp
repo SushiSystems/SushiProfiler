@@ -40,6 +40,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 SUSHIPROFILER_DLL_WARNINGS_PUSH
@@ -71,6 +72,13 @@ namespace SushiProfiler
         CounterOp op = CounterOp::Add;   /**< A counter's operation. */
     };
 
+    /// @brief Where a registry keeps the id it gave a site.
+    enum class SiteCache : std::uint8_t
+    {
+        InHandle,  /**< In the site's handle: lock-free after first use; one registry per handle. */
+        InRegistry /**< In a map of the registry: a lock per lookup; handles stay untouched. */
+    };
+
     /**
      * @brief Gives each site one id on first use and answers, lock-free, whether it records.
      *
@@ -83,8 +91,12 @@ namespace SushiProfiler
             /// @brief The capacity of the process-wide registry.
             static constexpr std::size_t K_DEFAULT_SITE_CAPACITY = 65536U;
 
-            /// @brief Builds an empty registry that holds up to @p capacity sites.
-            explicit SiteRegistry(std::size_t capacity = K_DEFAULT_SITE_CAPACITY);
+            /**
+             * @brief Builds an empty registry that holds up to @p capacity sites and keeps their
+             *        ids where @p cache says.
+             */
+            explicit SiteRegistry(std::size_t capacity = K_DEFAULT_SITE_CAPACITY,
+                                  SiteCache cache = SiteCache::InHandle);
 
             SiteRegistry(const SiteRegistry&) = delete;
             SiteRegistry& operator=(const SiteRegistry&) = delete;
@@ -95,6 +107,8 @@ namespace SushiProfiler
             /// @brief Returns @p handle's id, registering its site on first use; 0 if refused.
             [[nodiscard]] SiteID id_of(SiteHandle& handle)
             {
+                if (cache_ == SiteCache::InRegistry)
+                    return find_or_register(handle);
                 const SiteID cached = handle.id.load(std::memory_order_acquire);
                 if (cached == K_UNREGISTERED)
                     return register_site(handle);
@@ -129,16 +143,28 @@ namespace SushiProfiler
             /// @brief Registers @p handle's site under the lock, or finds it registered.
             SiteID register_site(SiteHandle& handle);
 
+            /// @brief Returns @p handle's id from ids_, registering its site first; 0 if refused.
+            SiteID find_or_register(const SiteHandle& handle);
+
+            /// @brief Adds @p site under id `infos_.size() + 1`; the caller holds mutex_ and room.
+            SiteID add_locked(const Site& site);
+
             /// @brief Returns whether @p info records under filter_; filter_ is read locked.
             [[nodiscard]] bool passes_locked(const SiteInfo& info) const;
 
             /// @brief The number of sites the registry holds at most.
             std::size_t capacity_;
 
+            /// @brief Where the registry keeps the ids it gave.
+            SiteCache cache_;
+
+            /// @brief The id of each site, or K_REFUSED, when cache_ is InRegistry.
+            std::unordered_map<const Site*, SiteID> ids_;
+
             /// @brief One enable byte per id, 0 included, allocated once.
             std::unique_ptr<std::atomic<std::uint8_t>[]> enabled_;
 
-            /// @brief Guards infos_ and filter_.
+            /// @brief Guards infos_, ids_ and filter_.
             mutable std::mutex mutex_;
 
             /// @brief The description of id `index + 1`.

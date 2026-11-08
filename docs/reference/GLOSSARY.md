@@ -7,7 +7,7 @@ it; the others give the meaning the design intends.
 | --- | --- |
 | Zone | A stretch of code a program marks, so that the time it takes is recorded as one event; `SushiProfiler/zones/zone.hpp` |
 | Site | The place in the source where a record is declared; every execution of that place shares one site and one id; `SushiProfiler/sites/site.hpp` |
-| Collector | The one process-wide object: the gate, every thread's ring and the drain one consumer polls; `SushiProfiler/collector/collector.hpp` |
+| Collector | A gate, every thread's ring and the drain one consumer polls; the macros reach the process-wide one, `Collector::instance()`, and an owner may build and pass in its own; `SushiProfiler/collector/collector.hpp` |
 | Gate | The collector's open or closed state; a closed gate makes every record a single load and nothing more |
 | Ring | One thread's lock-free buffer of events between its records and the consumer's drain; a full ring drops and counts; `SushiProfiler/rings/thread_ring.hpp` |
 | Lane | A scope on one thread whose events form a row of their own, for a thread that serves several streams |

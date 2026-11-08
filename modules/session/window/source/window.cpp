@@ -34,9 +34,21 @@
 
 namespace SushiProfiler
 {
-    Window::Window(const WindowSchedule& schedule) noexcept : schedule_(schedule)
+    Window::Window(const WindowSchedule& schedule) noexcept
+        : schedule_(schedule), collector_(nullptr)
     {
 
+    }
+
+    Window::Window(const WindowSchedule& schedule, Collector& collector) noexcept
+        : schedule_(schedule), collector_(&collector)
+    {
+
+    }
+
+    Collector& Window::collector() const
+    {
+        return collector_ != nullptr ? *collector_ : Collector::instance();
     }
 
     WindowPhase Window::phase_of(std::uint64_t index) const noexcept
@@ -75,13 +87,13 @@ namespace SushiProfiler
     {
         static_cast<void>(timeline);
         if (records(index))
-            Collector::instance().resume();
+            collector().resume();
     }
 
     void Window::after_mark(const PeriodTimeline& timeline, std::uint64_t index) noexcept
     {
         static_cast<void>(timeline);
         if (!records(index))
-            Collector::instance().pause();
+            collector().pause();
     }
 } // namespace SushiProfiler

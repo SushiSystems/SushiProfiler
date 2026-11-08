@@ -43,56 +43,96 @@ namespace SushiProfiler
 {
     namespace Detail
     {
-        /// @brief Writes one event of @p kind at @p handle's site if it records now.
-        inline void record(SiteHandle& handle, EventKind kind, std::uint64_t begin,
-                           std::uint64_t end, NameID name) noexcept
+        /// @brief Writes one event of @p kind at @p handle's site into @p collector if it records.
+        inline void record(Collector& collector, SiteHandle& handle, EventKind kind,
+                           std::uint64_t begin, std::uint64_t end, NameID name) noexcept
         {
             SiteID site = 0U;
-            ThreadRing* const ring = admit(handle, site);
+            ThreadRing* const ring = admit(collector, handle, site);
             if (ring != nullptr)
                 static_cast<void>(ring->push(TraceEvent{begin, end, pack_site(kind, site), name}));
         }
 
-        /// @brief Writes one event of @p kind stamped now, carrying @p end, if it records.
-        inline void record_now(SiteHandle& handle, EventKind kind, std::uint64_t end) noexcept
+        /// @brief Writes an event of @p kind stamped now, carrying @p end, if @p collector records.
+        inline void record_now(Collector& collector, SiteHandle& handle, EventKind kind,
+                               std::uint64_t end) noexcept
         {
             SiteID site = 0U;
-            ThreadRing* const ring = admit(handle, site);
+            ThreadRing* const ring = admit(collector, handle, site);
             if (ring == nullptr)
                 return;
-            const TraceEvent event{Collector::now(), end, pack_site(kind, site), 0U};
+            const TraceEvent event{collector.stamp(), end, pack_site(kind, site), 0U};
             static_cast<void>(ring->push(event));
         }
     } // namespace Detail
 
-    /// @brief Records @p value at a counter site; the site's operation folds it per period.
+    /// @brief Records @p value at a counter site of @p collector; the site's operation folds it.
+    inline void record_counter(Collector& collector, SiteHandle& handle, double value) noexcept
+    {
+        Detail::record_now(collector, handle, EventKind::Counter, value_bits(value));
+    }
+
+    /// @brief Records @p value at a counter site of the process-wide collector.
     inline void record_counter(SiteHandle& handle, double value) noexcept
     {
-        Detail::record_now(handle, EventKind::Counter, value_bits(value));
+        if (Collector::recording())
+            record_counter(Collector::instance(), handle, value);
     }
 
-    /// @brief Records @p value at a value site, kept as sampled.
+    /// @brief Records @p value at a value site of @p collector, kept as sampled.
+    inline void record_value(Collector& collector, SiteHandle& handle, double value) noexcept
+    {
+        Detail::record_now(collector, handle, EventKind::Value, value_bits(value));
+    }
+
+    /// @brief Records @p value at a value site of the process-wide collector.
     inline void record_value(SiteHandle& handle, double value) noexcept
     {
-        Detail::record_now(handle, EventKind::Value, value_bits(value));
+        if (Collector::recording())
+            record_value(Collector::instance(), handle, value);
     }
 
-    /// @brief Records an occurrence now.
-    inline void record_instant(SiteHandle& handle) noexcept
+    /// @brief Records an occurrence now in @p collector.
+    inline void record_instant(Collector& collector, SiteHandle& handle) noexcept
     {
         SiteID site = 0U;
-        ThreadRing* const ring = Detail::admit(handle, site);
+        ThreadRing* const ring = Detail::admit(collector, handle, site);
         if (ring == nullptr)
             return;
-        const std::uint64_t now = Collector::now();
+        const std::uint64_t now = collector.stamp();
         const TraceEvent event{now, now, pack_site(EventKind::Instant, site), 0U};
         static_cast<void>(ring->push(event));
+    }
+
+    /// @brief Records an occurrence now in the process-wide collector.
+    inline void record_instant(SiteHandle& handle) noexcept
+    {
+        if (Collector::recording())
+            record_instant(Collector::instance(), handle);
+    }
+
+    /// @brief Records in @p collector an occurrence at @p steady_ns, read on the steady clock.
+    inline void record_instant_at(Collector& collector, SiteHandle& handle,
+                                  std::uint64_t steady_ns) noexcept
+    {
+        Detail::record(collector, handle, EventKind::ExternalInstant, steady_ns, steady_ns, 0U);
     }
 
     /// @brief Records an occurrence at @p steady_ns, a time the caller read on the steady clock.
     inline void record_instant_at(SiteHandle& handle, std::uint64_t steady_ns) noexcept
     {
-        Detail::record(handle, EventKind::ExternalInstant, steady_ns, steady_ns, 0U);
+        if (Collector::recording())
+            record_instant_at(Collector::instance(), handle, steady_ns);
+    }
+
+    /**
+     * @brief Records in @p collector a time range the caller measured on the steady clock.
+     * @param name A dynamic name, or 0 for the site's.
+     */
+    inline void record_zone_at(Collector& collector, SiteHandle& handle, std::uint64_t begin_ns,
+                               std::uint64_t end_ns, NameID name = 0U) noexcept
+    {
+        Detail::record(collector, handle, EventKind::ExternalZone, begin_ns, end_ns, name);
     }
 
     /**
@@ -102,7 +142,18 @@ namespace SushiProfiler
     inline void record_zone_at(SiteHandle& handle, std::uint64_t begin_ns, std::uint64_t end_ns,
                                NameID name = 0U) noexcept
     {
-        Detail::record(handle, EventKind::ExternalZone, begin_ns, end_ns, name);
+        if (Collector::recording())
+            record_zone_at(Collector::instance(), handle, begin_ns, end_ns, name);
+    }
+
+    /**
+     * @brief Records in @p collector a point on item @p id's path across threads.
+     * @pre @p kind is FlowBegin, FlowStep or FlowEnd.
+     */
+    inline void record_flow(Collector& collector, SiteHandle& handle, EventKind kind,
+                            std::uint64_t id) noexcept
+    {
+        Detail::record_now(collector, handle, kind, id);
     }
 
     /**
@@ -111,6 +162,7 @@ namespace SushiProfiler
      */
     inline void record_flow(SiteHandle& handle, EventKind kind, std::uint64_t id) noexcept
     {
-        Detail::record_now(handle, kind, id);
+        if (Collector::recording())
+            record_flow(Collector::instance(), handle, kind, id);
     }
 } // namespace SushiProfiler

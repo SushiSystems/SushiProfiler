@@ -6,5 +6,7 @@
 sushiprofiler_add_module(
     NAME clock TIER foundation
     SOURCES
+        manual_tick_source.cpp
         trace_clock.cpp
+        trace_tick_source.cpp
     DEPENDS version)

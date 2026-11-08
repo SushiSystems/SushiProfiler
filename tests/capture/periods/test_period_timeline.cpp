@@ -30,6 +30,7 @@
 
 #include <SushiProfiler/periods/period_timeline.hpp>
 
+#include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
 #include <SushiProfiler/zones/macros.hpp>
@@ -45,6 +46,7 @@ using SushiProfiler::Collector;
 using SushiProfiler::CollectorSettings;
 using SushiProfiler::DrainBatch;
 using SushiProfiler::EventKind;
+using SushiProfiler::ManualTickSource;
 using SushiProfiler::PeriodTimeline;
 using SushiProfiler::ThreadDrain;
 using SushiProfiler::TraceEvent;
@@ -238,4 +240,24 @@ TEST_F(Small_PeriodTimeline, ResetStartsPeriodZeroAgain)
 
     EXPECT_EQ(timeline.current(), PeriodTimeline::K_NO_PERIOD);
     EXPECT_EQ(timeline.mark(), 0U);
+}
+
+TEST(Small_PeriodTimelineOfAGivenCollector, MarksIntoItWithTheStampOfItsClock)
+{
+    const ManualTickSource clock(40U);
+    Collector collector(clock);
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
+    PeriodTimeline timeline(collector, "step");
+
+    static_cast<void>(timeline.mark());
+
+    DrainBatch batch;
+    collector.drain(batch);
+    ASSERT_EQ(batch.threads.size(), 1U);
+    ASSERT_EQ(batch.threads[0].events.size(), 1U);
+    const TraceEvent& mark = batch.threads[0].events[0];
+    EXPECT_EQ(SushiProfiler::kind_of(mark), EventKind::PeriodMark);
+    EXPECT_EQ(mark.begin, 40U);
+    EXPECT_EQ(mark.end, 0U);
+    EXPECT_EQ(mark.name, timeline.id());
 }

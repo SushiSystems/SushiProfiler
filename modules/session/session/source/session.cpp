@@ -78,13 +78,13 @@ namespace SushiProfiler
                 std::chrono::duration_cast<std::chrono::nanoseconds>(since_epoch).count());
         }
 
-        /// @brief Returns the mean cost of one read of the collector's clock, in nanoseconds.
-        double measure_read_cost() noexcept
+        /// @brief Returns the mean cost of one read of @p collector's clock, in nanoseconds.
+        double measure_read_cost(const Collector& collector) noexcept
         {
             constexpr int K_READS = 1000;
             const auto begin = std::chrono::steady_clock::now();
             for (int read = 0; read < K_READS; ++read)
-                static_cast<void>(Collector::now());
+                static_cast<void>(collector.stamp());
             const auto elapsed = std::chrono::steady_clock::now() - begin;
             const auto ns = std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count();
             return static_cast<double>(ns) / K_READS;
@@ -100,15 +100,21 @@ namespace SushiProfiler
 
     SessionStart Session::start(const ProfilerConfig& config, const Registry& registry)
     {
-        std::unique_ptr<Session> session(new Session(config, registry));
+        return start(config, registry, Collector::instance());
+    }
+
+    SessionStart Session::start(const ProfilerConfig& config, const Registry& registry,
+                                Collector& collector)
+    {
+        std::unique_ptr<Session> session(new Session(config, registry, collector));
         const std::string error = session->open();
         if (!error.empty())
             return SessionStart{nullptr, error};
         return SessionStart{std::move(session), std::string()};
     }
 
-    Session::Session(const ProfilerConfig& config, const Registry& registry)
-        : config_(config), registry_(registry),
+    Session::Session(const ProfilerConfig& config, const Registry& registry, Collector& collector)
+        : config_(config), registry_(registry), collector_(collector),
           channel_(std::make_shared<LiveChannel>(config.live.history))
     {
 
@@ -126,7 +132,7 @@ namespace SushiProfiler
         const auto found = timelines_.find(name);
         if (found != timelines_.end())
             return *found->second;
-        auto made = std::make_unique<PeriodTimeline>(name);
+        auto made = std::make_unique<PeriodTimeline>(collector_, name);
         PeriodTimeline& timeline = *made;
         timelines_.emplace(std::string(name), std::move(made));
         return timeline;
@@ -201,8 +207,8 @@ namespace SushiProfiler
         if (!running_locked() || paused_)
             return false;
         pauses_->begin(steady_now_ns());
-        Collector::instance().hold();
-        Collector::want_sources(false);
+        collector_.hold();
+        collector_.set_sources_wanted(false);
         paused_ = true;
         return true;
     }
@@ -213,8 +219,8 @@ namespace SushiProfiler
         if (!running_locked() || !paused_)
             return false;
         pauses_->end(steady_now_ns());
-        Collector::instance().release();
-        Collector::want_sources(true);
+        collector_.release();
+        collector_.set_sources_wanted(true);
         paused_ = false;
         return true;
     }
@@ -291,7 +297,7 @@ namespace SushiProfiler
                 return "the output folder \"" + config_.output +
                        "\" could not be made: " + failure.message();
         }
-        state_facts(config_.enabled ? measure_read_cost() : 0.0);
+        state_facts(config_.enabled ? measure_read_cost(collector_) : 0.0);
         return config_.enabled ? begin_recording() : std::string();
     }
 
@@ -326,7 +332,7 @@ namespace SushiProfiler
 
     std::string Session::begin_recording()
     {
-        Collector& collector = Collector::instance();
+        Collector& collector = collector_;
         if (collector.is_open())
             return "the collector is already open outside a session";
         DrainBatch leftover;
@@ -355,7 +361,7 @@ namespace SushiProfiler
                        std::to_string(K_MAX_SOURCE_DELAY_MS) + " ms";
             delay_ns = std::max(delay_ns, source_delay_ns);
         }
-        Collector::want_sources(true);
+        collector.set_sources_wanted(true);
         std::vector<StreamWriterSet::Entry> entries;
         for (const StreamPart& part : streams_)
             entries.push_back(StreamWriterSet::Entry{part.name, part.writer.get(), part.enabled});
@@ -376,7 +382,7 @@ namespace SushiProfiler
             schedule.warmup = 0U;
             schedule.active_all = true;
         }
-        window_ = std::make_unique<Window>(schedule);
+        window_ = std::make_unique<Window>(schedule, collector);
         pauses_ = std::make_unique<PauseLog>();
         publisher_ = std::make_unique<PeriodPublisher>(
             *channel_, RunCap{config_.live.max_runs, config_.live.min_run_ns},
@@ -423,14 +429,14 @@ namespace SushiProfiler
 
     std::vector<std::string> Session::shut_down()
     {
-        Collector::want_sources(false);
+        collector_.set_sources_wanted(false);
         if (followed_ != nullptr)
             followed_->observe(nullptr);
         if (paused_ && pauses_ != nullptr)
             pauses_->end(steady_now_ns());
         paused_ = false;
         if (opened_collector_)
-            Collector::instance().close();
+            collector_.close();
         opened_collector_ = false;
         if (consumer_ != nullptr)
             consumer_->stop();

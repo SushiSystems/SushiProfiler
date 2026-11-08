@@ -39,6 +39,8 @@
 SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
+    class Collector;
+
     /// @brief Where a period falls in the window's schedule.
     enum class WindowPhase : std::uint8_t
     {
@@ -59,8 +61,17 @@ namespace SushiProfiler
     class SUSHIPROFILER_API Window final : public PeriodObserver
     {
         public:
-            /// @brief Builds a window over @p schedule; `schedule.active` is at least 1.
+            /**
+             * @brief Builds a window over @p schedule that drives the process-wide collector;
+             *        `schedule.active` is at least 1.
+             */
             explicit Window(const WindowSchedule& schedule) noexcept;
+
+            /**
+             * @brief Builds a window over @p schedule that drives @p collector.
+             * @pre @p collector outlives the window; `schedule.active` is at least 1.
+             */
+            Window(const WindowSchedule& schedule, Collector& collector) noexcept;
 
             /**
              * @brief Returns the phase of period @p index.
@@ -83,8 +94,14 @@ namespace SushiProfiler
                             std::uint64_t index) noexcept override;
 
         private:
+            /// @brief Returns the collector the window drives.
+            [[nodiscard]] Collector& collector() const;
+
             /// @brief The schedule.
             WindowSchedule schedule_;
+
+            /// @brief The collector the window drives, or null for the process-wide one.
+            Collector* collector_;
     };
 } // namespace SushiProfiler
 SUSHIPROFILER_DLL_WARNINGS_POP

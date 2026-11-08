@@ -46,13 +46,16 @@ A program records through the macros of `zones`. Each call site builds its `Site
 `static constexpr` object beside a static `SiteHandle`, so nothing runs before the first record.
 A record passes `Detail::admit` in `zones/admission.hpp`, in this order:
 
-1. The gate: `Collector::recording()`, one relaxed load. A closed gate ends the record here.
+1. The gate: the collector's `is_recording()`, one relaxed load. A closed gate ends the record
+   here. The macros record into the process-wide `Collector::instance()`, whose closed gate costs
+   two loads; a zone or record function given a `Collector&` records into that one.
 2. The site: `SiteRegistry::id_of` registers the handle on first use and is one acquire load
    after; the site's enable byte, which a `SiteFilter` sets by level and group, says whether it
    records.
-3. The ring: `Collector::ring()` returns the thread's `ThreadRing`.
+3. The ring: the collector's `thread_ring()` returns the thread's `ThreadRing`.
 
-A zone reads `Collector::now()`, TSC ticks when the counter is invariant, on entry and pushes one
+A zone reads the collector's `stamp()` through its `TickSource`, TSC ticks when the counter is
+invariant for the process-wide one, on entry and pushes one
 24-byte `TraceEvent` on exit. Counters, values, instants, flows and caller-timed spans push one
 event each. Period marks and lanes carry no site, so only the gate turns them off. A record above
 its library's compiled level is compiled out and costs nothing.
@@ -64,10 +67,10 @@ signal it; the consumer chooses its next poll from the fill.
 
 ## The session path
 
-`Session::start` in `session` reads nothing itself: the host passes a `ProfilerConfig` and a
-`Registry`. The session makes the named sources and writers from the registry, gathers the
-environment and build facts, opens the collector, installs a `Window` on the configured timeline
-and starts a `Consumer`.
+`Session::start` in `session` reads nothing itself: the host passes a `ProfilerConfig`, a `Registry`
+and, when it owns one, the `Collector` to record into. The session makes the named sources and
+writers from the registry, gathers the environment and build facts, opens the collector, installs a
+`Window` on the configured timeline and starts a `Consumer`.
 
 1. The window, a `PeriodObserver`, resumes and pauses the gate at each mark, so only the warm-up
    and active periods record.

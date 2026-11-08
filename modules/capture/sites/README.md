@@ -14,7 +14,10 @@ depends on `events`.
   acquire load. `enabled(id)` is one relaxed byte load from an array allocated once; id 0 reads
   false. `apply(SiteFilter)` rewrites every byte, and later registrations follow the same filter.
   A site past the capacity (65,536 by default) is refused once and counted by `refused()`; its
-  handle is marked so it never takes the lock again.
+  handle is marked so it never takes the lock again. That caching in the handle is
+  `SiteCache::InHandle`, the default, and only one registry of a process may use it, since a
+  handle holds one id. A registry built with `SiteCache::InRegistry` keeps its ids in a map of its
+  own under its lock and never writes a handle; a collector its owner builds uses it.
 - `SushiProfiler/sites/name_table.hpp`: `NameTable` interns run-time strings into `NameID`s,
   from 1, never freed; empty text is 0.
 

@@ -43,8 +43,8 @@ namespace SushiProfiler
         }
     } // namespace
 
-    SiteRegistry::SiteRegistry(std::size_t capacity)
-        : capacity_(capacity), enabled_(new std::atomic<std::uint8_t>[capacity + 1U])
+    SiteRegistry::SiteRegistry(std::size_t capacity, SiteCache cache)
+        : capacity_(capacity), cache_(cache), enabled_(new std::atomic<std::uint8_t>[capacity + 1U])
     {
         for (std::size_t index = 0U; index <= capacity_; ++index)
             enabled_[index].store(0U, std::memory_order_relaxed);
@@ -64,7 +64,30 @@ namespace SushiProfiler
             handle.id.store(K_REFUSED, std::memory_order_release);
             return 0U;
         }
-        const Site& site = *handle.site;
+        const SiteID id = add_locked(*handle.site);
+        handle.id.store(id, std::memory_order_release);
+        return id;
+    }
+
+    SiteID SiteRegistry::find_or_register(const SiteHandle& handle)
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto found = ids_.find(handle.site);
+        if (found != ids_.end())
+            return found->second == K_REFUSED ? 0U : found->second;
+        if (infos_.size() >= capacity_)
+        {
+            refused_.fetch_add(1U, std::memory_order_relaxed);
+            ids_.emplace(handle.site, K_REFUSED);
+            return 0U;
+        }
+        const SiteID id = add_locked(*handle.site);
+        ids_.emplace(handle.site, id);
+        return id;
+    }
+
+    SiteID SiteRegistry::add_locked(const Site& site)
+    {
         SiteInfo info;
         info.name = owned(site.name);
         info.group = owned(site.group);
@@ -78,7 +101,6 @@ namespace SushiProfiler
         infos_.push_back(std::move(info));
         const auto id = static_cast<SiteID>(infos_.size());
         enabled_[id].store(passes ? 1U : 0U, std::memory_order_relaxed);
-        handle.id.store(id, std::memory_order_release);
         return id;
     }
 

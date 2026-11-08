@@ -37,7 +37,15 @@
 namespace SushiProfiler
 {
     PeriodTimeline::PeriodTimeline(std::string_view name, std::uint64_t budget_ns)
-        : name_(name), id_(Collector::instance().names().intern(name)), budget_ns_(budget_ns)
+        : PeriodTimeline(Collector::instance(), name, budget_ns)
+    {
+
+    }
+
+    PeriodTimeline::PeriodTimeline(Collector& collector, std::string_view name,
+                                   std::uint64_t budget_ns)
+        : collector_(collector), name_(name), id_(collector.names().intern(name)),
+          budget_ns_(budget_ns)
     {
 
     }
@@ -61,12 +69,12 @@ namespace SushiProfiler
 
     void PeriodTimeline::write_mark(std::uint64_t index, std::uint64_t budget_ns) const noexcept
     {
-        if (!Collector::marking())
+        if (!collector_.is_marking())
             return;
-        ThreadRing* const ring = Collector::mark_ring();
+        ThreadRing* const ring = collector_.thread_mark_ring();
         if (ring == nullptr)
             return;
-        const std::uint64_t now = Collector::now();
+        const std::uint64_t now = collector_.stamp();
         static_cast<void>(
             ring->push(TraceEvent{now, index, pack_site(EventKind::PeriodMark, 0U), id_}));
         if (budget_ns != 0U)
@@ -94,14 +102,14 @@ namespace SushiProfiler
 
     void PeriodTimeline::tag(std::string_view key, std::string_view value)
     {
-        if (!Collector::recording())
+        if (!collector_.is_recording())
             return;
-        NameTable& names = Collector::instance().names();
+        NameTable& names = collector_.names();
         const std::uint64_t pair = (std::uint64_t{names.intern(key)} << 32U) | names.intern(value);
-        ThreadRing* const ring = Collector::ring();
+        ThreadRing* const ring = collector_.thread_ring();
         if (ring == nullptr)
             return;
-        const TraceEvent event{Collector::now(), pair, pack_site(EventKind::PeriodTag, 0U), id_};
+        const TraceEvent event{collector_.stamp(), pair, pack_site(EventKind::PeriodTag, 0U), id_};
         static_cast<void>(ring->push(event));
     }
 

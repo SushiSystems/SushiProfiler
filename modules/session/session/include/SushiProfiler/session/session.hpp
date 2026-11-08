@@ -61,6 +61,7 @@
 SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
 {
+    class Collector;
     class Session;
 
     /// @brief A started session, or why it did not start.
@@ -110,9 +111,21 @@ namespace SushiProfiler
     class SUSHIPROFILER_API Session final
     {
         public:
-            /// @brief Starts a session from @p config with the parts @p registry makes.
+            /**
+             * @brief Starts a session from @p config with the parts @p registry makes, recording
+             *        into the process-wide collector.
+             */
             [[nodiscard]] static SessionStart start(const ProfilerConfig& config,
                                                     const Registry& registry);
+
+            /**
+             * @brief Starts a session from @p config with the parts @p registry makes, recording
+             *        into @p collector.
+             * @pre @p collector outlives the session.
+             */
+            [[nodiscard]] static SessionStart start(const ProfilerConfig& config,
+                                                    const Registry& registry,
+                                                    Collector& collector);
 
             Session(const Session&) = delete;
             Session& operator=(const Session&) = delete;
@@ -154,7 +167,7 @@ namespace SushiProfiler
              * @return Whether the session paused: false when it is not running or already paused.
              *
              * Periods that overlap the pause carry the fact `paused`. Sources are not wanted while
-             * paused (`Collector::sources_wanted()` is false).
+             * paused (the collector's `wants_sources()` is false).
              */
             [[nodiscard]] bool pause();
 
@@ -181,8 +194,8 @@ namespace SushiProfiler
                 bool enabled = true;              /**< Whether report() runs it. */
             };
 
-            /// @brief Builds an idle session of @p config.
-            Session(const ProfilerConfig& config, const Registry& registry);
+            /// @brief Builds an idle session of @p config that records into @p collector.
+            Session(const ProfilerConfig& config, const Registry& registry, Collector& collector);
 
             /// @brief Checks the names, makes the parts, opens the collector and starts the run.
             [[nodiscard]] std::string open();
@@ -207,6 +220,7 @@ namespace SushiProfiler
 
             ProfilerConfig config_;                     /**< The configuration. */
             const Registry& registry_;                  /**< Where parts come from. */
+            Collector& collector_;                      /**< What the session records into. */
             mutable std::mutex control_mutex_;          /**< Serialises the control calls. */
             std::shared_ptr<LiveChannel> channel_;      /**< The live channel, for the session's life. */
             std::vector<std::unique_ptr<Source>> sources_; /**< The sources. */

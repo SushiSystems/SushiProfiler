@@ -65,8 +65,14 @@ it defines it before the include: `SP_ZONE(name)`, `SP_ZONE_GROUP(name, group)`,
   take the caller's steady-clock times, `record_instant_at` and `record_zone_at`, for spans a
   device or another clock measured. `record_zone_at` takes an optional interned name.
 - `admission.hpp`: `Detail::admit`, the check every record makes: the gate, the site's enable
-  byte, then the thread's ring. A closed gate costs one relaxed load. A site's first use
+  byte, then the thread's ring. A closed process-wide gate costs two loads. A site's first use
   registers it and may allocate; a failure there refuses the record, and no exception leaves a
   record.
+
+Every zone, lane and record function has two forms. The one without a collector records into the
+process-wide `Collector::instance()`, which the macros use. The one that takes a `Collector&`
+first, such as `ScopedZone<true>(collector, handle)` or `record_counter(collector, handle, value)`,
+records into that collector and stamps with its tick source, so a test or a host that owns a
+collector reaches no process-wide state.
 
 The tests are in `tests/capture/zones/`.

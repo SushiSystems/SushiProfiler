@@ -7,4 +7,7 @@ sushiprofiler_add_module_tests(
     MODULE clock
     SOURCES
         test_trace_clock.cpp
-        test_calibration.cpp)
+        test_calibration.cpp
+        test_manual_tick_source.cpp
+        test_tick_source.cpp
+        test_trace_tick_source.cpp)

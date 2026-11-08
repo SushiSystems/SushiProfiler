@@ -30,32 +30,54 @@
 
 #include <SushiProfiler/collector/collector.hpp>
 
+#include <algorithm>
 #include <new>
 #include <system_error>
 #include <utility>
 
+#include <SushiProfiler/clock/trace_tick_source.hpp>
+
 namespace SushiProfiler
 {
-    std::atomic<bool> Collector::use_tsc_{false};
-    std::atomic<std::uint32_t> Collector::gate_{0U};
-    std::atomic<std::uint32_t> Collector::marking_{0U};
-    std::atomic<bool> Collector::sources_wanted_{false};
+    std::atomic<Collector*> Collector::process_wide_{nullptr};
 
     namespace
     {
-        /// @brief The calling thread's ring once registered.
-        thread_local ThreadRing* t_ring = nullptr;
+        /// @brief The serial the next collector takes; 0 is never taken.
+        std::atomic<std::uint64_t> g_next_serial{1U};
 
-        /// @brief The calling thread's index once registered.
-        thread_local std::uint32_t t_index = Collector::K_NO_THREAD;
+        /// @brief The collector a thread last reached and the ring and index it has there.
+        struct ThreadSlot
+        {
+            std::uint64_t serial = 0U;                        /**< The collector's serial, or 0. */
+            ThreadRing* ring = nullptr;                       /**< The thread's ring in it. */
+            std::uint32_t index = Collector::K_NO_THREAD;     /**< The thread's index in it. */
+        };
 
-        /// @brief Whether the calling thread's registration was torn down at exit.
+        /// @brief The calling thread's cache of its last collector.
+        thread_local ThreadSlot t_slot;
+
+        /// @brief Whether the calling thread's registrations were torn down at exit.
         thread_local bool t_retired = false;
 
-        /// @brief Retires the calling thread's ring when the thread exits.
+        /// @brief Every collector alive in the process, which a retiring thread visits.
+        struct LiveCollectors
+        {
+            std::mutex mutex;                    /**< Guards collectors. */
+            std::vector<Collector*> collectors;  /**< The collectors. */
+        };
+
+        /// @brief Returns the list of live collectors; never destroyed, like the process-wide one.
+        LiveCollectors& live_collectors()
+        {
+            static LiveCollectors* const live = new LiveCollectors();
+            return *live;
+        }
+
+        /// @brief Retires the calling thread's rings when the thread exits.
         struct ThreadRetirementGuard
         {
-            /// @brief Hands the ring back to the collector for its last drain.
+            /// @brief Hands the rings back to their collectors for a last drain.
             ~ThreadRetirementGuard()
             {
                 Collector::retire_current_thread();
@@ -74,24 +96,39 @@ namespace SushiProfiler
         }
     } // namespace
 
+    Collector::Collector(const TickSource& clock) : Collector(clock, SiteCache::InRegistry)
+    {
+
+    }
+
+    Collector::Collector(const TickSource& clock, SiteCache cache)
+        : clock_(clock), serial_(g_next_serial.fetch_add(1U, std::memory_order_relaxed)),
+          sites_(SiteRegistry::K_DEFAULT_SITE_CAPACITY, cache)
+    {
+        LiveCollectors& live = live_collectors();
+        const std::lock_guard<std::mutex> lock(live.mutex);
+        live.collectors.push_back(this);
+    }
+
+    Collector::~Collector()
+    {
+        LiveCollectors& live = live_collectors();
+        const std::lock_guard<std::mutex> lock(live.mutex);
+        live.collectors.erase(std::remove(live.collectors.begin(), live.collectors.end(), this),
+                              live.collectors.end());
+    }
+
     Collector& Collector::instance()
     {
         // Never destroyed: a thread that exits after main returns still retires into it.
-        static Collector* const collector = new Collector();
+        static Collector* const collector = []
+        {
+            static const TraceTickSource* const clock = new TraceTickSource();
+            Collector* const built = new Collector(*clock, SiteCache::InHandle);
+            process_wide_.store(built, std::memory_order_release);
+            return built;
+        }();
         return *collector;
-    }
-
-    Collector::Collector()
-    {
-        use_tsc_.store(TraceClock::ticks_are_invariant(), std::memory_order_relaxed);
-    }
-
-    CalibrationPoint Collector::sample() const noexcept
-    {
-        if (use_tsc_.load(std::memory_order_relaxed))
-            return TraceClock::sample();
-        const std::uint64_t steady = TraceClock::steady_now_ns();
-        return CalibrationPoint{steady, steady};
     }
 
     bool Collector::open(const CollectorSettings& settings)
@@ -113,7 +150,7 @@ namespace SushiProfiler
         }
         registrations_ = std::move(kept);
         discard_.clear();
-        first_point_ = sample();
+        first_point_ = clock_.sample();
         held_.store(false, std::memory_order_relaxed);
         open_.store(true, std::memory_order_release);
         marking_.store(1U, std::memory_order_release);
@@ -168,7 +205,12 @@ namespace SushiProfiler
         return held_.load(std::memory_order_relaxed);
     }
 
-    void Collector::want_sources(bool wanted) noexcept
+    bool Collector::is_open() const noexcept
+    {
+        return open_.load(std::memory_order_acquire);
+    }
+
+    void Collector::set_sources_wanted(bool wanted) noexcept
     {
         sources_wanted_.store(wanted, std::memory_order_relaxed);
     }
@@ -180,17 +222,12 @@ namespace SushiProfiler
         gate_.store(open ? 1U : 0U, std::memory_order_release);
     }
 
-    bool Collector::is_open() const noexcept
-    {
-        return open_.load(std::memory_order_acquire);
-    }
-
     void Collector::drain(DrainBatch& out)
     {
         out.threads.clear();
-        out.ticks_are_tsc = use_tsc_.load(std::memory_order_relaxed);
+        out.ticks_are_tsc = clock_.ticks_are_tsc();
         std::lock_guard<std::mutex> lock(mutex_);
-        out.point = sample();
+        out.point = clock_.sample();
         out.threads.reserve(registrations_.size());
         std::vector<Registration> kept;
         kept.reserve(registrations_.size());
@@ -233,96 +270,182 @@ namespace SushiProfiler
         return first_point_;
     }
 
-    ThreadRing* Collector::register_current_thread(std::size_t capacity_events)
+    ThreadRing* Collector::attach_current_thread(std::size_t capacity_events, bool may_register)
     {
         std::lock_guard<std::mutex> lock(mutex_);
+        const std::thread::id self = std::this_thread::get_id();
+        for (const Registration& registration : registrations_)
+        {
+            if (registration.thread == self && !registration.retired)
+            {
+                t_slot = ThreadSlot{serial_, registration.ring.get(), registration.thread_index};
+                return registration.ring.get();
+            }
+        }
+        if (!may_register)
+            return nullptr;
         Registration registration;
         registration.ring = std::make_unique<ThreadRing>(
             capacity_events != 0U ? capacity_events : settings_.ring_events);
+        registration.thread = self;
         registration.thread_index = next_index_++;
         ThreadRing* const ring = registration.ring.get();
+        const std::uint32_t index = registration.thread_index;
         registrations_.push_back(std::move(registration));
         arm_thread_retirement();
-        t_index = registrations_.back().thread_index;
-        t_ring = ring;
+        t_slot = ThreadSlot{serial_, ring, index};
         return ring;
+    }
+
+    ThreadRing* Collector::attach_or_null(bool may_register) noexcept
+    {
+        try
+        {
+            return attach_current_thread(0U, may_register);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return nullptr;
+        }
+        catch (const std::system_error&)
+        {
+            return nullptr;
+        }
+    }
+
+    ThreadRing* Collector::thread_ring() noexcept
+    {
+        if (t_slot.serial == serial_)
+            return t_slot.ring;
+        // A thread whose slot was never filled has no ring in any collector.
+        if (t_retired || (t_slot.serial == 0U && !is_recording()))
+            return nullptr;
+        return attach_or_null(is_recording());
+    }
+
+    ThreadRing* Collector::thread_mark_ring() noexcept
+    {
+        if (t_slot.serial == serial_)
+            return t_slot.ring;
+        // A thread whose slot was never filled has no ring in any collector.
+        if (t_retired || (t_slot.serial == 0U && !is_marking()))
+            return nullptr;
+        return attach_or_null(is_marking());
+    }
+
+    bool Collector::register_thread(std::size_t capacity_events)
+    {
+        if (t_slot.serial == serial_)
+            return true;
+        if (t_retired)
+            return false;
+        return attach_current_thread(capacity_events, true) != nullptr;
+    }
+
+    void Collector::name_thread(std::string_view name)
+    {
+        if (register_thread())
+            t_slot.ring->set_name(name);
+    }
+
+    std::uint32_t Collector::index_of_thread() const noexcept
+    {
+        if (t_slot.serial == serial_)
+            return t_slot.index;
+        if (t_slot.serial == 0U)
+            return K_NO_THREAD;
+        const std::thread::id self = std::this_thread::get_id();
+        try
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (const Registration& registration : registrations_)
+            {
+                if (registration.thread == self && !registration.retired)
+                    return registration.thread_index;
+            }
+        }
+        catch (const std::system_error&)
+        {
+            return K_NO_THREAD;
+        }
+        return K_NO_THREAD;
+    }
+
+    void Collector::retire_thread(std::thread::id thread) noexcept
+    {
+        try
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            for (Registration& registration : registrations_)
+            {
+                if (registration.thread == thread)
+                    registration.retired = true;
+            }
+        }
+        catch (const std::system_error&)
+        {
+            return;
+        }
+    }
+
+    std::uint64_t Collector::now() noexcept
+    {
+        const Collector* const collector = process_wide_.load(std::memory_order_acquire);
+        return collector != nullptr ? collector->stamp() : instance().stamp();
+    }
+
+    void Collector::want_sources(bool wanted) noexcept
+    {
+        instance().set_sources_wanted(wanted);
     }
 
     ThreadRing* Collector::ring() noexcept
     {
-        ThreadRing* const ring = t_ring;
-        if (ring != nullptr)
-            return ring;
-        if (t_retired || !recording())
-            return nullptr;
-        try
-        {
-            return instance().register_current_thread(0U);
-        }
-        catch (const std::bad_alloc&)
-        {
-            return nullptr;
-        }
-        catch (const std::system_error&)
-        {
-            return nullptr;
-        }
+        Collector* const collector = process_wide_.load(std::memory_order_acquire);
+        return collector != nullptr ? collector->thread_ring() : nullptr;
     }
 
     ThreadRing* Collector::mark_ring() noexcept
     {
-        ThreadRing* const ring = t_ring;
-        if (ring != nullptr)
-            return ring;
-        if (t_retired || !marking())
-            return nullptr;
-        try
-        {
-            return instance().register_current_thread(0U);
-        }
-        catch (const std::bad_alloc&)
-        {
-            return nullptr;
-        }
-        catch (const std::system_error&)
-        {
-            return nullptr;
-        }
+        Collector* const collector = process_wide_.load(std::memory_order_acquire);
+        return collector != nullptr ? collector->thread_mark_ring() : nullptr;
     }
 
     bool Collector::register_this_thread(std::size_t capacity_events)
     {
-        if (t_ring != nullptr)
-            return true;
-        if (t_retired)
-            return false;
-        return instance().register_current_thread(capacity_events) != nullptr;
+        return instance().register_thread(capacity_events);
     }
 
     void Collector::set_thread_name(std::string_view name)
     {
-        if (register_this_thread())
-            t_ring->set_name(name);
+        instance().name_thread(name);
     }
 
     std::uint32_t Collector::thread_index() noexcept
     {
-        return t_index;
+        const Collector* const collector = process_wide_.load(std::memory_order_acquire);
+        return collector != nullptr ? collector->index_of_thread() : K_NO_THREAD;
     }
 
     void Collector::retire_current_thread() noexcept
     {
-        ThreadRing* const ring = t_ring;
-        t_ring = nullptr;
+        t_slot = ThreadSlot{};
         t_retired = true;
-        if (ring == nullptr)
-            return;
-        Collector& collector = instance();
-        std::lock_guard<std::mutex> lock(collector.mutex_);
-        for (Registration& registration : collector.registrations_)
+        const std::thread::id self = std::this_thread::get_id();
+        try
         {
-            if (registration.ring.get() == ring)
-                registration.retired = true;
+            LiveCollectors& live = live_collectors();
+            const std::lock_guard<std::mutex> lock(live.mutex);
+            for (Collector* const collector : live.collectors)
+                collector->retire_thread(self);
+        }
+        catch (const std::bad_alloc&)
+        {
+            return;
+        }
+        catch (const std::system_error&)
+        {
+            return;
         }
     }
 } // namespace SushiProfiler
