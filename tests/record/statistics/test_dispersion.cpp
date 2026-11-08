@@ -33,10 +33,23 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstddef>
+
+#include "support/tolerance.hpp"
 
 using SushiProfiler::coefficient_of_variation;
 using SushiProfiler::jitter;
 using SushiProfiler::mean;
+
+namespace
+{
+    /**
+     * @brief Rounded operations behind the coefficient of variation of eight samples: 9 for the
+     * mean, 24 for the squared deviations, 3 for the variance, its root and the quotient, 3 in the
+     * expected value.
+     */
+    constexpr std::size_t K_EIGHT_SAMPLE_CV_OPERATIONS = 39U;
+} // namespace
 
 TEST(Small_Dispersion, TheMeanOfNothingIsZero)
 {
@@ -48,8 +61,9 @@ TEST(Small_Dispersion, TheCoefficientOfVariationUsesTheSampleDeviation)
 {
     const double expected = std::sqrt(32.0 / 7.0) / 5.0;
 
-    EXPECT_NEAR(coefficient_of_variation({2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0}), expected,
-                1e-15);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        coefficient_of_variation({2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0}), expected,
+        K_EIGHT_SAMPLE_CV_OPERATIONS)));
 }
 
 TEST(Small_Dispersion, TheCoefficientOfVariationIsZeroWithoutASpread)

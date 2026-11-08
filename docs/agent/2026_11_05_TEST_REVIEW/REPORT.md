@@ -48,6 +48,7 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 
 1. The collector is passed in. A reset owned by the fixture would keep the process-wide state that the small tests must not reach, and passing it in is the shape SOLID asks for. Every seam is added as a parameter or overload whose default keeps today's behaviour, so existing callers compile unchanged and the change is a minor version. A value passed in is preferred to a reset of process-wide state.
 2. A named constant holding a hand-typed epsilon is not a typed tolerance. A tolerance names its kind (absolute, relative or ulps) and its derivation, so every such constant is redefined through `tolerance.hpp`, keeping its name. The rewrites stay rewrites, and they are mechanical.
+3. T1 takes the tolerance out of the ten bare `EXPECT_NEAR` calls of `record` as well as out of `expect_row`, since its acceptance says no comparison with a tolerance spells a literal. Each call now measures against an operation count named in its file, with the count's derivation beside it. The rest of each of those records (the roofline column loop, for one) stays with M6.
 
 ## Dispatches
 

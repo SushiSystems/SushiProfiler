@@ -33,11 +33,13 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstddef>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "analysis_record.hpp"
+#include "support/tolerance.hpp"
 
 using SushiProfiler::PeriodRecord;
 using SushiProfiler::RunRecord;
@@ -53,6 +55,12 @@ using SushiProfilerTests::whole;
 
 namespace
 {
+    /**
+     * @brief Rounded operations behind a blamed share: one division in the analysis, one in the
+     * expected value.
+     */
+    constexpr std::size_t K_SHARE_OPERATIONS = 2U;
+
     /// @brief Returns a record of one 600 ns period with one device span from 0 to 100 and one
     /// from 400 to 500 queued at @p queued, submitted by thread 0, over host zones @p runs.
     RunRecord gap_record(std::uint64_t queued, std::vector<ZoneRun> runs)
@@ -105,7 +113,8 @@ TEST(Small_DeviceIdleAnalysis, NamesTheInnermostHostZoneOpenOnTheSubmittingThrea
     const auto blame = blame_of(record);
 
     EXPECT_EQ(blame.first, "decode");
-    EXPECT_NEAR(blame.second, 300.0 / 400.0, 1e-12);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        blame.second, 300.0 / 400.0, K_SHARE_OPERATIONS)));
 }
 
 TEST(Small_DeviceIdleAnalysis, IgnoresAZoneOpenOnAnotherThread)
@@ -115,7 +124,8 @@ TEST(Small_DeviceIdleAnalysis, IgnoresAZoneOpenOnAnotherThread)
     const auto blame = blame_of(record);
 
     EXPECT_EQ(blame.first, "unattributed");
-    EXPECT_NEAR(blame.second, 1.0, 1e-12);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<double>(blame.second, 1.0, K_SHARE_OPERATIONS)));
 }
 
 TEST(Small_DeviceIdleAnalysis, ChargesAGapToLaunchWhenNoZoneIsOpenAndTheNextSpanWasQueued)
@@ -125,7 +135,8 @@ TEST(Small_DeviceIdleAnalysis, ChargesAGapToLaunchWhenNoZoneIsOpenAndTheNextSpan
     const auto blame = blame_of(record);
 
     EXPECT_EQ(blame.first, "launch");
-    EXPECT_NEAR(blame.second, 300.0 / 400.0, 1e-12);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        blame.second, 300.0 / 400.0, K_SHARE_OPERATIONS)));
 }
 
 TEST(Small_DeviceIdleAnalysis, ARecordWithoutSpansHasNoRows)

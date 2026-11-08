@@ -1,6 +1,6 @@
 # Test review: plan
 
-**Status:** Open — not started; the owner chooses inline or parallel
+**Status:** Open — under way since 2026-11-09, one worker, under the owner's rules of 2026-11-07
 
 Applies the verdicts of `REPORT.md`, in hierarchy order: the shared helpers, adapters and seams the
 rewrites need come first, then the defects the review found, then each module's tests. A module job
@@ -11,7 +11,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 | Job | Files | Waits on | Status |
 | --- | --- | --- | --- |
-| T1 | `tests/support/tolerance.hpp` copied from SushiSkills, and `expect_row` moved onto it |  | todo |
+| T1 | `tests/support/tolerance.hpp` copied from SushiSkills, and `expect_row` moved onto it |  | done |
 | T2 | The collector seam |  | todo |
 | T3 | In-memory adapters beside `StreamWriter`, `Source`, `RecordWriter`, `EnvironmentContributor` |  | todo |
 | T4 | The CLI's `project` fixture replaced by sushicore's in-memory runner and console | sushicore T1 | done |

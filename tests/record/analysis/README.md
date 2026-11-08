@@ -1,7 +1,8 @@
 # tests/record/analysis
 
 `analysis_record.hpp` builds the record the analysis tests share and compares rows cell by cell,
-reals within 1e-9 relative. Its timeline `step` runs on thread 0:
+reals within the rounding bound `tests/support/tolerance.hpp` derives for 24 operations, the
+longest path to a real cell of these records. Its timeline `step` runs on thread 0:
 
 | Period | Length | Zones (inclusive, self) | Samples |
 | --- | --- | --- | --- |

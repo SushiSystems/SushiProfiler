@@ -32,7 +32,11 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include <initializer_list>
+
+#include "support/tolerance.hpp"
 
 using SushiProfiler::Cell;
 using SushiProfiler::Comparison;
@@ -45,6 +49,12 @@ using SushiProfiler::Tag;
 
 namespace
 {
+    /**
+     * @brief Rounded operations behind a ratio of medians: one division in the comparison, one in
+     * the expected value.
+     */
+    constexpr std::size_t K_RATIO_OPERATIONS = 2U;
+
     /// @brief The names every test record shares: timeline `step`, tag `layer` and its values.
     const std::vector<std::string> K_NAMES = {"", "step", "layer", "fused", "plain"};
 
@@ -108,7 +118,8 @@ TEST(Small_CompareRecords, OverlappingIntervalsAreNoChange)
     const Row* const row = row_of(comparison, "", "timeline:step");
     ASSERT_NE(row, nullptr);
     EXPECT_EQ((*row)[12], Cell::text(""));
-    EXPECT_NEAR(*(*row)[9].as_real(), 115.0 / 110.0, 1e-12);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        *(*row)[9].as_real(), 115.0 / 110.0, K_RATIO_OPERATIONS)));
 }
 
 TEST(Small_CompareRecords, ASlowerCandidateIsNamed)

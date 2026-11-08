@@ -32,7 +32,9 @@
 
 #include <gtest/gtest.h>
 
-#include <cmath>
+#include <cstddef>
+
+#include "support/tolerance.hpp"
 
 using SushiProfiler::Cell;
 using SushiProfiler::CounterOp;
@@ -50,6 +52,15 @@ using SushiProfiler::ZoneTree;
 
 namespace
 {
+    /**
+     * @brief Rounded operations on the longest path to a real cell of the hand-built records.
+     *
+     * A coefficient of variation of four samples takes 20 in the analysis (5 for the mean, 12
+     * for the squared deviations, 3 for the variance, its root and the quotient), and its
+     * expected value takes up to 4 more.
+     */
+    constexpr std::size_t K_CELL_OPERATIONS = 24U;
+
     /// @brief Returns a site named @p name in @p group with @p role, @p op and @p unit.
     SiteRecord site(const char* name, const char* group, SiteRole role,
                     CounterOp op = CounterOp::Add, const char* unit = "")
@@ -202,8 +213,9 @@ namespace SushiProfilerTests
             const double* const wanted = expected[index].as_real();
             if (real != nullptr && wanted != nullptr)
             {
-                const double tolerance = 1e-9 * std::fabs(*wanted) + 1e-12;
-                EXPECT_NEAR(*real, *wanted, tolerance) << "column " << index;
+                EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+                    *real, *wanted, K_CELL_OPERATIONS)))
+                    << "column " << index;
             }
             else
             {

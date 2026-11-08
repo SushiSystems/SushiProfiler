@@ -32,7 +32,20 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
+#include "support/tolerance.hpp"
+
 using SushiProfiler::SortedSamples;
+
+namespace
+{
+    /**
+     * @brief Rounded operations behind a type-7 percentile and its literal: the rank, its fraction,
+     * the interpolation and 4.6.
+     */
+    constexpr std::size_t K_PERCENTILE_OPERATIONS = 7U;
+} // namespace
 
 TEST(Small_SortedSamples, SortsAndAnswersTheEnds)
 {
@@ -57,7 +70,8 @@ TEST(Small_SortedSamples, PercentilesInterpolateByTheType7Rule)
 
     EXPECT_EQ(samples.percentile(0.0), 1.0);
     EXPECT_EQ(samples.percentile(25.0), 2.0);
-    EXPECT_NEAR(samples.percentile(90.0), 4.6, 1e-12);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        samples.percentile(90.0), 4.6, K_PERCENTILE_OPERATIONS)));
     EXPECT_EQ(samples.percentile(100.0), 5.0);
 }
 

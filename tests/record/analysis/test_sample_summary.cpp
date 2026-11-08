@@ -33,11 +33,24 @@
 #include <gtest/gtest.h>
 
 #include <cmath>
+#include <cstddef>
+
+#include "support/tolerance.hpp"
 
 using SushiProfiler::Row;
 using SushiProfiler::SampleSummary;
 using SushiProfiler::Table;
 using SushiProfiler::Unit;
+
+namespace
+{
+    /**
+     * @brief Rounded operations behind the coefficient of variation of four samples: 5 for the
+     * mean, 12 for the squared deviations, 3 for the variance, its root and the quotient, 2 in the
+     * expected value.
+     */
+    constexpr std::size_t K_FOUR_SAMPLE_CV_OPERATIONS = 22U;
+} // namespace
 
 TEST(Small_SampleSummary, SummarisesFixedSamples)
 {
@@ -49,7 +62,8 @@ TEST(Small_SampleSummary, SummarisesFixedSamples)
     EXPECT_EQ(summary.high, 80.0);
     EXPECT_EQ(summary.minimum, 10.0);
     EXPECT_EQ(summary.p95, 80.0);
-    EXPECT_NEAR(summary.cv, std::sqrt(1425.0) / 47.5, 1e-12);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        summary.cv, std::sqrt(1425.0) / 47.5, K_FOUR_SAMPLE_CV_OPERATIONS)));
 }
 
 TEST(Small_SampleSummary, NoSamplesGiveZeros)

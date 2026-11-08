@@ -32,6 +32,10 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
+#include "support/tolerance.hpp"
+
 using SushiProfiler::Check;
 using SushiProfiler::PeriodRecord;
 using SushiProfiler::RunRecord;
@@ -40,6 +44,12 @@ using SushiProfiler::Verdict;
 
 namespace
 {
+    /**
+     * @brief Rounded operations behind a type-7 percentile: the rank, its fraction and the
+     * interpolation.
+     */
+    constexpr std::size_t K_PERCENTILE_OPERATIONS = 6U;
+
     /// @brief Returns a record whose timeline `step` has periods of 100, 120 and 110 ns.
     RunRecord step_record()
     {
@@ -99,7 +109,8 @@ TEST(Small_Verdict, PercentilesFollowTheType7Rule)
     const std::vector<Verdict> verdicts =
         SushiProfiler::check(step_record(), {step_check(Statistic::P90, 200.0)});
 
-    EXPECT_NEAR(verdicts[0].value, 118.0, 1e-9);
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        verdicts[0].value, 118.0, K_PERCENTILE_OPERATIONS)));
 }
 
 TEST(Small_Verdict, AMissingSubjectFails)

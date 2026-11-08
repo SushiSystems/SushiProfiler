@@ -32,9 +32,12 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
+
 #include <string>
 
 #include "analysis_record.hpp"
+#include "support/tolerance.hpp"
 
 using SushiProfiler::Cell;
 using SushiProfiler::PeriodRecord;
@@ -48,6 +51,9 @@ using SushiProfilerTests::whole;
 
 namespace
 {
+    /// @brief Rounded operations behind a rate cell: nanoseconds to seconds, then the quotient.
+    constexpr std::size_t K_RATE_OPERATIONS = 2U;
+
     /// @brief Appends a span of @p name on @p track from 0 to @p length ns with its cost.
     void add_span(PeriodRecord& period, SushiProfiler::NameID name, SushiProfiler::TrackID track,
                   std::uint64_t length, std::int64_t flops, std::int64_t bytes)
@@ -207,8 +213,10 @@ TEST(Small_RooflineAnalysis, LeavesTheCeilingCellsEmptyWhenTheTrackHasNoFacts)
     const SushiProfiler::Row& row = table.rows[2];
     EXPECT_EQ(*row[0].as_whole(), 2);
     EXPECT_EQ(*row[4].as_text(), "queue 1");
-    EXPECT_NEAR(*row[11].as_real(), 1e11, 1.0);
-    EXPECT_NEAR(*row[13].as_real(), 20.0, 1e-9);
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<double>(*row[11].as_real(), 1e11, K_RATE_OPERATIONS)));
+    EXPECT_TRUE(TestSupport::is_within(
+        TestSupport::measure_relative_error<double>(*row[13].as_real(), 20.0, K_RATE_OPERATIONS)));
     for (std::size_t column = 14U; column < row.size(); ++column)
         EXPECT_TRUE(row[column].empty()) << "column " << column;
 }

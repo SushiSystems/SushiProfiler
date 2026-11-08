@@ -5,6 +5,10 @@ The tests mirror `modules/`: the test of
 `tests/<tier>/<module>/test_<name>.cpp`. Each module's tests build one program,
 `sp_<module>_tests`, through `sushiprofiler_add_module_tests` in `cmake/SushiProfilerTests.cmake`.
 
+`tests/support/` holds what the tests of several modules share, reached as
+`#include "support/<name>.hpp"`. `tolerance.hpp` is the copy of SushiSkills's
+`tools/testing/support/tolerance.hpp`: every comparison with a tolerance derives its bound there.
+
 ## Sizes
 
 A test's size is the prefix of its GoogleTest suite. A suite without one is never registered with ctest, and `tools/testing/check_test_sizes.py` fails on it.

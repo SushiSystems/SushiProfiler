@@ -91,7 +91,8 @@ endfunction()
 # sushiprofiler_add_module_tests(MODULE <module> SOURCES <file>... [BENCHMARKS <file>...])
 #
 # Called from tests/<tier>/<module>/CMakeLists.txt, with paths relative to that folder. Builds
-# sp_<module>_tests against SushiProfiler::SushiProfiler, copies the DLL beside it, refuses a suite with
+# sp_<module>_tests against SushiProfiler::SushiProfiler with tests/ on its include path, so a test
+# reaches tests/support/ as "support/<name>.hpp", copies the DLL beside it, refuses a suite with
 # no size prefix, and registers every test with its size. With SP_BUILD_BENCHMARKS on, each
 # BENCHMARKS file becomes a benchmark program.
 function(sushiprofiler_add_module_tests)
@@ -107,7 +108,8 @@ function(sushiprofiler_add_module_tests)
 
     add_executable(${program} ${sources})
     target_link_libraries(${program} PRIVATE SushiProfiler::SushiProfiler GTest::gtest_main)
-    target_include_directories(${program} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(${program} PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}" "${PROJECT_SOURCE_DIR}/tests")
     sushiprofiler_apply_build_policy(${program})
     sushiprofiler_copy_runtime_files(${program})
 

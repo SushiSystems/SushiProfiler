@@ -65,6 +65,6 @@ namespace SushiProfilerTests
     /// @brief Returns a real cell.
     [[nodiscard]] SushiProfiler::Cell real(double value);
 
-    /// @brief Expects @p row to equal @p expected, reals within 1e-9 relative.
+    /// @brief Expects @p row to equal @p expected, reals within their derived rounding bound.
     void expect_row(const SushiProfiler::Row& row, const SushiProfiler::Row& expected);
 } // namespace SushiProfilerTests
