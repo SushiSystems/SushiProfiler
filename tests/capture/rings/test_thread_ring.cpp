@@ -32,8 +32,13 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <functional>
+#include <iterator>
+#include <numeric>
 #include <string>
 #include <thread>
 #include <vector>
@@ -50,6 +55,50 @@ namespace
         event.begin = value;
         return event;
     }
+
+    /// @brief Pushes events numbered from 0 up to @p count into @p ring; returns how many it kept.
+    std::uint64_t push_numbered(ThreadRing& ring, std::uint64_t count)
+    {
+        std::uint64_t kept = 0U;
+        for (std::uint64_t value = 0U; value < count; ++value)
+            kept += ring.push(event_numbered(value)) ? 1U : 0U;
+        return kept;
+    }
+
+    /// @brief Returns the numbers 0 up to @p count, in order.
+    std::vector<std::uint64_t> numbers_below(std::uint64_t count)
+    {
+        std::vector<std::uint64_t> numbers(count);
+        std::iota(numbers.begin(), numbers.end(), std::uint64_t{0U});
+        return numbers;
+    }
+
+    /// @brief Returns the begin field of each of @p events, in order.
+    std::vector<std::uint64_t> begins_of(const std::vector<TraceEvent>& events)
+    {
+        std::vector<std::uint64_t> begins;
+        begins.reserve(events.size());
+        std::transform(events.begin(), events.end(), std::back_inserter(begins),
+                       [](const TraceEvent& event) { return event.begin; });
+        return begins;
+    }
+
+    /// @brief Drains @p ring into @p out until @p producing turns false, then once more.
+    void drain_while_producing(ThreadRing& ring, const std::atomic<bool>& producing,
+                               std::vector<TraceEvent>& out)
+    {
+        while (producing.load(std::memory_order_acquire))
+            ring.drain(out);
+        ring.drain(out);
+    }
+
+    /// @brief Returns whether each begin field of @p events is larger than the one before it.
+    bool strictly_increasing(const std::vector<TraceEvent>& events)
+    {
+        return std::adjacent_find(events.begin(), events.end(),
+                                  [](const TraceEvent& before, const TraceEvent& after)
+                                  { return before.begin >= after.begin; }) == events.end();
+    }
 } // namespace
 
 TEST(Small_ThreadRing, CapacityRoundsUpToAPowerOfTwo)
@@ -62,28 +111,35 @@ TEST(Small_ThreadRing, CapacityRoundsUpToAPowerOfTwo)
 TEST(Small_ThreadRing, DrainsInOrder)
 {
     ThreadRing ring(64U);
-    for (std::uint64_t value = 0U; value < 10U; ++value)
-        ASSERT_TRUE(ring.push(event_numbered(value)));
+    push_numbered(ring, 10U);
     std::vector<TraceEvent> drained;
 
     EXPECT_EQ(ring.drain(drained), 10U);
-    ASSERT_EQ(drained.size(), 10U);
-    for (std::uint64_t value = 0U; value < 10U; ++value)
-        EXPECT_EQ(drained[value].begin, value);
-    EXPECT_EQ(ring.drain(drained), 0U);
+    EXPECT_EQ(begins_of(drained), numbers_below(10U));
 }
 
-TEST(Small_ThreadRing, AFullRingDropsAndCounts)
+TEST(Small_ThreadRing, ADrainedRingDrainsNothingMore)
 {
     ThreadRing ring(64U);
-    int kept = 0;
-    for (std::uint64_t value = 0U; value < 70U; ++value)
-        kept += ring.push(event_numbered(value)) ? 1 : 0;
+    push_numbered(ring, 10U);
     std::vector<TraceEvent> drained;
     ring.drain(drained);
 
-    EXPECT_EQ(kept, 64);
-    EXPECT_EQ(drained.size(), 64U);
+    EXPECT_EQ(ring.drain(drained), 0U);
+}
+
+TEST(Small_ThreadRing, AFullRingKeepsItsCapacity)
+{
+    ThreadRing ring(64U);
+
+    EXPECT_EQ(push_numbered(ring, 70U), 64U);
+}
+
+TEST(Small_ThreadRing, AFullRingCountsWhatItDropped)
+{
+    ThreadRing ring(64U);
+    push_numbered(ring, 70U);
+
     EXPECT_EQ(ring.take_dropped(), 6U);
     EXPECT_EQ(ring.take_dropped(), 0U);
 }
@@ -91,11 +147,15 @@ TEST(Small_ThreadRing, AFullRingDropsAndCounts)
 TEST(Small_ThreadRing, FillFollowsOccupancy)
 {
     ThreadRing ring(64U);
-    for (std::uint64_t value = 0U; value < 32U; ++value)
-        ring.push(event_numbered(value));
+    push_numbered(ring, 32U);
 
     EXPECT_DOUBLE_EQ(ring.fill(), 0.5);
+}
 
+TEST(Small_ThreadRing, FillIsZeroOnceDrained)
+{
+    ThreadRing ring(64U);
+    push_numbered(ring, 32U);
     std::vector<TraceEvent> drained;
     ring.drain(drained);
 
@@ -108,7 +168,12 @@ TEST(Small_ThreadRing, NameIsTruncatedAtSixtyThree)
     ring.set_name(std::string(100U, 'x'));
 
     EXPECT_EQ(ring.name(), std::string(63U, 'x'));
+}
 
+TEST(Small_ThreadRing, ASecondNameReplacesTheFirst)
+{
+    ThreadRing ring(64U);
+    ring.set_name(std::string(100U, 'x'));
     ring.set_name("audio");
 
     EXPECT_EQ(ring.name(), "audio");
@@ -121,17 +186,12 @@ TEST(Medium_ThreadRing, OneProducerOneConsumerLoseNothingThatIsNotCounted)
     std::atomic<bool> producing{true};
     std::vector<TraceEvent> drained;
     drained.reserve(K_EVENTS);
-    std::thread consumer([&] {
-        while (producing.load(std::memory_order_acquire))
-            ring.drain(drained);
-        ring.drain(drained);
-    });
-    for (std::uint64_t value = 0U; value < K_EVENTS; ++value)
-        ring.push(event_numbered(value));
+    std::thread consumer(drain_while_producing, std::ref(ring), std::cref(producing),
+                         std::ref(drained));
+    push_numbered(ring, K_EVENTS);
     producing.store(false, std::memory_order_release);
     consumer.join();
 
     EXPECT_EQ(drained.size() + ring.take_dropped(), K_EVENTS);
-    for (std::size_t index = 1U; index < drained.size(); ++index)
-        ASSERT_LT(drained[index - 1U].begin, drained[index].begin);
+    EXPECT_TRUE(strictly_increasing(drained));
 }
