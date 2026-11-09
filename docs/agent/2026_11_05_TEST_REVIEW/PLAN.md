@@ -17,7 +17,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | T4 | The CLI's `project` fixture replaced by sushicore's in-memory runner and console | sushicore T1 | done |
 | T5 | The defects of this report, each with a test that fails first |  | done |
 | T6 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |
-| M1 | the tests of `capture` (18 files): 17 rewrite, 37 resize, 15 split, 5 delete | T1, T2, T3, T4, T5, T6 | todo |
+| M1 | the tests of `capture` (18 files): 17 rewrite, 37 resize, 15 split, 5 delete | T1, T2, T3, T4, T5, T6 | done |
 | M2 | the tests of `cli` (6 files): 23 rewrite, 1 resize, 2 merge | T1, T2, T3, T4, T5, T6 | todo |
 | M3 | the tests of `cli/services` (1 file): 28 rewrite, 1 delete | T1, T2, T3, T4, T5, T6 | todo |
 | M4 | the tests of `foundation` (10 files): 12 rewrite, 1 resize, 12 split, 4 delete | T1, T2, T3, T4, T5, T6 | todo |
@@ -30,12 +30,13 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 ## Resume note
 
-M1 is under way, in the order of the `capture` records of `REPORT.md`. Done and pushed:
-`tests/capture/collector/` (`test_collector.cpp`, and the two default-value tests replaced by
-`compile_collector_settings.cpp` and `compile_drain_batch.cpp`). Next: `tests/capture/lock_wait/test_contended_lock.cpp`.
-`tests/capture/collector/` has no `compile_` example elsewhere yet; the pattern is a `compile_<name>.cpp`
-of static_asserts listed in the module's `SOURCES`. Syntax check: clang `-fsyntax-only` with the include
-directories of `build/pkg-*/compile_commands.json` and gtest as `-isystem`.
+M1 is done and pushed. M2 (`cli`, 6 files) has not started; take its records from `REPORT.md` by
+grepping the headings of `cli/tests/` and read each record range with offset and limit. The seams
+M1 built: `ContendedLock` and `lock_with_wait` take a `Collector&`; `OwnedRecordingFixture` in
+`tests/capture/zones/recording_fixture.hpp` gives a test its own collector; `ScriptedMutex` in
+`tests/capture/lock_wait/` scripts a contended mutex. Syntax check: clang `-fsyntax-only` with the
+include directories of `build/pkg-*/compile_commands.json` and gtest as `-isystem`. Nothing built
+or ran in M1: the first `sp test` over `tests/capture` is still owed.
 
 ## Acceptance
 
