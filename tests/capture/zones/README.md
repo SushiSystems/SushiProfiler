@@ -23,9 +23,9 @@
   value keeps its sample; an external zone keeps the caller's times past 2^32; an external
   instant keeps its time; each flow kind carries its item; a lane brackets the events inside it.
   One medium test checks that compiled-out record macros write nothing.
-- `test_macros.cpp`: every direct macro writes its kind at the default level 2; after each site's
-  first use, 100,000 rounds of zones, counters, values, instants, flows and lanes allocate nothing
-  on the recording thread.
+- `test_macros.cpp`: medium tests, one per direct macro, each checking the kinds that macro writes
+  at the default level 2; after each site's first use, 100,000 rounds of zones, counters, values,
+  instants, flows and lanes allocate nothing on the recording thread.
 - `test_named_records.cpp`: on a collector of its own, counters and values named at run time
   become one site per name with their operation and unit, a value keeps every sample, and a
   counter and a value of one name are two sites. Two medium tests check the macros: the name
