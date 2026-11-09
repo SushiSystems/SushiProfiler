@@ -30,5 +30,7 @@
   become one site per name with their operation and unit, a value keeps every sample, and a
   counter and a value of one name are two sites. Two medium tests check the macros: the name
   expression is not evaluated with the gate closed, and `SP_THREAD_NAME` names the ring.
-- `test_named_macros.cpp`: compiled with `SP_PROFILE_LEVEL` 0, `SP_THREAD_NAME` names nothing and
-  the named macros record nothing and do not evaluate their name.
+- `test_named_macros.cpp`: compiled with `SP_PROFILE_LEVEL` 0, `SP_THREAD_NAME` and the named
+  macros do not evaluate their argument or name (small tests, which reach no collector), and
+  `SP_THREAD_NAME` names nothing and the named macros write nothing (medium tests, which reach
+  the process-wide collector).

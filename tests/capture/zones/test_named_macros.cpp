@@ -43,15 +43,37 @@ using SushiProfiler::Collector;
 
 namespace
 {
-    /// @brief The level-0 macro tests.
-    class Small_NamedMacros : public SushiProfilerTests::RecordingFixture
+    /// @brief The level-0 macro tests that reach the process-wide collector or start a thread.
+    class Medium_NamedMacros : public SushiProfilerTests::RecordingFixture
     {
     };
 
     static_assert(SP_PROFILE_LEVEL == 0, "this unit compiles the macros out");
 } // namespace
 
-TEST_F(Small_NamedMacros, ThreadNameIsCompiledOutAtLevelZero)
+TEST(Small_NamedMacros, ThreadNameDoesNotEvaluateItsArgumentAtLevelZero)
+{
+    int evaluated = 0;
+    SP_THREAD_NAME((++evaluated, "never.set"));
+
+    EXPECT_EQ(evaluated, 0);
+}
+
+TEST(Small_NamedMacros, NamedRecordsDoNotBuildTheirNameAtLevelZero)
+{
+    int built = 0;
+    const auto build = [&built]
+    {
+        ++built;
+        return std::string("level0.name");
+    };
+    SP_COUNTER_NAMED(build(), "", Add, 1.0);
+    SP_VALUE_NAMED(build(), "", 1.0);
+
+    EXPECT_EQ(built, 0);
+}
+
+TEST_F(Medium_NamedMacros, ThreadNameNamesNothingAtLevelZero)
 {
     std::thread(
         []
@@ -65,17 +87,10 @@ TEST_F(Small_NamedMacros, ThreadNameIsCompiledOutAtLevelZero)
         .join();
 }
 
-TEST_F(Small_NamedMacros, NamedRecordsAreCompiledOutAtLevelZero)
+TEST_F(Medium_NamedMacros, NamedRecordsWriteNothingAtLevelZero)
 {
-    int built = 0;
-    const auto build = [&built]
-    {
-        ++built;
-        return std::string("level0.name");
-    };
-    SP_COUNTER_NAMED(build(), "", Add, 1.0);
-    SP_VALUE_NAMED(build(), "", 1.0);
+    SP_COUNTER_NAMED(std::string("level0.name"), "", Add, 1.0);
+    SP_VALUE_NAMED(std::string("level0.name"), "", 1.0);
 
-    EXPECT_EQ(built, 0);
     EXPECT_TRUE(drain_mine().empty());
 }
