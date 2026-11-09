@@ -56,6 +56,13 @@ namespace SushiProfiler
                 lock();
             }
 
+            /// @brief Locks @p mutex, recording the wait at @p handle's site in @p collector.
+            ContendedLock(Collector& collector, Mutex& mutex, SiteSlot<Compiled>& handle)
+                : mutex_(mutex), handle_(handle), collector_(&collector)
+            {
+                lock();
+            }
+
             ContendedLock(const ContendedLock&) = delete;
             ContendedLock& operator=(const ContendedLock&) = delete;
             ContendedLock(ContendedLock&&) = delete;
@@ -73,10 +80,7 @@ namespace SushiProfiler
             void lock()
             {
                 if (!mutex_.try_lock())
-                {
-                    [[maybe_unused]] const ScopedZone<Compiled> wait(handle_);
-                    mutex_.lock();
-                }
+                    lock_and_record_wait();
                 owns_ = true;
             }
 
@@ -95,11 +99,27 @@ namespace SushiProfiler
             }
 
         private:
+            /// @brief Locks the mutex inside a zone, in the collector given or the process-wide one.
+            void lock_and_record_wait()
+            {
+                if (collector_ != nullptr)
+                {
+                    [[maybe_unused]] const ScopedZone<Compiled> wait(*collector_, handle_);
+                    mutex_.lock();
+                    return;
+                }
+                [[maybe_unused]] const ScopedZone<Compiled> wait(handle_);
+                mutex_.lock();
+            }
+
             /// @brief The guarded mutex.
             Mutex& mutex_;
 
             /// @brief The site the waits are recorded at.
             SiteSlot<Compiled>& handle_;
+
+            /// @brief The collector the waits are recorded in, or null for the process-wide one.
+            Collector* collector_ = nullptr;
 
             /// @brief Whether the guard holds the mutex.
             bool owns_ = false;

@@ -23,36 +23,76 @@
 
 /**
  * @file test_contended_lock.cpp
- * @brief Tests that a lock records a wait zone only when another thread holds it.
+ * @brief Tests that a lock records a wait zone only when the mutex is held by another.
  * @author Mustafa Garip
  * @see tests/capture/lock_wait/README.md
  */
 
 #include <SushiProfiler/lock_wait/contended_lock.hpp>
 
+#include "scripted_mutex.hpp"
+
+#include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 
 #include <gtest/gtest.h>
 
-#include <atomic>
-#include <chrono>
-#include <mutex>
-#include <thread>
+#include <cstdint>
+#include <utility>
 #include <vector>
 
 using SushiProfiler::Collector;
 using SushiProfiler::CollectorSettings;
+using SushiProfiler::ContendedLock;
 using SushiProfiler::DrainBatch;
 using SushiProfiler::EventKind;
+using SushiProfiler::ManualTickSource;
 using SushiProfiler::SiteInfo;
 using SushiProfiler::SiteRole;
 using SushiProfiler::ThreadDrain;
 using SushiProfiler::TraceEvent;
+using SushiProfilerTests::ScriptedMutex;
 
 namespace
 {
-    /// @brief Opens the collector before each test, and closes and empties it after.
-    class LockWaitTest : public ::testing::Test
+    /// @brief The length of the wait a scripted holder imposes, in nanoseconds.
+    constexpr std::uint64_t K_WAIT_NS = 250U;
+
+    /// @brief The lock wait site the class tests record at.
+    constexpr SushiProfiler::Site K_SITE{"queue", "Lock wait", "test_contended_lock.cpp",
+                                         1U, 1U, SiteRole::LockWait,
+                                         SushiProfiler::CounterOp::Add, nullptr};
+
+    /// @brief Returns what @p collector holds for the calling thread, draining it.
+    std::vector<TraceEvent> drain_mine(Collector& collector)
+    {
+        DrainBatch batch;
+        collector.drain(batch);
+        for (ThreadDrain& thread : batch.threads)
+        {
+            if (thread.thread_index == collector.index_of_thread())
+                return std::move(thread.events);
+        }
+        return {};
+    }
+
+    /// @brief Gives each test its own open collector on a manual clock that starts at 100 ns.
+    class Small_ContendedLock : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                ASSERT_TRUE(collector.open(CollectorSettings{}));
+            }
+
+            ManualTickSource clock{100U};
+            Collector collector{clock};
+            SushiProfiler::SiteHandle handle{&K_SITE};
+    };
+
+    /// @brief The macro tests: they reach the process-wide collector, which is opened and emptied
+    ///        around each test.
+    class Medium_ContendedLock : public ::testing::Test
     {
         protected:
             void SetUp() override
@@ -67,7 +107,7 @@ namespace
             }
 
             /// @brief Returns what the calling thread wrote since the last drain.
-            static std::vector<TraceEvent> drain_mine()
+            static std::vector<TraceEvent> drain_mine_process_wide()
             {
                 DrainBatch batch;
                 Collector::instance().drain(batch);
@@ -88,92 +128,130 @@ namespace
                 Collector::instance().drain(discarded);
             }
     };
-
-    /// @brief The lock tests on one thread.
-    class Small_ContendedLock : public LockWaitTest
-    {
-    };
-
-    /// @brief The lock tests with a second thread.
-    class Medium_ContendedLock : public LockWaitTest
-    {
-    };
 } // namespace
 
 TEST_F(Small_ContendedLock, AnUncontendedLockWritesNothing)
 {
-    std::mutex mutex;
+    ScriptedMutex mutex(false);
     {
-        SP_LOCK_WAIT_AT(1, "queue", mutex);
+        const ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
     }
 
-    EXPECT_TRUE(drain_mine().empty());
-    EXPECT_TRUE(mutex.try_lock());
-    mutex.unlock();
+    EXPECT_TRUE(drain_mine(collector).empty());
 }
 
-TEST_F(Small_ContendedLock, UnlockReleasesAndLockTakesAgain)
+TEST_F(Small_ContendedLock, TheLockReleasesTheMutexAtScopeEnd)
 {
-    static constexpr SushiProfiler::Site site{"state", "Lock wait", "test_contended_lock.cpp",
-                                              1U, 1U, SiteRole::LockWait,
-                                              SushiProfiler::CounterOp::Add, nullptr};
-    static SushiProfiler::SiteHandle handle{&site};
-    std::mutex mutex;
-    SushiProfiler::ContendedLock<std::mutex> lock(mutex, handle);
+    ScriptedMutex mutex(false);
+    {
+        const ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
+    }
+
+    EXPECT_FALSE(mutex.locked());
+}
+
+TEST_F(Small_ContendedLock, UnlockReleasesTheMutex)
+{
+    ScriptedMutex mutex(false);
+    ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
 
     lock.unlock();
 
     EXPECT_FALSE(lock.owns_lock());
-    EXPECT_TRUE(mutex.try_lock());
-    mutex.unlock();
+    EXPECT_FALSE(mutex.locked());
+}
+
+TEST_F(Small_ContendedLock, LockTakesTheMutexAgain)
+{
+    ScriptedMutex mutex(false);
+    ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
+    lock.unlock();
 
     lock.lock();
 
     EXPECT_TRUE(lock.owns_lock());
-    EXPECT_FALSE(mutex.try_lock());
+    EXPECT_TRUE(mutex.locked());
 }
 
-TEST_F(Medium_ContendedLock, AContendedLockWritesOneWaitZone)
+TEST_F(Small_ContendedLock, AContendedLockWritesOneZone)
 {
-    std::mutex mutex;
-    std::atomic<bool> held{false};
-    std::thread holder([&] {
-        const std::lock_guard<std::mutex> guard(mutex);
-        held.store(true, std::memory_order_release);
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
-    });
-    while (!held.load(std::memory_order_acquire))
-        std::this_thread::yield();
+    ScriptedMutex mutex(true, &clock, K_WAIT_NS);
     {
-        SP_LOCK_WAIT_AT(1, "queue", mutex);
+        const ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
     }
-    holder.join();
-    const std::vector<TraceEvent> events = drain_mine();
+
+    const std::vector<TraceEvent> events = drain_mine(collector);
 
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::Zone);
-    EXPECT_LT(events[0].begin, events[0].end);
-    const SiteInfo info = Collector::instance().sites().info(SushiProfiler::site_of(events[0]));
+}
+
+TEST_F(Small_ContendedLock, TheWaitZoneLastsTheWaitOfTheHolder)
+{
+    ScriptedMutex mutex(true, &clock, K_WAIT_NS);
+    {
+        const ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
+    }
+
+    const std::vector<TraceEvent> events = drain_mine(collector);
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(events[0].end - events[0].begin, K_WAIT_NS);
+}
+
+TEST_F(Small_ContendedLock, TheWaitZoneSitsAtALockWaitSite)
+{
+    ScriptedMutex mutex(true, &clock, K_WAIT_NS);
+    {
+        const ContendedLock<ScriptedMutex> lock(collector, mutex, handle);
+    }
+
+    const std::vector<TraceEvent> events = drain_mine(collector);
+
+    ASSERT_EQ(events.size(), 1U);
+    const SiteInfo info = collector.sites().info(SushiProfiler::site_of(events[0]));
     EXPECT_EQ(info.name, "queue");
     EXPECT_EQ(info.group, "Lock wait");
     EXPECT_EQ(info.role, SiteRole::LockWait);
 }
 
-TEST_F(Medium_ContendedLock, ACompiledOutLockWaitsWithoutWriting)
+TEST_F(Small_ContendedLock, ACompiledOutLockStillLocksAndWritesNothing)
 {
-    std::mutex mutex;
-    std::atomic<bool> held{false};
-    std::thread holder([&] {
-        const std::lock_guard<std::mutex> guard(mutex);
-        held.store(true, std::memory_order_release);
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-    });
-    while (!held.load(std::memory_order_acquire))
-        std::this_thread::yield();
+    ScriptedMutex mutex(true, &clock, K_WAIT_NS);
+    SushiProfiler::SiteSlot<false> slot{nullptr};
+    {
+        const ContendedLock<ScriptedMutex, false> lock(collector, mutex, slot);
+
+        EXPECT_TRUE(mutex.locked());
+    }
+
+    EXPECT_TRUE(drain_mine(collector).empty());
+}
+
+TEST_F(Medium_ContendedLock, TheMacroWritesOneZoneAtALockWaitSiteWhenTheMutexIsHeld)
+{
+    ScriptedMutex mutex(true);
+    {
+        SP_LOCK_WAIT_AT(1, "queue", mutex);
+    }
+
+    const std::vector<TraceEvent> events = drain_mine_process_wide();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::Zone);
+    const SiteInfo info = Collector::instance().sites().info(SushiProfiler::site_of(events[0]));
+    EXPECT_EQ(info.name, "queue");
+    EXPECT_EQ(info.role, SiteRole::LockWait);
+}
+
+TEST_F(Medium_ContendedLock, TheMacroAtLevelZeroLocksAndWritesNothing)
+{
+    ScriptedMutex mutex(true);
     {
         SP_LOCK_WAIT_AT(0, "queue", mutex);
-    }
-    holder.join();
 
-    EXPECT_TRUE(drain_mine().empty());
+        EXPECT_TRUE(mutex.locked());
+    }
+
+    EXPECT_TRUE(drain_mine_process_wide().empty());
 }

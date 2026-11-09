@@ -10,6 +10,9 @@ calls `try_lock`; only when that fails does it open a zone at its site and call 
 uncontended lock therefore writes nothing and costs one `try_lock`, and the zone measures the
 wait alone, not the time the lock is held.
 
+`ContendedLock` and `lock_with_wait` also take a `Collector&` first, to record the wait in that
+collector; the macros do not pass one yet and use the process-wide collector.
+
 `SP_LOCK_WAIT_AT(compiled, name, mutex)` locks `mutex` for the rest of the scope at a site of role
 `LockWait` in the group `Lock wait`, level 1; `compiled` below 1 leaves a plain lock.
 `SP_LOCK_WAIT(name, mutex)` takes `SP_PROFILE_LEVEL`.

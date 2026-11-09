@@ -55,6 +55,17 @@ namespace SushiProfiler
         [[maybe_unused]] const ScopedZone<Compiled> wait(handle);
         lock.lock();
     }
+
+    /// @brief Locks @p lock as above, recording the wait at @p handle's site in @p collector.
+    template <bool Compiled, class Mutex>
+    void lock_with_wait(Collector& collector, std::unique_lock<Mutex>& lock,
+                        SiteSlot<Compiled>& handle)
+    {
+        if (lock.try_lock())
+            return;
+        [[maybe_unused]] const ScopedZone<Compiled> wait(collector, handle);
+        lock.lock();
+    }
 } // namespace SushiProfiler
 
 /// @brief Declares lock wait site @p id and a locked `std::unique_lock` named @p lock on @p mutex.
