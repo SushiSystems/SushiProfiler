@@ -53,7 +53,7 @@ namespace
     void fill_to_limit(DynamicSiteTable& table)
     {
         for (std::size_t index = 0U; index < DynamicSiteTable::K_MAX_NAMES; ++index)
-            table.handle("name" + std::to_string(index), "", CounterOp::Add, 1U);
+            static_cast<void>(table.handle("name" + std::to_string(index), "", CounterOp::Add, 1U));
     }
 
     /// @brief Returns the handles @p calls lookups of @p names rotating names return in @p table.
