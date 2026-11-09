@@ -139,3 +139,19 @@ namespace SushiProfiler
 
 /// @brief Locks @p mutex for the rest of the scope, recording its wait.
 #define SP_LOCK_WAIT(name, mutex) SP_LOCK_WAIT_AT(SP_PROFILE_LEVEL, name, mutex)
+
+/// @brief Declares lock wait site @p id and locks @p mutex, recording the wait in @p collector.
+#define SP_DETAIL_LOCK_WAIT_IN(id, collector, compiled, name, mutex)                              \
+    SP_DETAIL_SITE(id, ((compiled) >= 1), name, "Lock wait", 1, LockWait, Add, nullptr);           \
+    const ::SushiProfiler::ContendedLock<std::remove_reference_t<decltype(mutex)>,                 \
+                                         ((compiled) >= 1)>                                        \
+        SP_DETAIL_JOIN(sp_lock_, id)((collector), (mutex), SP_DETAIL_JOIN(sp_handle_, id))
+
+/// @brief Locks @p mutex for the rest of the scope as `SP_LOCK_WAIT_AT` does, recording its wait in
+/// the `Collector` @p collector instead of the process-wide one.
+#define SP_LOCK_WAIT_IN_AT(collector, compiled, name, mutex)                                      \
+    SP_DETAIL_LOCK_WAIT_IN(__COUNTER__, collector, compiled, name, mutex)
+
+/// @brief Locks @p mutex for the rest of the scope, recording its wait in @p collector.
+#define SP_LOCK_WAIT_IN(collector, name, mutex)                                                   \
+    SP_LOCK_WAIT_IN_AT(collector, SP_PROFILE_LEVEL, name, mutex)

@@ -82,3 +82,21 @@ namespace SushiProfiler
 /// @brief Declares `std::unique_lock lock` on @p mutex and locks it, recording its wait.
 #define SP_LOCK_WAIT_NAMED(lock, name, mutex)                                                     \
     SP_LOCK_WAIT_NAMED_AT(SP_PROFILE_LEVEL, lock, name, mutex)
+
+/// @brief Declares lock wait site @p id and a locked `std::unique_lock` named @p lock on @p mutex,
+/// recording the wait in @p collector.
+#define SP_DETAIL_LOCK_WAIT_NAMED_IN(id, collector, compiled, lock, name, mutex)                  \
+    SP_DETAIL_SITE(id, ((compiled) >= 1), name, "Lock wait", 1, LockWait, Add, nullptr);           \
+    std::unique_lock<std::remove_reference_t<decltype(mutex)>> lock((mutex), std::defer_lock);     \
+    ::SushiProfiler::lock_with_wait<((compiled) >= 1)>((collector), lock,                          \
+                                                       SP_DETAIL_JOIN(sp_handle_, id))
+
+/// @brief Declares and locks `std::unique_lock lock` as `SP_LOCK_WAIT_NAMED_AT` does, recording
+/// the wait in the `Collector` @p collector instead of the process-wide one.
+#define SP_LOCK_WAIT_NAMED_IN_AT(collector, compiled, lock, name, mutex)                          \
+    SP_DETAIL_LOCK_WAIT_NAMED_IN(__COUNTER__, collector, compiled, lock, name, mutex)
+
+/// @brief Declares and locks `std::unique_lock lock` on @p mutex, recording the wait in
+/// @p collector.
+#define SP_LOCK_WAIT_NAMED_IN(collector, lock, name, mutex)                                       \
+    SP_LOCK_WAIT_NAMED_IN_AT(collector, SP_PROFILE_LEVEL, lock, name, mutex)

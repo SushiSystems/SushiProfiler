@@ -58,6 +58,8 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 
 8. The orchestrator ruled on 2026-11-10 that the "counted once" claim of `ASiteBeyondCapacityIsCountedNotRecorded` comes back as its own test. `Small_SiteRegistry.ASiteBeyondCapacityRaisesTheRefusedCountByExactlyOne` fills a registry of capacity 2, reads `refused()`, asks for a third id and expects the count one higher. The original test keeps the id 0 and the disabled id 0, and no longer asserts the count, so each test has one reason to fail.
 
+9. The orchestrator ruled on 2026-11-10 that the `SP_LOCK_WAIT*` macros get a collector-taking form with the default unchanged. This supersedes the "not passed in yet" of decision 4 for the lock-wait macros. `SP_LOCK_WAIT_IN_AT(collector, compiled, name, mutex)`, `SP_LOCK_WAIT_IN(collector, name, mutex)`, `SP_LOCK_WAIT_NAMED_IN_AT(collector, compiled, lock, name, mutex)` and `SP_LOCK_WAIT_NAMED_IN(collector, lock, name, mutex)` pass the collector to `ContendedLock` and `lock_with_wait`; the four existing macros expand as before. The four macro tests (`TheMacroWritesOneZoneAtALockWaitSiteWhenTheMutexIsHeld`, `TheMacroAtLevelZeroLocksAndWritesNothing`, `TheMacroWritesOneLockWaitZoneWhenTheMutexIsHeld`, `TheMacroAtLevelZeroStillLocks`) now run `Small_` on the fixture's own collector with a `ScriptedMutex`. The process-wide fixture of `test_contended_lock.cpp` is gone; the one in `test_named_lock_wait.cpp` stays for the condition-variable test until decision 10. The macro family grows from four names to eight, which is the cost of keeping the default unchanged.
+
 ## Dispatches
 
 dispatch: J15 review, 6 chunks — haiku high, 1 round each, passed, rung 1

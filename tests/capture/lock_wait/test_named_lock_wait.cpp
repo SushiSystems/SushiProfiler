@@ -201,35 +201,35 @@ TEST_F(Small_NamedLockWait, ACompiledOutLockStillLocksAndWritesNothing)
     EXPECT_TRUE(drain_mine(collector).empty());
 }
 
-TEST_F(Medium_NamedLockWait, TheMacroWritesOneLockWaitZoneWhenTheMutexIsHeld)
+TEST_F(Small_NamedLockWait, TheMacroWritesOneLockWaitZoneWhenTheMutexIsHeld)
 {
     ScriptedMutex mutex(true);
     {
-        SP_LOCK_WAIT_NAMED_AT(1, lock, "queue", mutex);
+        SP_LOCK_WAIT_NAMED_IN_AT(collector, 1, lock, "queue", mutex);
 
         EXPECT_TRUE(lock.owns_lock());
     }
 
-    const std::vector<TraceEvent> events = drain_mine_process_wide();
+    const std::vector<TraceEvent> events = drain_mine(collector);
 
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::Zone);
-    const SiteInfo info = Collector::instance().sites().info(SushiProfiler::site_of(events[0]));
+    const SiteInfo info = collector.sites().info(SushiProfiler::site_of(events[0]));
     EXPECT_EQ(info.role, SiteRole::LockWait);
     EXPECT_EQ(info.name, "queue");
 }
 
-TEST_F(Medium_NamedLockWait, TheMacroAtLevelZeroStillLocks)
+TEST_F(Small_NamedLockWait, TheMacroAtLevelZeroStillLocks)
 {
     ScriptedMutex mutex(false);
     {
-        SP_LOCK_WAIT_NAMED_AT(0, lock, "queue", mutex);
+        SP_LOCK_WAIT_NAMED_IN_AT(collector, 0, lock, "queue", mutex);
 
         EXPECT_TRUE(lock.owns_lock());
         EXPECT_TRUE(mutex.locked());
     }
 
-    EXPECT_TRUE(drain_mine_process_wide().empty());
+    EXPECT_TRUE(drain_mine(collector).empty());
 }
 
 TEST_F(Medium_NamedLockWait, TheLockPassesToAConditionVariableWait)

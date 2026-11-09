@@ -11,14 +11,17 @@ uncontended lock therefore writes nothing and costs one `try_lock`, and the zone
 wait alone, not the time the lock is held.
 
 `ContendedLock` and `lock_with_wait` also take a `Collector&` first, to record the wait in that
-collector; the macros do not pass one yet and use the process-wide collector.
+collector. The macros use the process-wide collector; `SP_LOCK_WAIT_IN_AT(collector, compiled, name,
+mutex)` and `SP_LOCK_WAIT_IN(collector, name, mutex)` take a `Collector&` first and record the wait there.
 
 `SP_LOCK_WAIT_AT(compiled, name, mutex)` locks `mutex` for the rest of the scope at a site of role
 `LockWait` in the group `Lock wait`, level 1; `compiled` below 1 leaves a plain lock.
 `SP_LOCK_WAIT(name, mutex)` takes `SP_PROFILE_LEVEL`.
 
 `SushiProfiler/lock_wait/named_lock_wait.hpp` declares `SP_LOCK_WAIT_NAMED_AT(compiled, lock, name,
-mutex)` and `SP_LOCK_WAIT_NAMED(lock, name, mutex)`. They declare a non-const
+mutex)` and `SP_LOCK_WAIT_NAMED(lock, name, mutex)`; `SP_LOCK_WAIT_NAMED_IN_AT(collector, compiled,
+lock, name, mutex)` and `SP_LOCK_WAIT_NAMED_IN(collector, lock, name, mutex)` record in a collector
+of the caller's. They declare a non-const
 `std::unique_lock<Mutex> lock` and take it with `lock_with_wait`, which tries first and opens the
 zone only when the try fails, so `std::condition_variable::wait` accepts the lock. The zone
 measures the first acquisition only: a re-lock inside `std::condition_variable::wait` is not

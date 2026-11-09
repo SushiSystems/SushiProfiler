@@ -89,45 +89,6 @@ namespace
             Collector collector{clock};
             SushiProfiler::SiteHandle handle{&K_SITE};
     };
-
-    /// @brief The macro tests: they reach the process-wide collector, which is opened and emptied
-    ///        around each test.
-    class Medium_ContendedLock : public ::testing::Test
-    {
-        protected:
-            void SetUp() override
-            {
-                close_and_empty();
-                ASSERT_TRUE(Collector::instance().open(CollectorSettings{}));
-            }
-
-            void TearDown() override
-            {
-                close_and_empty();
-            }
-
-            /// @brief Returns what the calling thread wrote since the last drain.
-            static std::vector<TraceEvent> drain_mine_process_wide()
-            {
-                DrainBatch batch;
-                Collector::instance().drain(batch);
-                for (ThreadDrain& thread : batch.threads)
-                {
-                    if (thread.thread_index == Collector::thread_index())
-                        return std::move(thread.events);
-                }
-                return {};
-            }
-
-        private:
-            /// @brief Closes the collector and discards what its rings hold.
-            static void close_and_empty()
-            {
-                Collector::instance().close();
-                DrainBatch discarded;
-                Collector::instance().drain(discarded);
-            }
-    };
 } // namespace
 
 TEST_F(Small_ContendedLock, AnUncontendedLockWritesNothing)
@@ -228,30 +189,30 @@ TEST_F(Small_ContendedLock, ACompiledOutLockStillLocksAndWritesNothing)
     EXPECT_TRUE(drain_mine(collector).empty());
 }
 
-TEST_F(Medium_ContendedLock, TheMacroWritesOneZoneAtALockWaitSiteWhenTheMutexIsHeld)
+TEST_F(Small_ContendedLock, TheMacroWritesOneZoneAtALockWaitSiteWhenTheMutexIsHeld)
 {
     ScriptedMutex mutex(true);
     {
-        SP_LOCK_WAIT_AT(1, "queue", mutex);
+        SP_LOCK_WAIT_IN_AT(collector, 1, "queue", mutex);
     }
 
-    const std::vector<TraceEvent> events = drain_mine_process_wide();
+    const std::vector<TraceEvent> events = drain_mine(collector);
 
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::Zone);
-    const SiteInfo info = Collector::instance().sites().info(SushiProfiler::site_of(events[0]));
+    const SiteInfo info = collector.sites().info(SushiProfiler::site_of(events[0]));
     EXPECT_EQ(info.name, "queue");
     EXPECT_EQ(info.role, SiteRole::LockWait);
 }
 
-TEST_F(Medium_ContendedLock, TheMacroAtLevelZeroLocksAndWritesNothing)
+TEST_F(Small_ContendedLock, TheMacroAtLevelZeroLocksAndWritesNothing)
 {
     ScriptedMutex mutex(true);
     {
-        SP_LOCK_WAIT_AT(0, "queue", mutex);
+        SP_LOCK_WAIT_IN_AT(collector, 0, "queue", mutex);
 
         EXPECT_TRUE(mutex.locked());
     }
 
-    EXPECT_TRUE(drain_mine_process_wide().empty());
+    EXPECT_TRUE(drain_mine(collector).empty());
 }
