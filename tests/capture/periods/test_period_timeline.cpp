@@ -261,6 +261,15 @@ TEST_F(Small_PeriodTimeline, ATagWhileHeldIsDropped)
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::PeriodMark);
 }
 
+TEST_F(Small_PeriodTimeline, ATagWhileTheCollectorIsClosedWritesNothing)
+{
+    PeriodTimeline timeline(collector, "closed.step");
+    collector.close();
+    timeline.tag("variant", "fused");
+
+    EXPECT_TRUE(drain_mine().empty());
+}
+
 TEST_F(Medium_PeriodTimeline, AMarkFromAnUnregisteredThreadWhileHeldRegistersItsRing)
 {
     PeriodTimeline timeline("held.step");

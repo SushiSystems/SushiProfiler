@@ -9,5 +9,5 @@
   writes none; the index advances while the collector is closed, so the first recorded mark
   carries index 2; a tag carries its key and value; two timelines keep their own index.
 - A mark written while the gate is held reaches the drain and a zone in that period does not; a
-  tag while held is dropped; a thread that first marks while held registers its ring; `reset`
+  tag while held or while the collector is closed is dropped; a thread that first marks while held registers its ring; `reset`
   starts period 0 again. Only the thread test reaches the process-wide collector.
