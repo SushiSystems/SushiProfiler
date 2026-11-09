@@ -26,8 +26,9 @@
 - `test_macros.cpp`: every direct macro writes its kind at the default level 2; after each site's
   first use, 100,000 rounds of zones, counters, values, instants, flows and lanes allocate nothing
   on the recording thread.
-- `test_named_records.cpp`: counters and values named at run time become one site per name with
-  their operation and unit; the name expression is not evaluated with the gate closed; a counter
-  and a value of one name are two sites; `SP_THREAD_NAME` names the ring.
+- `test_named_records.cpp`: on a collector of its own, counters and values named at run time
+  become one site per name with their operation and unit, a value keeps every sample, and a
+  counter and a value of one name are two sites. Two medium tests check the macros: the name
+  expression is not evaluated with the gate closed, and `SP_THREAD_NAME` names the ring.
 - `test_named_macros.cpp`: compiled with `SP_PROFILE_LEVEL` 0, `SP_THREAD_NAME` names nothing and
   the named macros record nothing and do not evaluate their name.
