@@ -3,7 +3,7 @@
 - `compile_site.cpp`: a site is a constant aggregate, checked by `static_assert`s.
 - `test_site_registry.cpp`: one id per handle however often it is asked; two sites with equal
   text are two sites; the filter's level and groups; ungrouped sites passing a group filter; a
-  filter applied before a site registers, and a changed one applied to a registered site; a site past the capacity gets 0 and is counted once;
+  filter applied before a site registers, and a changed one applied to a registered site; a site past the capacity gets 0, and a third id raises the refused count by exactly one;
   the registry keeps copies of the site's strings and maps its other fields; the info of id 0 or
   of an id never given is empty; eight threads registering one handle at once
   get one id.

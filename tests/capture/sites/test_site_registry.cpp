@@ -186,7 +186,23 @@ TEST(Small_SiteRegistry, ASiteBeyondCapacityIsCountedNotRecorded)
     EXPECT_NE(registry.id_of(second), 0U);
     EXPECT_EQ(registry.id_of(third), 0U);
     EXPECT_FALSE(registry.enabled(0U));
-    EXPECT_EQ(registry.refused(), 1U);
+}
+
+TEST(Small_SiteRegistry, ASiteBeyondCapacityRaisesTheRefusedCountByExactlyOne)
+{
+    static constexpr Site sites[3] = {zone_site("a", nullptr, 1U), zone_site("b", nullptr, 1U),
+                                      zone_site("c", nullptr, 1U)};
+    SiteHandle first{&sites[0]};
+    SiteHandle second{&sites[1]};
+    SiteHandle third{&sites[2]};
+    SiteRegistry registry(2U);
+    static_cast<void>(registry.id_of(first));
+    static_cast<void>(registry.id_of(second));
+    const std::uint64_t before = registry.refused();
+
+    static_cast<void>(registry.id_of(third));
+
+    EXPECT_EQ(registry.refused(), before + 1U);
 }
 
 TEST(Small_SiteRegistry, InfoCopiesTheStrings)
