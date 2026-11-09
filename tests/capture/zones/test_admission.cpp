@@ -34,18 +34,18 @@
 
 #include <gtest/gtest.h>
 
-using SushiProfiler::Collector;
 using SushiProfiler::CounterOp;
 using SushiProfiler::Site;
 using SushiProfiler::SiteFilter;
 using SushiProfiler::SiteHandle;
 using SushiProfiler::SiteID;
 using SushiProfiler::SiteRole;
+using SushiProfiler::ThreadRing;
 
 namespace
 {
-    /// @brief The admission tests, on one thread.
-    class Small_Admission : public SushiProfilerTests::RecordingFixture
+    /// @brief The admission tests, on one thread and a collector of their own.
+    class Small_Admission : public SushiProfilerTests::OwnedRecordingFixture
     {
     };
 
@@ -59,7 +59,19 @@ TEST_F(Small_Admission, AnEnabledSiteGetsTheThreadsRing)
     static SiteHandle handle{&K_SITE};
     SiteID site = 0U;
 
-    EXPECT_EQ(SushiProfiler::Detail::admit(handle, site), Collector::ring());
+    ThreadRing* const ring = SushiProfiler::Detail::admit(collector, handle, site);
+
+    EXPECT_NE(ring, nullptr);
+    EXPECT_EQ(ring, collector.thread_ring());
+}
+
+TEST_F(Small_Admission, AnEnabledSiteGetsAnId)
+{
+    static SiteHandle handle{&K_SITE};
+    SiteID site = 0U;
+
+    static_cast<void>(SushiProfiler::Detail::admit(collector, handle, site));
+
     EXPECT_NE(site, 0U);
 }
 
@@ -67,9 +79,9 @@ TEST_F(Small_Admission, AClosedCollectorAdmitsNothing)
 {
     static SiteHandle handle{&K_SITE};
     SiteID site = 0U;
-    Collector::instance().close();
+    collector.close();
 
-    EXPECT_EQ(SushiProfiler::Detail::admit(handle, site), nullptr);
+    EXPECT_EQ(SushiProfiler::Detail::admit(collector, handle, site), nullptr);
 }
 
 TEST_F(Small_Admission, ADisabledSiteIsRefused)
@@ -78,7 +90,7 @@ TEST_F(Small_Admission, ADisabledSiteIsRefused)
     SiteID site = 0U;
     SiteFilter filter;
     filter.level = 1U;
-    Collector::instance().apply(filter);
+    collector.apply(filter);
 
-    EXPECT_EQ(SushiProfiler::Detail::admit(handle, site), nullptr);
+    EXPECT_EQ(SushiProfiler::Detail::admit(collector, handle, site), nullptr);
 }

@@ -1,7 +1,9 @@
 # tests/capture/zones
 
-- `recording_fixture.hpp`: `RecordingFixture` opens the collector before each test, closes and
-  empties it after, and `drain_mine()` returns what the test's thread wrote.
+- `recording_fixture.hpp`: `RecordingFixture` opens the process-wide collector before each test,
+  closes and empties it after, and `drain_mine()` returns what the test's thread wrote.
+  `OwnedRecordingFixture` gives each test a `Collector` of its own on a `ManualTickSource`, opened,
+  with the same `drain_mine()`; the small tests use it.
 - `allocation_counter.hpp`, `allocation_counter.cpp`: replace the program's global `operator new`
   and `delete` with `malloc` and `free` that count each thread's allocations;
   `allocations_on_this_thread()` reads the count.
@@ -9,8 +11,8 @@
   by `sp bench`. It prints the median nanoseconds of 31 runs of 1,000,000 iterations, after 3
   warm-up runs, for a zone compiled out, with the gate closed, at a disabled site and recording,
   a counter recording, and one read of each clock.
-- `test_admission.cpp`: an enabled site gets the thread's ring; a closed collector and a site the
-  filter disables get none.
+- `test_admission.cpp`: on a collector of its own, an enabled site gets the thread's ring and an
+  id; a closed collector and a site the filter disables get none.
 - `test_zone.cpp`: a zone writes one complete event with its site's name and line; nested zones
   nest by time; a named zone carries its name; a disabled site, a zone that outlives the
   collector's close and a compiled-out zone write nothing; compiled-out zones and lanes are

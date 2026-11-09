@@ -23,13 +23,14 @@
 
 /**
  * @file recording_fixture.hpp
- * @brief Declares the fixture that opens the collector for a test and reads back its events.
+ * @brief Declares the fixtures that open a collector for a test and read back its events.
  * @author Mustafa Garip
  * @see tests/capture/zones/README.md
  */
 
 #pragma once
 
+#include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
 
@@ -76,5 +77,31 @@ namespace SushiProfilerTests
                 SushiProfiler::DrainBatch discarded;
                 SushiProfiler::Collector::instance().drain(discarded);
             }
+    };
+
+    /// @brief Gives each test its own open collector on a manual clock that starts at 100 ns.
+    class OwnedRecordingFixture : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                ASSERT_TRUE(collector.open(SushiProfiler::CollectorSettings{}));
+            }
+
+            /// @brief Returns what the calling thread wrote since the last drain.
+            std::vector<SushiProfiler::TraceEvent> drain_mine()
+            {
+                SushiProfiler::DrainBatch batch;
+                collector.drain(batch);
+                for (SushiProfiler::ThreadDrain& thread : batch.threads)
+                {
+                    if (thread.thread_index == collector.index_of_thread())
+                        return std::move(thread.events);
+                }
+                return {};
+            }
+
+            SushiProfiler::ManualTickSource clock{100U};
+            SushiProfiler::Collector collector{clock};
     };
 } // namespace SushiProfilerTests
