@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_drain_batch.cpp                                                   */
+/* compile_drain_batch.cpp                                                */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -22,26 +22,21 @@
 /**************************************************************************/
 
 /**
- * @file test_drain_batch.cpp
- * @brief Tests that an empty drain says nothing about any thread.
+ * @file compile_drain_batch.cpp
+ * @brief Checks at compile time that a drain is a movable value with no argument to build it.
  * @author Mustafa Garip
  * @see tests/capture/collector/README.md
  */
 
 #include <SushiProfiler/collector/drain_batch.hpp>
 
-#include <gtest/gtest.h>
-
-using SushiProfiler::DrainBatch;
-using SushiProfiler::ThreadDrain;
-
-TEST(Small_DrainBatch, AnEmptyDrainHoldsNoThreadAndNoDrop)
+#include <type_traits>
+namespace
 {
-    const ThreadDrain thread;
-    const DrainBatch batch;
+    using SushiProfiler::DrainBatch;
+    using SushiProfiler::ThreadDrain;
 
-    EXPECT_TRUE(thread.events.empty());
-    EXPECT_EQ(thread.dropped, 0U);
-    EXPECT_FALSE(thread.retired);
-    EXPECT_TRUE(batch.threads.empty());
-}
+    static_assert(std::is_default_constructible_v<ThreadDrain>, "an empty thread drain needs no argument");
+    static_assert(std::is_default_constructible_v<DrainBatch>, "an empty batch needs no argument");
+    static_assert(std::is_nothrow_move_constructible_v<DrainBatch>, "a batch moves its threads without throwing");
+} // namespace

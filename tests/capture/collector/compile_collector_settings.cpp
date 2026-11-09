@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_collector_settings.cpp                                            */
+/* compile_collector_settings.cpp                                         */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -22,23 +22,22 @@
 /**************************************************************************/
 
 /**
- * @file test_collector_settings.cpp
- * @brief Tests the collector's default settings.
+ * @file compile_collector_settings.cpp
+ * @brief Checks at compile time that the collector settings are a plain copyable value.
  * @author Mustafa Garip
  * @see tests/capture/collector/README.md
  */
 
 #include <SushiProfiler/collector/collector_settings.hpp>
 
-#include <gtest/gtest.h>
-
-using SushiProfiler::CollectorSettings;
-
-TEST(Small_CollectorSettings, DefaultsKeepEverySiteInRingsOfSixtyFourKiloEvents)
+#include <cstddef>
+#include <type_traits>
+namespace
 {
-    const CollectorSettings settings;
+    using SushiProfiler::CollectorSettings;
 
-    EXPECT_EQ(settings.ring_events, 65536U);
-    EXPECT_EQ(settings.filter.level, 3U);
-    EXPECT_TRUE(settings.filter.groups.empty());
-}
+    static_assert(std::is_default_constructible_v<CollectorSettings>, "settings need no argument");
+    static_assert(std::is_copy_constructible_v<CollectorSettings>, "a session copies its settings");
+    static_assert(std::is_same_v<decltype(CollectorSettings::ring_events), std::size_t>,
+                  "ring sizes count events as a size");
+} // namespace

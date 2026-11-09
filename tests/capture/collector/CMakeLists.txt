@@ -7,8 +7,8 @@ sushiprofiler_add_module_tests(
     MODULE collector
     SOURCES
         test_collector.cpp
-        test_collector_settings.cpp
-        test_drain_batch.cpp)
+        compile_collector_settings.cpp
+        compile_drain_batch.cpp)
 
 # A second shared image that records a zone, so a test proves both images reach one collector.
 add_library(sp_second_image SHARED second_image.cpp)

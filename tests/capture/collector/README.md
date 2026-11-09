@@ -15,6 +15,8 @@
   `second_image.cpp`, built as the shared library `sp_second_image`, reaches the same collector and
   drain as a zone of the test executable, on the calling thread and on a thread that only runs the
   second image; a closed collector records nothing from it.
-- `test_collector_settings.cpp`: rings of 65,536 events and a filter that keeps every site by
-  default.
-- `test_drain_batch.cpp`: an empty drain holds no thread and no drop.
+- `compile_collector_settings.cpp`: compile-time checks that `CollectorSettings` is a default
+  constructible, copyable value whose ring size is a `std::size_t`. The default values are not
+  tested.
+- `compile_drain_batch.cpp`: compile-time checks that `ThreadDrain` and `DrainBatch` are default
+  constructible and that a batch moves without throwing.
