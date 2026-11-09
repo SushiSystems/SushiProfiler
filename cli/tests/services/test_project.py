@@ -323,9 +323,3 @@ def test_rules_of_reads_the_list_rules_flag(tmp_path):
         encoding="utf-8")
 
     assert project_service.rules_of(checker) == frozenset({"rule_a", "rule_b"})
-
-
-def test_resolve_build_type_ignores_the_type_a_tree_carries(project):
-    project.configure_tree("RelWithDebInfo")
-
-    assert project_service.resolve_build_type(None) == BuildType.DEBUG

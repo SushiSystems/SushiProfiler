@@ -46,6 +46,7 @@ add_executable(sushiprofiler_consumer consumer.cpp)
 target_link_libraries(sushiprofiler_consumer PRIVATE SushiProfiler::SushiProfiler)
 target_compile_definitions(sushiprofiler_consumer PRIVATE
     CONSUMER_EXPECTED_VERSION="${expected_version}")
-add_test(NAME Small_Package.ReadsTheVersionThroughTheTarget COMMAND sushiprofiler_consumer)
-set_tests_properties(Small_Package.ReadsTheVersionThroughTheTarget PROPERTIES
-    LABELS small TIMEOUT 60)
+# It loads the installed library file, which a small test may not, so it is medium.
+add_test(NAME Medium_Package.ReadsTheVersionThroughTheTarget COMMAND sushiprofiler_consumer)
+set_tests_properties(Medium_Package.ReadsTheVersionThroughTheTarget PROPERTIES
+    LABELS medium TIMEOUT 300)

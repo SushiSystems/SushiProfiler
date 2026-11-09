@@ -31,6 +31,8 @@
 #include "second_image.hpp"
 
 #include <SushiProfiler/collector/collector.hpp>
+
+#include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/zones/macros.hpp>
 
 #include <gtest/gtest.h>
@@ -43,6 +45,7 @@
 using SushiProfiler::DrainBatch;
 using SushiProfiler::Collector;
 using SushiProfiler::CollectorSettings;
+using SushiProfiler::ManualTickSource;
 using SushiProfiler::EventKind;
 using SushiProfiler::ThreadDrain;
 using SushiProfiler::ThreadRing;
@@ -164,16 +167,22 @@ TEST_F(Medium_Collector, DropsReachTheDrain)
     EXPECT_EQ(writer->dropped, 6U);
 }
 
-TEST_F(Small_Collector, OpenDiscardsEventsFromBefore)
+TEST(Small_OwnedCollector, OpenDiscardsEventsLeftInTheRingsFromBefore)
 {
-    push_events(3U);
-    reopen(CollectorSettings{});
-    DrainBatch batch;
-    Collector::instance().drain(batch);
+    const ManualTickSource clock;
+    Collector collector(clock);
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
+    ThreadRing* const ring = collector.thread_ring();
+    ASSERT_NE(ring, nullptr);
+    static_cast<void>(ring->push(TraceEvent{}));
+    collector.close();
 
-    const ThreadDrain* const mine = find(batch, Collector::thread_index());
-    ASSERT_NE(mine, nullptr);
-    EXPECT_TRUE(mine->events.empty());
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
+
+    DrainBatch batch;
+    collector.drain(batch);
+    ASSERT_EQ(batch.threads.size(), 1U);
+    EXPECT_TRUE(batch.threads[0].events.empty());
 }
 
 TEST_F(Medium_Collector, ARegisteredThreadKeepsItsRingWhileClosed)

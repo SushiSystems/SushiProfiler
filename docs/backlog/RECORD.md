@@ -10,6 +10,8 @@
 | RW-17 | P2 | open | Add the date, the commit and the host name to the facts | a record carries the date and the host name, and a library contributor adds its commit |  |  | 2026-10-26 |
 | RW-18 | P2 | open | Write a period table a program can read | a writer emits each period's statistics as CSV or JSON a script parses |  |  | 2026-10-26 |
 | RW-19 | P2 | open | Record every period of a run of unknown length | the window takes "every period" without a count |  |  | 2026-10-26 |
+| RW-27 | P2 | open | Commit the oracle of the bootstrap pinned-seed test | The pinned interval of Small_Bootstrap is derived by a committed script, and the test is no longer characterize |  | `docs/agent/2026_11_05_TEST_REVIEW/REPORT.md` | 2026-11-09 |
+| RW-28 | P3 | open | Give every asserting test helper the expect_ prefix | refusal, blame_of, replaced, written_events and registry_with_builtins are renamed or stop asserting |  | `docs/agent/2026_11_05_TEST_REVIEW/REPORT.md` | 2026-11-09 |
 
 ## Known issues
 

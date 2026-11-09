@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-09 — tests: Fixed the test defects of the review that sit in one test: the collector reopen test owns its collector, the no-op build-type test is gone, the package test is medium.
 - 2026-11-09 — session: Added the in-memory adapters `MemorySource`, `MemoryStreamWriter`, `MemoryRecordWriter` and `MemoryContributor` beside their ports, and moved the session tests onto them.
 - 2026-11-09 — collector: Let a caller build a `Collector` on a `TickSource` and pass it to zones, records, timelines, the window and `Session::start`; the macros keep the process-wide one (`collector.hpp`, `tick_source.hpp`).
 - 2026-11-09 — tests: Derived every tolerance of the record tests through `tests/support/tolerance.hpp` in place of a typed epsilon.

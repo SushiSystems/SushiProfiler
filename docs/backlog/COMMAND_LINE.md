@@ -4,6 +4,7 @@
 
 | ID | Pri | State | Title | Done when | Blocked by | Source | Opened |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| RW-29 | P2 | open | Test the skill-table promise of the test budget where the skill exists | test_test_budget_settings.py no longer skips here, and read_budget and differences leave the test file |  | `docs/agent/2026_11_05_TEST_REVIEW/REPORT.md` | 2026-11-09 |
 
 ## Known issues
 
