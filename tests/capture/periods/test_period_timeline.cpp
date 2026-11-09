@@ -33,13 +33,14 @@
 #include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
-#include <SushiProfiler/zones/macros.hpp>
+#include <SushiProfiler/zones/zone.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <thread>
+#include <utility>
 #include <vector>
 
 using SushiProfiler::Collector;
@@ -53,8 +54,40 @@ using SushiProfiler::TraceEvent;
 
 namespace
 {
-    /// @brief Opens the collector before each test, and closes and empties it after.
+    /// @brief The zone site the held-gate test writes a zone at.
+    constexpr SushiProfiler::Site K_ZONE_SITE{"held.zone", "Test", "test_period_timeline.cpp",
+                                              1U, 1U, SushiProfiler::SiteRole::Zone,
+                                              SushiProfiler::CounterOp::Add, nullptr};
+
+    /// @brief Gives each test its own open collector on a manual clock that starts at 40 ns.
     class Small_PeriodTimeline : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                ASSERT_TRUE(collector.open(CollectorSettings{}));
+            }
+
+            /// @brief Returns what the calling thread wrote since the last drain.
+            std::vector<TraceEvent> drain_mine()
+            {
+                DrainBatch batch;
+                collector.drain(batch);
+                for (ThreadDrain& thread : batch.threads)
+                {
+                    if (thread.thread_index == collector.index_of_thread())
+                        return std::move(thread.events);
+                }
+                return {};
+            }
+
+            ManualTickSource clock{40U};
+            Collector collector{clock};
+    };
+
+    /// @brief The test that starts a thread reads the process-wide thread index, so it uses the
+    ///        process-wide collector, opened and emptied around the test.
+    class Medium_PeriodTimeline : public ::testing::Test
     {
         protected:
             void SetUp() override
@@ -68,19 +101,6 @@ namespace
                 close_and_empty();
             }
 
-            /// @brief Returns what the calling thread wrote since the last drain.
-            static std::vector<TraceEvent> drain_mine()
-            {
-                DrainBatch batch;
-                Collector::instance().drain(batch);
-                for (ThreadDrain& thread : batch.threads)
-                {
-                    if (thread.thread_index == Collector::thread_index())
-                        return std::move(thread.events);
-                }
-                return {};
-            }
-
         private:
             /// @brief Closes the collector and discards what its rings hold.
             static void close_and_empty()
@@ -90,28 +110,41 @@ namespace
                 Collector::instance().drain(discarded);
             }
     };
-
-    /// @brief The tests that start threads.
-    class Medium_PeriodTimeline : public Small_PeriodTimeline
-    {
-    };
 } // namespace
+
+TEST_F(Small_PeriodTimeline, NoPeriodIsOpenBeforeTheFirstMark)
+{
+    PeriodTimeline timeline(collector, "train.step");
+
+    EXPECT_EQ(timeline.current(), PeriodTimeline::K_NO_PERIOD);
+}
 
 TEST_F(Small_PeriodTimeline, MarksCountFromZero)
 {
-    PeriodTimeline timeline("train.step");
+    PeriodTimeline timeline(collector, "train.step");
 
-    EXPECT_EQ(timeline.current(), PeriodTimeline::K_NO_PERIOD);
     EXPECT_EQ(timeline.mark(), 0U);
     EXPECT_EQ(timeline.mark(), 1U);
     EXPECT_EQ(timeline.current(), 1U);
-    EXPECT_EQ(timeline.name(), "train.step");
-    EXPECT_EQ(Collector::instance().names().text(timeline.id()), "train.step");
 }
 
-TEST_F(Small_PeriodTimeline, AMarkCarriesItsIndexAndTimeline)
+TEST_F(Small_PeriodTimeline, TheTimelineKeepsItsName)
 {
-    PeriodTimeline timeline("engine.frame");
+    PeriodTimeline timeline(collector, "train.step");
+
+    EXPECT_EQ(timeline.name(), "train.step");
+}
+
+TEST_F(Small_PeriodTimeline, TheTimelineInternsItsNameInItsCollector)
+{
+    PeriodTimeline timeline(collector, "train.step");
+
+    EXPECT_EQ(collector.names().text(timeline.id()), "train.step");
+}
+
+TEST_F(Small_PeriodTimeline, AMarkCarriesItsIndex)
+{
+    PeriodTimeline timeline(collector, "engine.frame");
     timeline.mark();
     timeline.mark();
     const std::vector<TraceEvent> events = drain_mine();
@@ -119,12 +152,31 @@ TEST_F(Small_PeriodTimeline, AMarkCarriesItsIndexAndTimeline)
     ASSERT_EQ(events.size(), 2U);
     EXPECT_EQ(SushiProfiler::kind_of(events[1]), EventKind::PeriodMark);
     EXPECT_EQ(events[1].end, 1U);
-    EXPECT_EQ(events[1].name, timeline.id());
+}
+
+TEST_F(Small_PeriodTimeline, AMarkCarriesItsTimeline)
+{
+    PeriodTimeline timeline(collector, "engine.frame");
+    timeline.mark();
+    const std::vector<TraceEvent> events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(events[0].name, timeline.id());
+}
+
+TEST_F(Small_PeriodTimeline, AMarkIsStampedByTheClockOfItsCollector)
+{
+    PeriodTimeline timeline(collector, "step");
+    timeline.mark();
+    const std::vector<TraceEvent> events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(events[0].begin, 40U);
 }
 
 TEST_F(Small_PeriodTimeline, AMarkCarriesItsBudget)
 {
-    PeriodTimeline timeline("audio.block", 2'666'667U);
+    PeriodTimeline timeline(collector, "audio.block", 2'666'667U);
     timeline.mark();
     timeline.mark(1'000'000U);
     timeline.mark(0U);
@@ -140,14 +192,13 @@ TEST_F(Small_PeriodTimeline, AMarkCarriesItsBudget)
 
 TEST_F(Small_PeriodTimeline, TheIndexAdvancesWhileTheCollectorIsClosed)
 {
-    PeriodTimeline timeline("bench.iteration");
-    Collector::instance().close();
+    PeriodTimeline timeline(collector, "bench.iteration");
+    collector.close();
     timeline.mark();
     timeline.mark();
-    Collector::instance().close();
     DrainBatch discarded;
-    Collector::instance().drain(discarded);
-    ASSERT_TRUE(Collector::instance().open(CollectorSettings{}));
+    collector.drain(discarded);
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
 
     EXPECT_EQ(timeline.mark(), 2U);
     const std::vector<TraceEvent> events = drain_mine();
@@ -157,7 +208,7 @@ TEST_F(Small_PeriodTimeline, TheIndexAdvancesWhileTheCollectorIsClosed)
 
 TEST_F(Small_PeriodTimeline, ATagCarriesKeyAndValue)
 {
-    PeriodTimeline timeline("train.step");
+    PeriodTimeline timeline(collector, "train.step");
     timeline.mark();
     timeline.tag("variant", "fused");
     const std::vector<TraceEvent> events = drain_mine();
@@ -167,14 +218,14 @@ TEST_F(Small_PeriodTimeline, ATagCarriesKeyAndValue)
     EXPECT_EQ(events[1].name, timeline.id());
     const auto key = static_cast<SushiProfiler::NameID>(events[1].end >> 32U);
     const auto value = static_cast<SushiProfiler::NameID>(events[1].end & 0xFFFFFFFFU);
-    EXPECT_EQ(Collector::instance().names().text(key), "variant");
-    EXPECT_EQ(Collector::instance().names().text(value), "fused");
+    EXPECT_EQ(collector.names().text(key), "variant");
+    EXPECT_EQ(collector.names().text(value), "fused");
 }
 
 TEST_F(Small_PeriodTimeline, TwoTimelinesKeepTheirOwnIndex)
 {
-    PeriodTimeline steps("train.step");
-    PeriodTimeline batches("data.batch");
+    PeriodTimeline steps(collector, "train.step");
+    PeriodTimeline batches(collector, "data.batch");
     steps.mark();
     batches.mark();
     batches.mark();
@@ -185,11 +236,12 @@ TEST_F(Small_PeriodTimeline, TwoTimelinesKeepTheirOwnIndex)
 
 TEST_F(Small_PeriodTimeline, AMarkWrittenWhileHeldReachesTheDrain)
 {
-    PeriodTimeline timeline("held.step");
-    Collector::instance().hold();
+    PeriodTimeline timeline(collector, "held.step");
+    SushiProfiler::SiteHandle handle{&K_ZONE_SITE};
+    collector.hold();
     timeline.mark();
     {
-        SP_ZONE("held.zone");
+        const SushiProfiler::ScopedZone<true> zone(collector, handle);
     }
     const std::vector<TraceEvent> events = drain_mine();
 
@@ -199,9 +251,9 @@ TEST_F(Small_PeriodTimeline, AMarkWrittenWhileHeldReachesTheDrain)
 
 TEST_F(Small_PeriodTimeline, ATagWhileHeldIsDropped)
 {
-    PeriodTimeline timeline("held.step");
+    PeriodTimeline timeline(collector, "held.step");
     timeline.mark();
-    Collector::instance().hold();
+    collector.hold();
     timeline.tag("variant", "fused");
     const std::vector<TraceEvent> events = drain_mine();
 
@@ -233,31 +285,11 @@ TEST_F(Medium_PeriodTimeline, AMarkFromAnUnregisteredThreadWhileHeldRegistersIts
 
 TEST_F(Small_PeriodTimeline, ResetStartsPeriodZeroAgain)
 {
-    PeriodTimeline timeline("reset.step");
+    PeriodTimeline timeline(collector, "reset.step");
     timeline.mark();
     timeline.mark();
     timeline.reset();
 
     EXPECT_EQ(timeline.current(), PeriodTimeline::K_NO_PERIOD);
     EXPECT_EQ(timeline.mark(), 0U);
-}
-
-TEST(Small_PeriodTimelineOfAGivenCollector, MarksIntoItWithTheStampOfItsClock)
-{
-    const ManualTickSource clock(40U);
-    Collector collector(clock);
-    ASSERT_TRUE(collector.open(CollectorSettings{}));
-    PeriodTimeline timeline(collector, "step");
-
-    static_cast<void>(timeline.mark());
-
-    DrainBatch batch;
-    collector.drain(batch);
-    ASSERT_EQ(batch.threads.size(), 1U);
-    ASSERT_EQ(batch.threads[0].events.size(), 1U);
-    const TraceEvent& mark = batch.threads[0].events[0];
-    EXPECT_EQ(SushiProfiler::kind_of(mark), EventKind::PeriodMark);
-    EXPECT_EQ(mark.begin, 40U);
-    EXPECT_EQ(mark.end, 0U);
-    EXPECT_EQ(mark.name, timeline.id());
 }
