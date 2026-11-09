@@ -162,6 +162,23 @@ TEST(Small_ThreadRing, FillIsZeroOnceDrained)
     EXPECT_DOUBLE_EQ(ring.fill(), 0.0);
 }
 
+TEST(Small_ThreadRing, FillIsOneWhenTheRingIsFull)
+{
+    ThreadRing ring(64U);
+    push_numbered(ring, 64U);
+
+    EXPECT_DOUBLE_EQ(ring.fill(), 1.0);
+}
+
+TEST(Small_ThreadRing, AnEmptyNameReadsEmpty)
+{
+    ThreadRing ring(64U);
+    ring.set_name("audio");
+    ring.set_name("");
+
+    EXPECT_EQ(ring.name(), "");
+}
+
 TEST(Small_ThreadRing, NameIsTruncatedAtSixtyThree)
 {
     ThreadRing ring(64U);
