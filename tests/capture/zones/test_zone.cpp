@@ -36,7 +36,6 @@
 #include <SushiProfiler/collector/collector_settings.hpp>
 #include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/sites/site.hpp>
-#include <SushiProfiler/zones/macros.hpp>
 
 #include <gtest/gtest.h>
 
@@ -44,27 +43,30 @@
 #include <type_traits>
 
 using SushiProfiler::Collector;
-using SushiProfiler::CollectorSettings;
-using SushiProfiler::DrainBatch;
 using SushiProfiler::EventKind;
 using SushiProfiler::ManualTickSource;
 using SushiProfiler::ScopedLane;
 using SushiProfiler::ScopedZone;
 using SushiProfiler::SiteFilter;
+using SushiProfiler::SiteHandle;
 using SushiProfiler::SiteInfo;
-using SushiProfiler::TraceEvent;
 
 namespace
 {
-    /// @brief The zone tests, on one thread.
-    class Small_Zone : public SushiProfilerTests::RecordingFixture
+    /// @brief The zone tests, on one thread and a collector of their own that starts at 100 ns.
+    class Small_Zone : public SushiProfilerTests::OwnedRecordingFixture
     {
     };
 
-    /// @brief The site of the zones recorded into a collector the test owns.
-    constexpr SushiProfiler::Site K_OWNED_SITE{"load", nullptr, __FILE__, __LINE__, 1U,
-                                               SushiProfiler::SiteRole::Zone,
-                                               SushiProfiler::CounterOp::Add, nullptr};
+    /// @brief The site of an ungrouped zone at level 1, claiming line 7.
+    constexpr SushiProfiler::Site K_SITE{"load", nullptr, "test_zone.cpp", 7U, 1U,
+                                         SushiProfiler::SiteRole::Zone,
+                                         SushiProfiler::CounterOp::Add, nullptr};
+
+    /// @brief The site of a zone in the group "Device".
+    constexpr SushiProfiler::Site K_DEVICE_SITE{"run", "Device", "test_zone.cpp", 8U, 1U,
+                                                SushiProfiler::SiteRole::Zone,
+                                                SushiProfiler::CounterOp::Add, nullptr};
 
     static_assert(std::is_empty_v<ScopedZone<false>>, "a compiled-out zone holds nothing");
     static_assert(std::is_empty_v<ScopedLane<false>>, "a compiled-out lane holds nothing");
@@ -72,43 +74,62 @@ namespace
 
 TEST_F(Small_Zone, WritesOneCompleteEvent)
 {
-    const std::uint32_t line = __LINE__ + 2U;
+    SiteHandle handle{&K_SITE};
     {
-        SP_ZONE_AT(3, 1, "load", nullptr);
+        const ScopedZone<true> zone(collector, handle);
+        clock.advance(25U);
     }
     const auto events = drain_mine();
 
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::Zone);
-    EXPECT_LE(events[0].begin, events[0].end);
-    const SiteInfo info = Collector::instance().sites().info(SushiProfiler::site_of(events[0]));
+    EXPECT_EQ(events[0].begin, 100U);
+    EXPECT_EQ(events[0].end, 125U);
+}
+
+TEST_F(Small_Zone, TheEventCarriesTheSiteOfItsZone)
+{
+    SiteHandle handle{&K_SITE};
+    {
+        const ScopedZone<true> zone(collector, handle);
+    }
+    const auto events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    const SiteInfo info = collector.sites().info(SushiProfiler::site_of(events[0]));
     EXPECT_EQ(info.name, "load");
-    EXPECT_EQ(info.line, line);
+    EXPECT_EQ(info.line, 7U);
     EXPECT_EQ(info.level, 1U);
 }
 
 TEST_F(Small_Zone, NestedZonesNestByTime)
 {
+    SiteHandle outer_handle{&K_SITE};
+    SiteHandle inner_handle{&K_SITE};
     {
-        SP_ZONE_AT(3, 1, "outer", nullptr);
+        const ScopedZone<true> outer(collector, outer_handle);
+        clock.advance(10U);
         {
-            SP_ZONE_AT(3, 1, "inner", nullptr);
+            const ScopedZone<true> inner(collector, inner_handle);
+            clock.advance(20U);
         }
+        clock.advance(30U);
     }
     const auto events = drain_mine();
 
     ASSERT_EQ(events.size(), 2U);
-    const TraceEvent& inner = events[0];
-    const TraceEvent& outer = events[1];
-    EXPECT_LE(outer.begin, inner.begin);
-    EXPECT_LE(inner.end, outer.end);
+    EXPECT_EQ(events[0].begin, 110U);
+    EXPECT_EQ(events[0].end, 130U);
+    EXPECT_EQ(events[1].begin, 100U);
+    EXPECT_EQ(events[1].end, 160U);
 }
 
 TEST_F(Small_Zone, ANamedZoneCarriesItsName)
 {
-    const SushiProfiler::NameID name = Collector::instance().names().intern("conv_3");
+    SiteHandle handle{&K_SITE};
+    const SushiProfiler::NameID name = collector.names().intern("conv_3");
     {
-        SP_ZONE_NAMED_AT(3, 1, "node", nullptr, name);
+        const ScopedZone<true> zone(collector, handle, name);
     }
     const auto events = drain_mine();
 
@@ -118,11 +139,12 @@ TEST_F(Small_Zone, ANamedZoneCarriesItsName)
 
 TEST_F(Small_Zone, ADisabledSiteWritesNothing)
 {
+    SiteHandle handle{&K_DEVICE_SITE};
     SiteFilter filter;
     filter.groups = {"Data"};
-    Collector::instance().apply(filter);
+    collector.apply(filter);
     {
-        SP_ZONE_AT(3, 1, "run", "Device");
+        const ScopedZone<true> zone(collector, handle);
     }
 
     EXPECT_TRUE(drain_mine().empty());
@@ -130,54 +152,26 @@ TEST_F(Small_Zone, ADisabledSiteWritesNothing)
 
 TEST_F(Small_Zone, AZoneClosedAfterTheCollectorClosesWritesNothing)
 {
-    {
-        SP_ZONE_AT(3, 1, "cut", nullptr);
-        Collector::instance().close();
-    }
-
-    EXPECT_TRUE(drain_mine().empty());
-}
-
-TEST_F(Small_Zone, ACompiledOutZoneIsEmpty)
-{
-    {
-        SP_ZONE_AT(1, 3, "detail", nullptr);
-    }
-
-    EXPECT_TRUE(drain_mine().empty());
-}
-
-TEST(Small_ZoneOfAGivenCollector, RecordsIntoItWithTheStampsOfItsClock)
-{
-    ManualTickSource clock(100U);
-    Collector collector(clock);
-    ASSERT_TRUE(collector.open(CollectorSettings{}));
-    SushiProfiler::SiteHandle handle{&K_OWNED_SITE};
-
+    SiteHandle handle{&K_SITE};
     {
         const ScopedZone<true> zone(collector, handle);
-        clock.advance(25U);
+        collector.close();
     }
 
-    DrainBatch batch;
-    collector.drain(batch);
-    ASSERT_EQ(batch.threads.size(), 1U);
-    ASSERT_EQ(batch.threads[0].events.size(), 1U);
-    EXPECT_EQ(batch.threads[0].events[0].begin, 100U);
-    EXPECT_EQ(batch.threads[0].events[0].end, 125U);
+    EXPECT_TRUE(drain_mine().empty());
 }
 
-TEST(Small_ZoneOfAGivenCollector, WritesNothingWhileItIsClosed)
+TEST(Small_ZoneOfAClosedCollector, WritesNothing)
 {
     const ManualTickSource clock;
     Collector collector(clock);
-    SushiProfiler::SiteHandle handle{&K_OWNED_SITE};
+    SiteHandle handle{&K_SITE};
 
     {
         const ScopedZone<true> zone(collector, handle);
     }
 
-    DrainBatch batch;
+    SushiProfiler::DrainBatch batch;
     collector.drain(batch);
     EXPECT_TRUE(batch.threads.empty());
 }

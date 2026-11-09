@@ -13,12 +13,12 @@
   a counter recording, and one read of each clock.
 - `test_admission.cpp`: on a collector of its own, an enabled site gets the thread's ring and an
   id; a closed collector and a site the filter disables get none.
-- `test_zone.cpp`: a zone writes one complete event with its site's name and line; nested zones
-  nest by time; a named zone carries its name; a disabled site, a zone that outlives the
-  collector's close and a compiled-out zone write nothing; compiled-out zones and lanes are
-  empty types. A zone given a collector the test owns records into it with the stamps of its
-  `ManualTickSource` and writes nothing while that collector is closed; these tests are small and
-  reach no process-wide collector.
+- `test_zone.cpp`: on a collector of its own, with stamps from its `ManualTickSource`, a zone
+  writes one complete event with the begin and end the clock gave it and the name, line and level
+  of its site; nested zones nest by time; a named zone carries its name; a disabled site and a
+  zone that outlives the collector's close write nothing, and so does a zone of a collector never
+  opened; compiled-out zones and lanes are empty types. These tests are small and reach no
+  process-wide collector.
 - `test_records.cpp`: on a collector of its own, a counter keeps its value, operation and unit; a
   value keeps its sample; an external zone keeps the caller's times past 2^32; an external
   instant keeps its time; each flow kind carries its item; a lane brackets the events inside it.
