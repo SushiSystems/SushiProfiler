@@ -30,13 +30,28 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 ## Resume note
 
-M1 is done and pushed. M2 (`cli`, 6 files) has not started; take its records from `REPORT.md` by
-grepping the headings of `cli/tests/` and read each record range with offset and limit. The seams
-M1 built: `ContendedLock` and `lock_with_wait` take a `Collector&`; `OwnedRecordingFixture` in
-`tests/capture/zones/recording_fixture.hpp` gives a test its own collector; `ScriptedMutex` in
-`tests/capture/lock_wait/` scripts a contended mutex. Syntax check: clang `-fsyntax-only` with the
-include directories of `build/pkg-*/compile_commands.json` and gtest as `-isystem`. Nothing built
-or ran in M1: the first `sp test` over `tests/capture` is still owed.
+M1 is done and pushed, with the orchestrator's three follow-ups of 2026-11-10 (`REPORT.md` decisions 8 to
+10): the refused-count test, the `SP_LOCK_WAIT*_IN` macros, and the `Small_` condition-variable test. M2
+(`cli`, 6 files) has not started as a job. Most of its `rewrite` records were already applied by T4:
+`cli/tests/test_cli.py`, `test_env.py` and `test_package_contract.py` run on the `project` fixture's
+recording runner and patch no repository function. What is left, file by file, in this order:
+
+1. `cli/tests/test_cli.py`: merge `test_help_lists_the_four_commands` and `test_help_lists_the_docs_group`
+   into one parametrised test over the command names.
+2. `cli/tests/test_console.py`: `test_importing_the_console_builds_nothing` reads `console._lazy.built`
+   (a private name) and needs a rewrite on the public surface of sushicore's `LazyConsole`
+   (`D:/Projects/sushicore/source/sushicore/cli_console.py`, not read yet). `test_help_works_outside_a_checkout`
+   is `medium` (it calls `monkeypatch.chdir`): put the two tests in two classes, one mark each, and drop the
+   file-level `pytestmark`.
+3. `cli/tests/test_env.py`: both tests are `medium` today (`os.environ`, a build folder). Open ruling: build
+   an `environ` parameter on `load_build_env` and a `which` seam on `Config.resolved_compiler` (default
+   unchanged) so they run `small`, or keep them `medium` and record why.
+4. `test_config.py` and `test_main.py` are `keep`; check their size labels only.
+5. Then the folder README of `cli/tests`, the `REPORT.md` decision for M2, and set M2 to done.
+
+Syntax check: `syn.py` in the scratchpad (C++ only). Nothing built or ran: the first `sp test` over
+`tests/capture` is still owed. A shared scratchpad is used by other agents: name message files with a
+`prof_` prefix.
 
 ## Acceptance
 
