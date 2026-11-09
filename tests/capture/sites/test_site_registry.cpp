@@ -32,6 +32,9 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <string>
 #include <thread>
@@ -53,6 +56,26 @@ namespace
     {
         return Site{name, group, "test_site_registry.cpp", 1U, level, SiteRole::Zone,
                     CounterOp::Add, nullptr};
+    }
+
+    /// @brief Returns the ids that @p thread_count threads get for @p handle from @p registry.
+    std::vector<SiteID> ids_from_threads(SiteRegistry& registry, SiteHandle& handle,
+                                         std::size_t thread_count)
+    {
+        std::vector<SiteID> ids(thread_count, 0U);
+        std::vector<std::thread> threads;
+        for (std::size_t index = 0U; index < thread_count; ++index)
+            threads.emplace_back([&registry, &handle, &ids, index]
+                                 { ids[index] = registry.id_of(handle); });
+        for (std::thread& thread : threads)
+            thread.join();
+        return ids;
+    }
+
+    /// @brief Returns whether every id in @p ids equals the first.
+    bool all_equal(const std::vector<SiteID>& ids)
+    {
+        return std::all_of(ids.begin(), ids.end(), [&ids](SiteID id) { return id == ids.front(); });
     }
 } // namespace
 
@@ -95,14 +118,12 @@ TEST(Small_SiteRegistry, TheFilterDisablesALevelAboveIt)
     EXPECT_FALSE(registry.enabled(registry.id_of(fine)));
 }
 
-TEST(Small_SiteRegistry, TheFilterKeepsOnlyNamedGroupsAndUngroupedSites)
+TEST(Small_SiteRegistry, TheFilterKeepsOnlyNamedGroups)
 {
     static constexpr Site data_site = zone_site("read", "Data", 1U);
     static constexpr Site device_site = zone_site("run", "Device", 1U);
-    static constexpr Site plain_site = zone_site("plain", nullptr, 1U);
     SiteHandle data{&data_site};
     SiteHandle device{&device_site};
-    SiteHandle plain{&plain_site};
     SiteRegistry registry;
     SiteFilter filter;
     filter.groups = {"Data"};
@@ -110,6 +131,17 @@ TEST(Small_SiteRegistry, TheFilterKeepsOnlyNamedGroupsAndUngroupedSites)
 
     EXPECT_TRUE(registry.enabled(registry.id_of(data)));
     EXPECT_FALSE(registry.enabled(registry.id_of(device)));
+}
+
+TEST(Small_SiteRegistry, TheFilterKeepsUngroupedSites)
+{
+    static constexpr Site plain_site = zone_site("plain", nullptr, 1U);
+    SiteHandle plain{&plain_site};
+    SiteRegistry registry;
+    SiteFilter filter;
+    filter.groups = {"Data"};
+    registry.apply(filter);
+
     EXPECT_TRUE(registry.enabled(registry.id_of(plain)));
 }
 
@@ -123,11 +155,22 @@ TEST(Small_SiteRegistry, AFilterAppliesToSitesRegisteredLater)
     registry.apply(filter);
 
     EXPECT_FALSE(registry.enabled(registry.id_of(fine)));
+}
+
+TEST(Small_SiteRegistry, AChangedFilterAppliesToSitesRegisteredBefore)
+{
+    static constexpr Site fine_site = zone_site("early", nullptr, 3U);
+    SiteHandle fine{&fine_site};
+    SiteRegistry registry;
+    SiteFilter filter;
+    filter.level = 2U;
+    registry.apply(filter);
+    const SiteID id = registry.id_of(fine);
 
     filter.level = 3U;
     registry.apply(filter);
 
-    EXPECT_TRUE(registry.enabled(registry.id_of(fine)));
+    EXPECT_TRUE(registry.enabled(id));
 }
 
 TEST(Small_SiteRegistry, ASiteBeyondCapacityIsCountedNotRecorded)
@@ -141,7 +184,6 @@ TEST(Small_SiteRegistry, ASiteBeyondCapacityIsCountedNotRecorded)
 
     EXPECT_NE(registry.id_of(first), 0U);
     EXPECT_NE(registry.id_of(second), 0U);
-    EXPECT_EQ(registry.id_of(third), 0U);
     EXPECT_EQ(registry.id_of(third), 0U);
     EXPECT_FALSE(registry.enabled(0U));
     EXPECT_EQ(registry.refused(), 1U);
@@ -162,6 +204,19 @@ TEST(Small_SiteRegistry, InfoCopiesTheStrings)
 
     EXPECT_EQ(info.name, "decode");
     EXPECT_EQ(info.group, "Data");
+}
+
+TEST(Small_SiteRegistry, InfoMapsTheFieldsOfTheSite)
+{
+    static constexpr Site site{"decode", "Data", "file.cpp", 42U, 2U,
+                               SiteRole::Counter, CounterOp::Max, "px"};
+    SiteHandle handle{&site};
+    SiteRegistry registry;
+
+    const SiteInfo info = registry.info(registry.id_of(handle));
+
+    EXPECT_EQ(info.name, "decode");
+    EXPECT_EQ(info.group, "Data");
     EXPECT_EQ(info.file, "file.cpp");
     EXPECT_EQ(info.unit, "px");
     EXPECT_EQ(info.line, 42U);
@@ -175,14 +230,9 @@ TEST(Medium_SiteRegistry, ConcurrentFirstUseGivesOneId)
     static constexpr Site site = zone_site("shared", nullptr, 1U);
     SiteHandle handle{&site};
     SiteRegistry registry;
-    std::vector<SiteID> ids(8U, 0U);
-    std::vector<std::thread> threads;
-    for (std::size_t index = 0U; index < ids.size(); ++index)
-        threads.emplace_back([&, index] { ids[index] = registry.id_of(handle); });
-    for (std::thread& thread : threads)
-        thread.join();
 
-    for (const SiteID id : ids)
-        EXPECT_EQ(id, ids.front());
+    const std::vector<SiteID> ids = ids_from_threads(registry, handle, 8U);
+
+    EXPECT_TRUE(all_equal(ids));
     EXPECT_EQ(registry.size(), 1U);
 }
