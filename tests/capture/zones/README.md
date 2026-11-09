@@ -19,9 +19,10 @@
   empty types. A zone given a collector the test owns records into it with the stamps of its
   `ManualTickSource` and writes nothing while that collector is closed; these tests are small and
   reach no process-wide collector.
-- `test_records.cpp`: a counter keeps its operation, unit and value; a value keeps its sample;
-  an external zone keeps the caller's times past 2^32; an external instant keeps its time; flows
-  carry their item; a lane brackets the events inside it; compiled-out records write nothing.
+- `test_records.cpp`: on a collector of its own, a counter keeps its value, operation and unit; a
+  value keeps its sample; an external zone keeps the caller's times past 2^32; an external
+  instant keeps its time; each flow kind carries its item; a lane brackets the events inside it.
+  One medium test checks that compiled-out record macros write nothing.
 - `test_macros.cpp`: every direct macro writes its kind at the default level 2; after each site's
   first use, 100,000 rounds of zones, counters, values, instants, flows and lanes allocate nothing
   on the recording thread.

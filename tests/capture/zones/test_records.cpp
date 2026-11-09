@@ -33,12 +33,12 @@
 #include "recording_fixture.hpp"
 
 #include <SushiProfiler/zones/macros.hpp>
+#include <SushiProfiler/zones/zone.hpp>
 
 #include <gtest/gtest.h>
 
 #include <cstdint>
 
-using SushiProfiler::Collector;
 using SushiProfiler::CounterOp;
 using SushiProfiler::EventKind;
 using SushiProfiler::NameID;
@@ -49,21 +49,56 @@ using SushiProfiler::SiteRole;
 
 namespace
 {
-    /// @brief The record tests, on one thread.
-    class Small_Records : public SushiProfilerTests::RecordingFixture
+    /// @brief The record tests, on one thread and a collector of their own.
+    class Small_Records : public SushiProfilerTests::OwnedRecordingFixture
     {
     };
+
+    /// @brief The record tests that go through the macros and so reach the process-wide collector.
+    class Medium_Records : public SushiProfilerTests::RecordingFixture
+    {
+    };
+
+    /// @brief A counter site that takes the largest value it is given, in items.
+    constexpr Site K_COUNTER_SITE{"queue", nullptr, "test_records.cpp", 1U, 1U, SiteRole::Counter,
+                                  CounterOp::Max, "items"};
+
+    /// @brief A value site.
+    constexpr Site K_VALUE_SITE{"loss", nullptr, "test_records.cpp", 1U, 1U, SiteRole::Value,
+                                CounterOp::Add, nullptr};
+
+    /// @brief A zone site in the group "Device".
+    constexpr Site K_ZONE_SITE{"kernel", "Device", "test_records.cpp", 1U, 1U, SiteRole::Zone,
+                               CounterOp::Add, nullptr};
+
+    /// @brief An instant site.
+    constexpr Site K_INSTANT_SITE{"fence", nullptr, "test_records.cpp", 1U, 1U, SiteRole::Instant,
+                                  CounterOp::Add, nullptr};
+
+    /// @brief A flow site.
+    constexpr Site K_FLOW_SITE{"frame", nullptr, "test_records.cpp", 1U, 1U, SiteRole::Flow,
+                               CounterOp::Add, nullptr};
 } // namespace
 
-TEST_F(Small_Records, ACounterKeepsItsOperationAndValue)
+TEST_F(Small_Records, ACounterKeepsItsValue)
 {
-    SP_COUNTER_AT(3, 1, "queue", "items", Max, 42.5);
+    SiteHandle handle{&K_COUNTER_SITE};
+    SushiProfiler::record_counter(collector, handle, 42.5);
     const auto events = drain_mine();
 
     ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::Counter);
     EXPECT_EQ(SushiProfiler::value_of(events[0].end), 42.5);
-    const SiteInfo info = Collector::instance().sites().info(SushiProfiler::site_of(events[0]));
+}
+
+TEST_F(Small_Records, ACounterSiteKeepsItsOperationAndUnit)
+{
+    SiteHandle handle{&K_COUNTER_SITE};
+    SushiProfiler::record_counter(collector, handle, 42.5);
+    const auto events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    const SiteInfo info = collector.sites().info(SushiProfiler::site_of(events[0]));
     EXPECT_EQ(info.op, CounterOp::Max);
     EXPECT_EQ(info.unit, "items");
     EXPECT_EQ(info.role, SiteRole::Counter);
@@ -71,7 +106,8 @@ TEST_F(Small_Records, ACounterKeepsItsOperationAndValue)
 
 TEST_F(Small_Records, AValueKeepsItsSample)
 {
-    SP_VALUE_AT(3, 1, "loss", "", -0.25);
+    SiteHandle handle{&K_VALUE_SITE};
+    SushiProfiler::record_value(collector, handle, -0.25);
     const auto events = drain_mine();
 
     ASSERT_EQ(events.size(), 1U);
@@ -81,10 +117,8 @@ TEST_F(Small_Records, AValueKeepsItsSample)
 
 TEST_F(Small_Records, AnExternalZoneKeepsTheCallersTimes)
 {
-    static constexpr Site site{"kernel", "Device", "test_records.cpp", 1U, 1U, SiteRole::Zone,
-                               CounterOp::Add, nullptr};
-    static SiteHandle handle{&site};
-    SushiProfiler::record_zone_at(handle, 1U, 5'000'000'001U);
+    SiteHandle handle{&K_ZONE_SITE};
+    SushiProfiler::record_zone_at(collector, handle, 1U, 5'000'000'001U);
     const auto events = drain_mine();
 
     ASSERT_EQ(events.size(), 1U);
@@ -95,10 +129,8 @@ TEST_F(Small_Records, AnExternalZoneKeepsTheCallersTimes)
 
 TEST_F(Small_Records, AnExternalInstantKeepsTheCallersTime)
 {
-    static constexpr Site site{"fence", nullptr, "test_records.cpp", 1U, 1U, SiteRole::Instant,
-                               CounterOp::Add, nullptr};
-    static SiteHandle handle{&site};
-    SushiProfiler::record_instant_at(handle, 77U);
+    SiteHandle handle{&K_INSTANT_SITE};
+    SushiProfiler::record_instant_at(collector, handle, 77U);
     const auto events = drain_mine();
 
     ASSERT_EQ(events.size(), 1U);
@@ -106,27 +138,46 @@ TEST_F(Small_Records, AnExternalInstantKeepsTheCallersTime)
     EXPECT_EQ(events[0].begin, 77U);
 }
 
-TEST_F(Small_Records, FlowsCarryTheirId)
+TEST_F(Small_Records, AFlowBeginCarriesItsId)
 {
-    SP_FLOW_AT(3, 1, "frame", FlowBegin, 7U);
-    SP_FLOW_AT(3, 1, "frame", FlowStep, 7U);
-    SP_FLOW_AT(3, 1, "frame", FlowEnd, 7U);
+    SiteHandle handle{&K_FLOW_SITE};
+    SushiProfiler::record_flow(collector, handle, EventKind::FlowBegin, 7U);
     const auto events = drain_mine();
 
-    ASSERT_EQ(events.size(), 3U);
+    ASSERT_EQ(events.size(), 1U);
     EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::FlowBegin);
-    EXPECT_EQ(SushiProfiler::kind_of(events[1]), EventKind::FlowStep);
-    EXPECT_EQ(SushiProfiler::kind_of(events[2]), EventKind::FlowEnd);
-    for (const auto& event : events)
-        EXPECT_EQ(event.end, 7U);
+    EXPECT_EQ(events[0].end, 7U);
+}
+
+TEST_F(Small_Records, AFlowStepCarriesItsId)
+{
+    SiteHandle handle{&K_FLOW_SITE};
+    SushiProfiler::record_flow(collector, handle, EventKind::FlowStep, 7U);
+    const auto events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::FlowStep);
+    EXPECT_EQ(events[0].end, 7U);
+}
+
+TEST_F(Small_Records, AFlowEndCarriesItsId)
+{
+    SiteHandle handle{&K_FLOW_SITE};
+    SushiProfiler::record_flow(collector, handle, EventKind::FlowEnd, 7U);
+    const auto events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(SushiProfiler::kind_of(events[0]), EventKind::FlowEnd);
+    EXPECT_EQ(events[0].end, 7U);
 }
 
 TEST_F(Small_Records, ALaneBracketsItsEvents)
 {
-    const NameID lane = Collector::instance().names().intern("worker");
+    SiteHandle handle{&K_INSTANT_SITE};
+    const NameID lane = collector.names().intern("worker");
     {
-        SP_LANE_AT(3, lane);
-        SP_INSTANT_AT(3, 1, "tick");
+        const SushiProfiler::ScopedLane<true> scope(collector, lane);
+        SushiProfiler::record_instant(collector, handle);
     }
     const auto events = drain_mine();
 
@@ -138,7 +189,7 @@ TEST_F(Small_Records, ALaneBracketsItsEvents)
     EXPECT_EQ(events[2].name, lane);
 }
 
-TEST_F(Small_Records, ACompiledOutRecordWritesNothing)
+TEST_F(Medium_Records, ACompiledOutRecordWritesNothing)
 {
     SP_COUNTER_AT(1, 2, "detail", "", Add, 1.0);
     SP_INSTANT_AT(0, 1, "off");
