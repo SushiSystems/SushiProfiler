@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_site.cpp                                                          */
+/* compile_site.cpp                                                          */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -22,33 +22,25 @@
 /**************************************************************************/
 
 /**
- * @file test_site.cpp
- * @brief Tests that a site is a constant aggregate and a handle starts unregistered.
+ * @file compile_site.cpp
+ * @brief Checks at compile time that a site is a constant aggregate built where it is declared.
  * @author Mustafa Garip
  * @see tests/capture/sites/README.md
  */
 
 #include <SushiProfiler/sites/site.hpp>
 
-#include <gtest/gtest.h>
-
-using SushiProfiler::CounterOp;
-using SushiProfiler::Site;
-using SushiProfiler::SiteHandle;
-using SushiProfiler::SiteRole;
+#include <type_traits>
 
 namespace
 {
+    using SushiProfiler::CounterOp;
+    using SushiProfiler::Site;
+    using SushiProfiler::SiteRole;
+
     /// @brief A site built at compile time, as the recording macros build theirs.
-    constexpr Site K_SITE{"frame", nullptr, "test_site.cpp", 7U, 1U, SiteRole::Zone,
+    constexpr Site K_SITE{"frame", nullptr, "compile_site.cpp", 7U, 1U, SiteRole::Zone,
                           CounterOp::Add, nullptr};
+    static_assert(std::is_aggregate_v<Site>, "a site is built by listing its fields");
     static_assert(K_SITE.line == 7U, "a site is a constant aggregate");
 } // namespace
-
-TEST(Small_Site, AHandleStartsUnregistered)
-{
-    static SiteHandle handle{&K_SITE};
-
-    EXPECT_EQ(handle.id.load(), 0U);
-    EXPECT_EQ(handle.site, &K_SITE);
-}

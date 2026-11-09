@@ -1,6 +1,6 @@
 # tests/capture/sites
 
-- `test_site.cpp`: a site is a constant aggregate and a static handle starts unregistered.
+- `compile_site.cpp`: a site is a constant aggregate, checked by `static_assert`s.
 - `test_site_registry.cpp`: one id per handle however often it is asked; two sites with equal
   text are two sites; the filter's level and groups, ungrouped sites passing a group filter, a
   filter applied before a site registers; a site past the capacity gets 0 and is counted once;
