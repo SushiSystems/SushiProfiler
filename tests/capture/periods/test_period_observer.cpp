@@ -30,6 +30,7 @@
 
 #include <SushiProfiler/periods/period_observer.hpp>
 
+#include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/events/trace_event.hpp>
 #include <SushiProfiler/periods/period_timeline.hpp>
@@ -37,12 +38,12 @@
 #include <gtest/gtest.h>
 
 #include <cstdint>
-#include <string>
 #include <vector>
 
 using SushiProfiler::Collector;
 using SushiProfiler::CollectorSettings;
 using SushiProfiler::DrainBatch;
+using SushiProfiler::ManualTickSource;
 using SushiProfiler::PeriodObserver;
 using SushiProfiler::PeriodTimeline;
 using SushiProfiler::ThreadDrain;
@@ -50,30 +51,27 @@ using SushiProfiler::TraceEvent;
 
 namespace
 {
-    /// @brief Opens the collector before each test, and closes and empties it after.
+    /// @brief The index no mark carries, so an observer left at it never steers the gate.
+    constexpr std::uint64_t K_NEVER = ~std::uint64_t{0U};
+
+    /// @brief Gives each test its own open collector on a manual clock that starts at 100 ns.
     class Small_PeriodObserver : public ::testing::Test
     {
         protected:
             void SetUp() override
             {
-                close_and_empty();
-                ASSERT_TRUE(Collector::instance().open(CollectorSettings{}));
-            }
-
-            void TearDown() override
-            {
-                close_and_empty();
+                ASSERT_TRUE(collector.open(CollectorSettings{}));
             }
 
             /// @brief Returns the indices of the marks this thread wrote since the last drain.
-            static std::vector<std::uint64_t> drained_marks()
+            std::vector<std::uint64_t> drained_marks()
             {
                 DrainBatch batch;
-                Collector::instance().drain(batch);
+                collector.drain(batch);
                 std::vector<std::uint64_t> marks;
                 for (const ThreadDrain& thread : batch.threads)
                 {
-                    if (thread.thread_index != Collector::thread_index())
+                    if (thread.thread_index != collector.index_of_thread())
                         continue;
                     for (const TraceEvent& event : thread.events)
                         marks.push_back(event.end);
@@ -81,66 +79,96 @@ namespace
                 return marks;
             }
 
-        private:
-            /// @brief Closes the collector and discards what its rings hold.
-            static void close_and_empty()
-            {
-                Collector::instance().close();
-                DrainBatch discarded;
-                Collector::instance().drain(discarded);
-            }
+            ManualTickSource clock{100U};
+            Collector collector{clock};
     };
 
-    /// @brief Records each call, and opens or closes the gate where it is told to.
+    /// @brief Records the index of each call, and steers the gate of its collector where told to.
     class ScriptedObserver final : public PeriodObserver
     {
         public:
+            /// @brief Builds an observer that steers @p collector.
+            explicit ScriptedObserver(Collector& collector) : collector_(collector)
+            {
+            }
+
             void before_mark(const PeriodTimeline&, std::uint64_t index) noexcept override
             {
-                calls.push_back("before " + std::to_string(index));
+                before_indices.push_back(index);
                 if (index == resume_at)
-                    Collector::instance().resume();
+                    collector_.resume();
             }
 
             void after_mark(const PeriodTimeline&, std::uint64_t index) noexcept override
             {
-                calls.push_back("after " + std::to_string(index));
+                after_indices.push_back(index);
                 if (index == pause_at)
-                    Collector::instance().pause();
+                    collector_.pause();
             }
 
-            /// @brief The calls heard, in order.
-            std::vector<std::string> calls;
+            /// @brief The indices heard before a write, in order.
+            std::vector<std::uint64_t> before_indices;
+
+            /// @brief The indices heard after a write, in order.
+            std::vector<std::uint64_t> after_indices;
 
             /// @brief The index whose mark resumes the gate before it is written.
-            std::uint64_t resume_at = ~std::uint64_t{0U};
+            std::uint64_t resume_at = K_NEVER;
 
             /// @brief The index whose mark pauses the gate after it is written.
-            std::uint64_t pause_at = ~std::uint64_t{0U};
+            std::uint64_t pause_at = K_NEVER;
+
+        private:
+            /// @brief The collector whose gate the observer steers.
+            Collector& collector_;
     };
 } // namespace
 
-TEST_F(Small_PeriodObserver, HearsEachMarkBeforeAndAfter)
+TEST_F(Small_PeriodObserver, HearsEachMarkBeforeItIsWritten)
 {
-    PeriodTimeline timeline("observed");
-    ScriptedObserver observer;
+    PeriodTimeline timeline(collector, "observed");
+    ScriptedObserver observer(collector);
+    timeline.observe(&observer);
+
+    timeline.mark();
+    timeline.mark();
+
+    EXPECT_EQ(observer.before_indices, (std::vector<std::uint64_t>{0U, 1U}));
+}
+
+TEST_F(Small_PeriodObserver, HearsEachMarkAfterItIsWritten)
+{
+    PeriodTimeline timeline(collector, "observed");
+    ScriptedObserver observer(collector);
+    timeline.observe(&observer);
+
+    timeline.mark();
+    timeline.mark();
+
+    EXPECT_EQ(observer.after_indices, (std::vector<std::uint64_t>{0U, 1U}));
+}
+
+TEST_F(Small_PeriodObserver, HearsNoMarkAfterItIsRemoved)
+{
+    PeriodTimeline timeline(collector, "observed");
+    ScriptedObserver observer(collector);
     timeline.observe(&observer);
     timeline.mark();
-    timeline.mark();
+
     timeline.observe(nullptr);
     timeline.mark();
 
-    const std::vector<std::string> expected = {"before 0", "after 0", "before 1", "after 1"};
-    EXPECT_EQ(observer.calls, expected);
+    EXPECT_EQ(observer.before_indices, std::vector<std::uint64_t>{0U});
+    EXPECT_EQ(observer.after_indices, std::vector<std::uint64_t>{0U});
 }
 
 TEST_F(Small_PeriodObserver, AMarkThatResumesTheGateIsWritten)
 {
-    PeriodTimeline timeline("window");
-    ScriptedObserver observer;
+    PeriodTimeline timeline(collector, "window");
+    ScriptedObserver observer(collector);
     observer.resume_at = 1U;
     timeline.observe(&observer);
-    Collector::instance().pause();
+    collector.pause();
     timeline.mark();
     timeline.mark();
     timeline.observe(nullptr);
@@ -150,8 +178,8 @@ TEST_F(Small_PeriodObserver, AMarkThatResumesTheGateIsWritten)
 
 TEST_F(Small_PeriodObserver, AMarkThatPausesTheGateIsStillWritten)
 {
-    PeriodTimeline timeline("window");
-    ScriptedObserver observer;
+    PeriodTimeline timeline(collector, "window");
+    ScriptedObserver observer(collector);
     observer.pause_at = 1U;
     timeline.observe(&observer);
     timeline.mark();
