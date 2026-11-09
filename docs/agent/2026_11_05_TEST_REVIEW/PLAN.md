@@ -28,6 +28,15 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M9 | the tests of `tools/record_tool` (1 file): 5 split | T1, T2, T3, T4, T5, T6 | todo |
 | M10 | the tests of `tools/umbrella` (1 file): 1 rewrite | T1, T2, T3, T4, T5, T6 | todo |
 
+## Resume note
+
+M1 is under way, in the order of the `capture` records of `REPORT.md`. Done and pushed:
+`tests/capture/collector/` (`test_collector.cpp`, and the two default-value tests replaced by
+`compile_collector_settings.cpp` and `compile_drain_batch.cpp`). Next: `tests/capture/lock_wait/test_contended_lock.cpp`.
+`tests/capture/collector/` has no `compile_` example elsewhere yet; the pattern is a `compile_<name>.cpp`
+of static_asserts listed in the module's `SOURCES`. Syntax check: clang `-fsyntax-only` with the include
+directories of `build/pkg-*/compile_commands.json` and gtest as `-isystem`.
+
 ## Acceptance
 
 - **T1.** No comparison with a tolerance spells a literal. Build: the repository's test command.
