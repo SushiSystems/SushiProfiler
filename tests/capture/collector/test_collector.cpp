@@ -473,3 +473,29 @@ TEST_F(Small_Collector, HoldDoesNothingWhileClosed)
     EXPECT_FALSE(collector.is_held());
     EXPECT_FALSE(collector.is_marking());
 }
+
+TEST_F(Medium_Collector, AThreadWithoutARingHasNoThreadIndex)
+{
+    std::uint32_t index = 0U;
+    std::thread([&index] { index = Collector::thread_index(); }).join();
+
+    EXPECT_EQ(index, Collector::K_NO_THREAD);
+}
+
+TEST_F(Medium_Collector, ARetiredThreadGetsNoRing)
+{
+    ManualTickSource clock{100U};
+    Collector collector{clock};
+    ASSERT_TRUE(collector.open(CollectorSettings{}));
+    ThreadRing* ring = nullptr;
+    std::thread(
+        [&collector, &ring]
+        {
+            static_cast<void>(collector.thread_ring());
+            Collector::retire_current_thread();
+            ring = collector.thread_ring();
+        })
+        .join();
+
+    EXPECT_EQ(ring, nullptr);
+}

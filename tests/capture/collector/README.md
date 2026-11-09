@@ -11,7 +11,8 @@
   nothing while closed. The `Medium_` tests use the process-wide collector and real threads: a new
   thread of a closed collector gets no ring; a ring of 64 that took 70 events reports 6 drops; a
   thread registered while closed keeps its ring of the size it asked; four threads get four rings;
-  an exited thread is drained once with `retired` set and then is gone. A zone recorded by
+  an exited thread is drained once with `retired` set and then is gone; a thread without a ring
+  has no thread index; a retired thread gets no ring. A zone recorded by
   `second_image.cpp`, built as the shared library `sp_second_image`, reaches the same collector and
   drain as a zone of the test executable, on the calling thread and on a thread that only runs the
   second image; a closed collector records nothing from it.
