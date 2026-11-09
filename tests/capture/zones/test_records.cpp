@@ -127,6 +127,17 @@ TEST_F(Small_Records, AnExternalZoneKeepsTheCallersTimes)
     EXPECT_EQ(events[0].end, 5'000'000'001U);
 }
 
+TEST_F(Small_Records, AnExternalZoneKeepsItsDynamicName)
+{
+    SiteHandle handle{&K_ZONE_SITE};
+    const NameID name = collector.names().intern("kernel.gemm");
+    SushiProfiler::record_zone_at(collector, handle, 1U, 2U, name);
+    const auto events = drain_mine();
+
+    ASSERT_EQ(events.size(), 1U);
+    EXPECT_EQ(events[0].name, name);
+}
+
 TEST_F(Small_Records, AnExternalInstantKeepsTheCallersTime)
 {
     SiteHandle handle{&K_INSTANT_SITE};

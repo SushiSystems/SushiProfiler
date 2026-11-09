@@ -20,7 +20,7 @@
   opened; compiled-out zones and lanes are empty types. These tests are small and reach no
   process-wide collector.
 - `test_records.cpp`: on a collector of its own, a counter keeps its value, operation and unit; a
-  value keeps its sample; an external zone keeps the caller's times past 2^32; an external
+  value keeps its sample; an external zone keeps the caller's times past 2^32 and its dynamic name; an external
   instant keeps its time; each flow kind carries its item; a lane brackets the events inside it.
   One medium test checks that compiled-out record macros write nothing.
 - `test_macros.cpp`: medium tests, one per direct macro, each checking the kinds that macro writes
