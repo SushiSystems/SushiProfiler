@@ -142,6 +142,15 @@ TEST(Small_DynamicSiteTable, KeepsTheFirstLevelOfAName)
     EXPECT_EQ(first->site->level, 1U);
 }
 
+TEST(Small_DynamicSiteTable, AnEmptyUnitLeavesTheUnitOfTheSiteNull)
+{
+    DynamicSiteTable table(SiteRole::Counter);
+    SiteHandle* const handle = table.handle("frames", "", CounterOp::Add, 1U);
+
+    ASSERT_NE(handle, nullptr);
+    EXPECT_EQ(handle->site->unit, nullptr);
+}
+
 TEST(Small_DynamicSiteTable, CopiesTheNameSoATemporaryMayBeFreed)
 {
     DynamicSiteTable table(SiteRole::Value);
