@@ -225,6 +225,23 @@ TEST(Small_SiteRegistry, InfoMapsTheFieldsOfTheSite)
     EXPECT_EQ(info.op, CounterOp::Max);
 }
 
+TEST(Small_SiteRegistry, InfoOfIdZeroIsEmpty)
+{
+    const SiteRegistry registry;
+
+    EXPECT_EQ(registry.info(0U).name, "");
+}
+
+TEST(Small_SiteRegistry, InfoOfAnIdNeverGivenIsEmpty)
+{
+    static constexpr Site site = zone_site("load", nullptr, 1U);
+    SiteHandle handle{&site};
+    SiteRegistry registry;
+    const SiteID given = registry.id_of(handle);
+
+    EXPECT_EQ(registry.info(given + 1U).name, "");
+}
+
 TEST(Medium_SiteRegistry, ConcurrentFirstUseGivesOneId)
 {
     static constexpr Site site = zone_site("shared", nullptr, 1U);
