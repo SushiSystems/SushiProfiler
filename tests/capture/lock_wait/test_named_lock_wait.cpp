@@ -40,7 +40,6 @@
 #include <condition_variable>
 #include <cstdint>
 #include <mutex>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -90,45 +89,6 @@ namespace
             ManualTickSource clock{100U};
             Collector collector{clock};
             SushiProfiler::SiteHandle handle{&K_SITE};
-    };
-
-    /// @brief The macro tests: they reach the process-wide collector, which is opened and emptied
-    ///        around each test.
-    class Medium_NamedLockWait : public ::testing::Test
-    {
-        protected:
-            void SetUp() override
-            {
-                close_and_empty();
-                ASSERT_TRUE(Collector::instance().open(CollectorSettings{}));
-            }
-
-            void TearDown() override
-            {
-                close_and_empty();
-            }
-
-            /// @brief Returns what the calling thread wrote since the last drain.
-            static std::vector<TraceEvent> drain_mine_process_wide()
-            {
-                DrainBatch batch;
-                Collector::instance().drain(batch);
-                for (ThreadDrain& thread : batch.threads)
-                {
-                    if (thread.thread_index == Collector::thread_index())
-                        return std::move(thread.events);
-                }
-                return {};
-            }
-
-        private:
-            /// @brief Closes the collector and discards what its rings hold.
-            static void close_and_empty()
-            {
-                Collector::instance().close();
-                DrainBatch discarded;
-                Collector::instance().drain(discarded);
-            }
     };
 } // namespace
 
@@ -232,27 +192,17 @@ TEST_F(Small_NamedLockWait, TheMacroAtLevelZeroStillLocks)
     EXPECT_TRUE(drain_mine(collector).empty());
 }
 
-TEST_F(Medium_NamedLockWait, TheLockPassesToAConditionVariableWait)
+TEST_F(Small_NamedLockWait, TheLockPassesToAConditionVariableWait)
 {
-    std::mutex mutex;
-    std::condition_variable ready;
-    bool flag = false;
-    std::thread setter;
+    ScriptedMutex mutex(false);
+    std::condition_variable_any ready;
+    const bool flag = true;
     {
-        SP_LOCK_WAIT_NAMED_AT(1, lock, "state", mutex);
-        setter = std::thread(
-            [&]
-            {
-                {
-                    const std::lock_guard<std::mutex> guard(mutex);
-                    flag = true;
-                }
-                ready.notify_one();
-            });
+        SP_LOCK_WAIT_NAMED_IN_AT(collector, 1, lock, "state", mutex);
+
         ready.wait(lock, [&] { return flag; });
 
-        EXPECT_TRUE(flag);
         EXPECT_TRUE(lock.owns_lock());
+        EXPECT_TRUE(mutex.locked());
     }
-    setter.join();
 }

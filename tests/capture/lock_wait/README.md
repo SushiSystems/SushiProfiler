@@ -11,5 +11,5 @@
 - `test_named_lock_wait.cpp`: on a collector of its own, `lock_with_wait` holds the lock on return
   and writes nothing when uncontended; a scripted contended one writes one `LockWait` zone as long
   as the scripted wait, and a compiled-out one still locks and writes nothing. `SP_LOCK_WAIT_NAMED_IN_AT`
-  writes one `LockWait` zone at level 1 and nothing at level 0. One medium test checks that
-  the lock waits on a `std::condition_variable` and returns holding it.
+  writes one `LockWait` zone at level 1 and nothing at level 0, and the lock passes to a `std::condition_variable_any` wait on a
+  `ScriptedMutex` and returns holding it.
