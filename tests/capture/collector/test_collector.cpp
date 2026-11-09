@@ -37,6 +37,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <thread>
@@ -53,8 +54,77 @@ using SushiProfiler::TraceEvent;
 
 namespace
 {
-    /// @brief Opens the collector for each test and closes and empties it after.
-    class CollectorTest : public ::testing::Test
+    /// @brief Pushes @p count events numbered from 0 on the calling thread's ring of @p collector.
+    void push_events(Collector& collector, std::uint64_t count)
+    {
+        ThreadRing* const ring = collector.thread_ring();
+        ASSERT_NE(ring, nullptr);
+        for (std::uint64_t value = 0U; value < count; ++value)
+        {
+            TraceEvent event{};
+            event.begin = value;
+            ring->push(event);
+        }
+    }
+
+    /// @brief Returns the drain of thread @p index in @p batch, or null.
+    const ThreadDrain* find(const DrainBatch& batch, std::uint32_t index)
+    {
+        for (const ThreadDrain& thread : batch.threads)
+        {
+            if (thread.thread_index == index)
+                return &thread;
+        }
+        return nullptr;
+    }
+
+    /**
+     * @brief Runs @p thread_count threads that each push @p count events into @p collector, drains it
+     *        and returns how many events each thread's ring held, in thread order.
+     */
+    std::vector<std::size_t> events_drained_per_thread(Collector& collector, std::size_t thread_count,
+                                                       std::uint64_t count)
+    {
+        std::vector<std::uint32_t> indices(thread_count, Collector::K_NO_THREAD);
+        std::vector<std::thread> threads;
+        for (std::size_t slot = 0U; slot < thread_count; ++slot)
+        {
+            threads.emplace_back(
+                [&collector, &indices, slot, count]
+                {
+                    push_events(collector, count);
+                    indices[slot] = collector.index_of_thread();
+                });
+        }
+        for (std::thread& thread : threads)
+            thread.join();
+        DrainBatch batch;
+        collector.drain(batch);
+
+        std::vector<std::size_t> sizes;
+        for (const std::uint32_t index : indices)
+        {
+            const ThreadDrain* const writer = find(batch, index);
+            sizes.push_back(writer != nullptr ? writer->events.size() : 0U);
+        }
+        return sizes;
+    }
+
+    /// @brief Gives each test its own open collector on a manual clock that starts at 100 ns.
+    class OwnedCollectorTest : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                ASSERT_TRUE(collector.open(CollectorSettings{}));
+            }
+
+            ManualTickSource clock{100U};
+            Collector collector{clock};
+    };
+
+    /// @brief The process-wide collector, opened for each test and closed and emptied after.
+    class ProcessWideCollectorTest : public ::testing::Test
     {
         protected:
             /// @brief Opens the collector with @p settings, closing any open one first.
@@ -81,48 +151,47 @@ namespace
                 DrainBatch discarded;
                 Collector::instance().drain(discarded);
             }
-
-            /// @brief Pushes @p count events numbered from 0 on the calling thread.
-            static void push_events(std::uint64_t count)
-            {
-                ThreadRing* const ring = Collector::ring();
-                ASSERT_NE(ring, nullptr);
-                for (std::uint64_t value = 0U; value < count; ++value)
-                {
-                    TraceEvent event{};
-                    event.begin = value;
-                    ring->push(event);
-                }
-            }
-
-            /// @brief Returns the drain of thread @p index in @p batch, or null.
-            static const ThreadDrain* find(const DrainBatch& batch, std::uint32_t index)
-            {
-                for (const ThreadDrain& thread : batch.threads)
-                {
-                    if (thread.thread_index == index)
-                        return &thread;
-                }
-                return nullptr;
-            }
     };
 
-    /// @brief The collector's tests that run on one thread.
-    class Small_Collector : public CollectorTest
+    /// @brief The collector's tests that run on one thread and read no process-wide state.
+    class Small_Collector : public OwnedCollectorTest
     {
     };
 
     /// @brief The collector's tests that start threads.
-    class Medium_Collector : public CollectorTest
+    class Medium_Collector : public ProcessWideCollectorTest
     {
+    };
+
+    /// @brief Tests that a second shared image reaches the collector of the executable.
+    class Medium_SecondImage : public ProcessWideCollectorTest
+    {
+        protected:
+            /// @brief Returns the names of the zones in @p events, oldest first.
+            static std::vector<std::string> zone_names(const std::vector<TraceEvent>& events)
+            {
+                std::vector<std::string> names;
+                for (const TraceEvent& event : events)
+                {
+                    if (SushiProfiler::kind_of(event) != EventKind::Zone)
+                        continue;
+                    const SushiProfiler::SiteID site = SushiProfiler::site_of(event);
+                    names.push_back(Collector::instance().sites().info(site).name);
+                }
+                return names;
+            }
     };
 } // namespace
 
-TEST_F(Small_Collector, OpensOnceAndRefusesASecondOpen)
+TEST_F(Small_Collector, OpenOpensTheGate)
 {
-    EXPECT_TRUE(Collector::instance().is_open());
-    EXPECT_TRUE(Collector::recording());
-    EXPECT_FALSE(Collector::instance().open(CollectorSettings{}));
+    EXPECT_TRUE(collector.is_open());
+    EXPECT_TRUE(collector.is_recording());
+}
+
+TEST_F(Small_Collector, ASecondOpenIsRefused)
+{
+    EXPECT_FALSE(collector.open(CollectorSettings{}));
 }
 
 TEST_F(Medium_Collector, ANewThreadOfAClosedCollectorGetsNoRing)
@@ -137,11 +206,11 @@ TEST_F(Medium_Collector, ANewThreadOfAClosedCollectorGetsNoRing)
 
 TEST_F(Small_Collector, ADrainReturnsWhatThisThreadPushed)
 {
-    push_events(5U);
+    push_events(collector, 5U);
     DrainBatch batch;
-    Collector::instance().drain(batch);
+    collector.drain(batch);
 
-    const ThreadDrain* const mine = find(batch, Collector::thread_index());
+    const ThreadDrain* const mine = find(batch, collector.index_of_thread());
     ASSERT_NE(mine, nullptr);
     ASSERT_EQ(mine->events.size(), 5U);
     EXPECT_EQ(mine->events[4].begin, 4U);
@@ -155,7 +224,7 @@ TEST_F(Medium_Collector, DropsReachTheDrain)
     reopen(settings);
     std::uint32_t index = 0U;
     std::thread([&] {
-        push_events(70U);
+        push_events(Collector::instance(), 70U);
         index = Collector::thread_index();
     }).join();
     DrainBatch batch;
@@ -202,54 +271,42 @@ TEST_F(Medium_Collector, ARegisteredThreadKeepsItsRingWhileClosed)
 
 TEST_F(Small_Collector, NamedThreadKeepsItsName)
 {
-    Collector::set_thread_name("decoder");
+    collector.name_thread("decoder");
     DrainBatch batch;
-    Collector::instance().drain(batch);
+    collector.drain(batch);
 
-    const ThreadDrain* const mine = find(batch, Collector::thread_index());
+    const ThreadDrain* const mine = find(batch, collector.index_of_thread());
     ASSERT_NE(mine, nullptr);
     EXPECT_EQ(mine->name, "decoder");
 }
 
 TEST_F(Small_Collector, CalibrationPointsAdvance)
 {
+    clock.advance(50U);
     DrainBatch first;
-    Collector::instance().drain(first);
+    collector.drain(first);
+    clock.advance(25U);
     DrainBatch second;
-    Collector::instance().drain(second);
+    collector.drain(second);
 
-    EXPECT_LE(Collector::instance().first_point().steady_ns, first.point.steady_ns);
-    EXPECT_LE(first.point.steady_ns, second.point.steady_ns);
-    EXPECT_LE(first.point.ticks, second.point.ticks);
+    EXPECT_EQ(collector.first_point().steady_ns, 100U);
+    EXPECT_EQ(first.point.steady_ns, 150U);
+    EXPECT_EQ(second.point.steady_ns, 175U);
+    EXPECT_EQ(second.point.ticks, 175U);
 }
 
 TEST_F(Medium_Collector, EachThreadHasItsOwnRing)
 {
-    std::vector<std::uint32_t> indices(4U, 0U);
-    std::vector<std::thread> threads;
-    for (std::size_t slot = 0U; slot < indices.size(); ++slot)
-        threads.emplace_back([&, slot] {
-            push_events(1000U);
-            indices[slot] = Collector::thread_index();
-        });
-    for (std::thread& thread : threads)
-        thread.join();
-    DrainBatch batch;
-    Collector::instance().drain(batch);
+    const std::vector<std::size_t> sizes = events_drained_per_thread(Collector::instance(), 4U, 1000U);
 
-    for (const std::uint32_t index : indices)
-    {
-        const ThreadDrain* const writer = find(batch, index);
-        ASSERT_NE(writer, nullptr);
-        EXPECT_EQ(writer->events.size(), 1000U);
-    }
+    EXPECT_EQ(sizes, std::vector<std::size_t>(4U, 1000U));
 }
 
 TEST_F(Medium_Collector, AnExitedThreadIsDrainedThenFreed)
 {
     std::uint32_t index = 0U;
     std::thread([&] {
-        push_events(10U);
+        push_events(Collector::instance(), 10U);
         index = Collector::thread_index();
     }).join();
     DrainBatch first;
@@ -264,88 +321,42 @@ TEST_F(Medium_Collector, AnExitedThreadIsDrainedThenFreed)
     EXPECT_EQ(find(second, index), nullptr);
 }
 
-TEST_F(Small_Collector, PauseClosesTheGateAndKeepsTheRings)
+TEST_F(Small_Collector, PauseClosesTheGate)
 {
-    push_events(4U);
-    Collector::instance().pause();
+    collector.pause();
 
-    EXPECT_FALSE(Collector::recording());
-    EXPECT_TRUE(Collector::instance().is_open());
+    EXPECT_FALSE(collector.is_recording());
+    EXPECT_TRUE(collector.is_open());
+}
+
+TEST_F(Small_Collector, PauseKeepsTheRings)
+{
+    push_events(collector, 4U);
+    collector.pause();
+
     DrainBatch batch;
-    Collector::instance().drain(batch);
-    const ThreadDrain* const mine = find(batch, Collector::thread_index());
+    collector.drain(batch);
+    const ThreadDrain* const mine = find(batch, collector.index_of_thread());
     ASSERT_NE(mine, nullptr);
     EXPECT_EQ(mine->events.size(), 4U);
 }
 
 TEST_F(Small_Collector, ResumeOpensTheGateOfAnOpenSession)
 {
-    Collector::instance().pause();
-    Collector::instance().resume();
+    collector.pause();
+    collector.resume();
 
-    EXPECT_TRUE(Collector::recording());
+    EXPECT_TRUE(collector.is_recording());
 }
 
 TEST_F(Small_Collector, ResumeDoesNothingWhileClosed)
 {
-    Collector::instance().close();
-    Collector::instance().resume();
+    collector.close();
+    collector.resume();
 
-    EXPECT_FALSE(Collector::recording());
-    EXPECT_FALSE(Collector::instance().is_open());
+    EXPECT_FALSE(collector.is_recording());
+    EXPECT_FALSE(collector.is_open());
 }
-
-namespace
-{
-    /// @brief Opens the collector for each test and closes and empties it after.
-    class Medium_SecondImage : public ::testing::Test
-    {
-        protected:
-            void SetUp() override
-            {
-                close_and_empty();
-                ASSERT_TRUE(Collector::instance().open(CollectorSettings{}));
-            }
-
-            void TearDown() override
-            {
-                close_and_empty();
-            }
-
-            /// @brief Closes the collector and discards what its rings hold.
-            static void close_and_empty()
-            {
-                Collector::instance().close();
-                DrainBatch discarded;
-                Collector::instance().drain(discarded);
-            }
-
-            /// @brief Returns the drain of thread @p index in @p batch, or null.
-            static const ThreadDrain* find(const DrainBatch& batch, std::uint32_t index)
-            {
-                for (const ThreadDrain& thread : batch.threads)
-                {
-                    if (thread.thread_index == index)
-                        return &thread;
-                }
-                return nullptr;
-            }
-
-            /// @brief Returns the names of the zones in @p events, oldest first.
-            static std::vector<std::string> zone_names(const std::vector<TraceEvent>& events)
-            {
-                std::vector<std::string> names;
-                for (const TraceEvent& event : events)
-                {
-                    if (SushiProfiler::kind_of(event) != EventKind::Zone)
-                        continue;
-                    const SushiProfiler::SiteID site = SushiProfiler::site_of(event);
-                    names.push_back(Collector::instance().sites().info(site).name);
-                }
-                return names;
-            }
-    };
-} // namespace
 
 TEST_F(Medium_SecondImage, AZoneOfTheSecondImageReachesTheCollectorOfTheExecutable)
 {
@@ -399,61 +410,66 @@ TEST_F(Medium_SecondImage, AClosedCollectorRecordsNothingFromTheSecondImage)
     EXPECT_TRUE(mine == nullptr || mine->events.empty());
 }
 
-TEST_F(Small_Collector, HoldClosesTheZoneGateButKeepsMarking)
+TEST_F(Small_Collector, HoldClosesTheZoneGate)
 {
-    Collector::instance().hold();
+    collector.hold();
 
-    EXPECT_TRUE(Collector::instance().is_held());
-    EXPECT_FALSE(Collector::recording());
-    EXPECT_TRUE(Collector::marking());
+    EXPECT_TRUE(collector.is_held());
+    EXPECT_FALSE(collector.is_recording());
 }
 
-TEST_F(Small_Collector, ReleaseReopensTheGateOnlyWhereTheWindowWants)
+TEST_F(Small_Collector, HoldKeepsMarking)
 {
-    Collector& collector = Collector::instance();
-    collector.pause();
     collector.hold();
-    collector.release();
-    EXPECT_FALSE(Collector::recording());
-    EXPECT_FALSE(Collector::marking());
-    collector.resume();
-    EXPECT_TRUE(Collector::recording());
 
+    EXPECT_TRUE(collector.is_marking());
+}
+
+TEST_F(Small_Collector, ReleaseKeepsAPausedGateClosed)
+{
+    collector.pause();
+    collector.hold();
+    collector.release();
+
+    EXPECT_FALSE(collector.is_recording());
+    EXPECT_FALSE(collector.is_marking());
+}
+
+TEST_F(Small_Collector, ResumeKeepsAHeldGateClosed)
+{
     collector.hold();
     collector.pause();
     collector.resume();
-    EXPECT_FALSE(Collector::recording());
-    EXPECT_TRUE(Collector::marking());
+
+    EXPECT_FALSE(collector.is_recording());
+    EXPECT_TRUE(collector.is_marking());
+}
+
+TEST_F(Small_Collector, ReleaseOpensTheGateOfAResumedWindow)
+{
+    collector.hold();
+    collector.pause();
+    collector.resume();
     collector.release();
-    EXPECT_TRUE(Collector::recording());
+
+    EXPECT_TRUE(collector.is_recording());
 }
 
 TEST_F(Small_Collector, CloseClearsAHold)
 {
-    Collector& collector = Collector::instance();
     collector.hold();
     collector.close();
     ASSERT_TRUE(collector.open(CollectorSettings{}));
 
-    EXPECT_TRUE(Collector::recording());
+    EXPECT_TRUE(collector.is_recording());
     EXPECT_FALSE(collector.is_held());
 }
 
 TEST_F(Small_Collector, HoldDoesNothingWhileClosed)
 {
-    Collector& collector = Collector::instance();
     collector.close();
     collector.hold();
 
     EXPECT_FALSE(collector.is_held());
-    EXPECT_FALSE(Collector::marking());
-}
-
-TEST_F(Small_Collector, SourcesWantedFollowsWantSources)
-{
-    EXPECT_FALSE(Collector::sources_wanted());
-    Collector::want_sources(true);
-    EXPECT_TRUE(Collector::sources_wanted());
-    Collector::want_sources(false);
-    EXPECT_FALSE(Collector::sources_wanted());
+    EXPECT_FALSE(collector.is_marking());
 }
