@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-11 — tools: Dropped the copied skill-table test of the time budget, which SushiSkills replaced with the one that runs where the skill lives (RW-29, `52fff37`).
 - 2026-11-10 — stream_writers: Added `MemoryStreamWriter::watch_writes`, a function run at the start of each write (`e311773`).
 - 2026-11-10 — cli: Required sushicore 0.12.2, which narrows a sharded test run by `--filter` and reruns a failed shard's cases.
 - 2026-11-10 — continuous_integration: Registered each test program's cases as CTest shards per size (RW-33, `7f8ad1a`).
