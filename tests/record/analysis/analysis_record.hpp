@@ -48,6 +48,16 @@ namespace SushiProfilerTests
      */
     [[nodiscard]] SushiProfiler::RunRecord analysis_record();
 
+    /// @brief Returns analysis_record() with no budget on any period.
+    [[nodiscard]] SushiProfiler::RunRecord unbudgeted_analysis_record();
+
+    /**
+     * @brief Returns analysis_record() with the flow's ending samples under a second call site.
+     *
+     * The new site repeats the name `item` of site 7, so a flow read by name joins both.
+     */
+    [[nodiscard]] SushiProfiler::RunRecord split_flow_analysis_record();
+
     /**
      * @brief Returns the record the span analysis tests read.
      *

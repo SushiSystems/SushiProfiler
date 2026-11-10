@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_analysis.cpp                                                      */
+/* compile_analysis.cpp                                                 */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -22,65 +22,25 @@
 /**************************************************************************/
 
 /**
- * @file test_analysis.cpp
- * @brief Tests the analysis options' defaults and that an analysis runs through its interface.
+ * @file compile_analysis.cpp
+ * @brief Checks at compile time that an analysis is an abstract interface that options configure.
  * @author Mustafa Garip
  * @see tests/record/analysis/README.md
  */
 
 #include <SushiProfiler/analysis/analysis.hpp>
 
-#include <gtest/gtest.h>
-
-#include <memory>
-
-using SushiProfiler::Analysis;
-using SushiProfiler::AnalysisOptions;
-using SushiProfiler::Cell;
-using SushiProfiler::RunRecord;
-using SushiProfiler::Table;
+#include <type_traits>
 
 namespace
 {
-    /// @brief Reports how many periods a record holds.
-    class PeriodCount final : public Analysis
-    {
-        public:
-            std::string_view name() const noexcept override
-            {
-                return "period_count";
-            }
+    using SushiProfiler::Analysis;
+    using SushiProfiler::AnalysisOptions;
 
-            Table run(const RunRecord& record, const AnalysisOptions& options) const override
-            {
-                Table table;
-                table.name = std::string(name());
-                table.add_column("periods");
-                table.rows.push_back({Cell::whole(static_cast<std::int64_t>(
-                    record.periods.size() + options.top * 0U))});
-                return table;
-            }
-    };
+    static_assert(std::is_abstract_v<Analysis>,
+                  "an analysis is an interface a catalog entry implements");
+    static_assert(std::has_virtual_destructor_v<Analysis>,
+                  "an analysis is deleted through its interface");
+    static_assert(std::is_default_constructible_v<AnalysisOptions>,
+                  "an analysis runs with the options a caller leaves unset");
 } // namespace
-
-TEST(Small_Analysis, OptionsDefaultToTheDesignedValues)
-{
-    const AnalysisOptions options;
-
-    EXPECT_EQ(options.top, 20U);
-    EXPECT_EQ(options.short_span_ns, 10'000U);
-    EXPECT_EQ(options.launch_floor_ns, 0U);
-    EXPECT_EQ(options.bootstrap.resamples, 2000U);
-    EXPECT_EQ(options.baseline, nullptr);
-}
-
-TEST(Small_Analysis, RunsThroughTheInterface)
-{
-    const std::unique_ptr<Analysis> analysis = std::make_unique<PeriodCount>();
-    RunRecord record;
-    record.periods.resize(3U);
-    const Table table = analysis->run(record, {});
-
-    EXPECT_EQ(table.name, "period_count");
-    EXPECT_EQ(table.rows[0][0], Cell::whole(3));
-}

@@ -7,7 +7,7 @@ sushiprofiler_add_module_tests(
     MODULE analysis
     SOURCES
         analysis_record.cpp
-        test_analysis.cpp
+        compile_analysis.cpp
         test_analysis_catalog.cpp
         test_analysis_runner.cpp
         test_breakdown_analysis.cpp

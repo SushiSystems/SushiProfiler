@@ -67,13 +67,15 @@ TEST(Small_AnalysisCatalog, RefusesATakenName)
     EXPECT_FALSE(catalog.add("breakdown", &make_breakdown));
 }
 
-TEST(Small_AnalysisCatalog, TheBuiltinsAreListedInOrder)
+TEST(Small_AnalysisCatalog, NamesAreListedInAscendingOrderWhateverTheInsertionOrder)
 {
     AnalysisCatalog catalog;
+    ASSERT_TRUE(catalog.add("zeta", &make_breakdown));
     SushiProfiler::register_builtin_analyses(catalog);
+    ASSERT_TRUE(catalog.add("alpha", &make_breakdown));
 
     const std::vector<std::string> expected = {
-        "breakdown", "budget",   "counters", "device_idle", "distribution",
-        "flows",     "overhead", "roofline", "short_spans", "top_spans"};
+        "alpha",    "breakdown", "budget",   "counters",    "device_idle", "distribution",
+        "flows",    "overhead",  "roofline", "short_spans", "top_spans",   "zeta"};
     EXPECT_EQ(catalog.names(), expected);
 }

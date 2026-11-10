@@ -24,22 +24,25 @@ and two active periods of 1000 ns. Times are queued, start and end:
 | 2, 2000 to 3000 | `gemm` 1950, 2000, 2600 with `batch` 4; `copy` 2590, 2700, 2708 |
 
 - `test_table.cpp`: a cell holds one kind; cells of different kinds differ; columns by name.
-- `test_analysis.cpp`: the options' defaults; an analysis runs through the interface.
-- `test_analysis_catalog.cpp`: made by name; a taken name refused; the built-ins in order, `roofline` among them.
+- `compile_analysis.cpp`: the interface is abstract with a virtual destructor, and the options need no
+  argument; no runtime test, since the runner and the catalog test reach it through real analyses.
+- `test_analysis_catalog.cpp`: made by name; a taken name refused; the names in ascending order whatever the insertion order, the built-ins among them.
 - `test_analysis_runner.cpp`: tables in the order asked; an unknown name refuses the run and
   lists the known names.
-- `test_sample_summary.cpp`: the summary of fixed samples; zeros for none; columns and cells line
-  up.
+- `test_sample_summary.cpp`: the summary of fixed samples; zero in every field for none; columns and
+  cells line up.
 - `test_subject_samples.cpp`: the eleven host subjects of the shared record in order, and the
   span subjects of the span record.
 - `test_breakdown_analysis.cpp`: `Model` 60, 80, 70; `Data` 30, 20, 30; uncovered 10, 20, 10;
-  shares over 330 ns.
+  shares over 330 ns. A two-timeline record (`alpha` 40 of 100 ns, `beta` 60) gives each timeline
+  its own group row and uncovered row, in name order.
 - `test_distribution_analysis.cpp`: the rows of the timeline, three zones, two counters and the
   value, with percentiles, jitter and histogram words.
 - `test_budget_analysis.cpp`: two periods over budget, the worst is period 2 at 120/105 with
-  `forward`; no budget, no row.
+  `forward`; no budget (`unbudgeted_analysis_record()`), no row.
 - `test_counters_analysis.cpp`: `bytes` sums to 150 and 200; `peak` peaks at 9, 4 and 7.
-- `test_flows_analysis.cpp`: totals 100 and 90; steps 20, 80, 80 and 10.
+- `test_flows_analysis.cpp`: totals 100 and 90; steps 20, 80, 80 and 10; the same totals when the
+  ending samples sit under a second call site of the same name (`split_flow_analysis_record()`).
 - `test_device_idle_analysis.cpp`: idle 395 and 392 ns; launch gaps 100 and 100, host gaps 295
   and 292, all `unattributed` with no zone runs; with runs, the innermost zone open on the
   submitting thread at the gap's start is named, a zone on another thread is not, and a queued
@@ -49,19 +52,20 @@ and two active periods of 1000 ns. Times are queued, start and end:
 - `test_roofline_analysis.cpp`: two `gemm` spans of 100 us at 5e7 FLOP and 2e6 B reach 5e11 FLOP/s
   and 2e10 B/s at intensity 25, half of the 1e12 compute roof; a `copy` span reaches 1e10 FLOP/s at
   intensity 0.125, 0.8 of the 1.25e10 memory bound; a track without ceiling facts has empty
-  ceiling cells; two spans without both attributes are counted and warm-up periods are skipped; a
+  ceiling cells; two spans without both attributes are counted in one note; a warm-up period gives no
+  row; a record without cost attributes has no rows and counts its five non-warm-up spans; a
   ceiling fact that is not a number counts as missing. With `node` and `dtype` attributes, node 7
   merges two `f16` spans against the 4e12 `f16` ceiling (0.25), node 8 splits into an `f16` row
   (0.125) and an `f32` row on the type-less 1e12 ceiling (1.0), and a span with no FLOPs and 8e6 B
   is `memory` at 0.8 of the memory ceiling. With `graph` and `origin` attributes on `gemm` spans of node 3, `g1` and `g2` give separate rows, `g1` with `o1` (two spans, 2e8 FLOP) and with `o2` (one span) are two rows, and the span with neither keeps an empty-labelled row.
 - `test_short_spans_analysis.cpp`: two of five spans under 10 ns, 13 ns of 1213; priced at a
   20 ns floor, 40 ns.
-- `test_overhead_analysis.cpp`: 33 events and 792 bytes, every drop, the note without a
-  baseline, and a 10% cost against a baseline of 90, 100 and 110 ns.
+- `test_overhead_analysis.cpp`: 33 events and 792 bytes and every drop; the note without a
+  baseline; a 10% cost against a baseline of 90, 100 and 110 ns.
 
 The bootstrap ends in the expected rows come from a Python reimplementation of the generator.
 
 - `test_period_breakdown.cpp`: a node takes the nearest grouped ancestor's group, else
   `(ungrouped)`; groups come largest self time first; only the marking thread's roots count as
   covered; uncovered time is 0 when zones overrun the period; every thread's totals sum its lanes;
-  the groups equal the `breakdown` rows of a one-period record.
+  groups of equal self time come in name order.

@@ -72,7 +72,11 @@ TEST(Small_SampleSummary, NoSamplesGiveZeros)
 
     EXPECT_EQ(summary.count, 0);
     EXPECT_EQ(summary.median, 0.0);
+    EXPECT_EQ(summary.low, 0.0);
     EXPECT_EQ(summary.high, 0.0);
+    EXPECT_EQ(summary.minimum, 0.0);
+    EXPECT_EQ(summary.p95, 0.0);
+    EXPECT_EQ(summary.cv, 0.0);
 }
 
 TEST(Small_SampleSummary, ColumnsAndCellsLineUp)

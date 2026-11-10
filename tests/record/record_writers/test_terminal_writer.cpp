@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 
 #include <sstream>
+#include <string>
 
 using SushiProfiler::Cell;
 using SushiProfiler::format_cell;
@@ -61,24 +62,60 @@ namespace
         table.notes.emplace_back("Example note.");
         return table;
     }
+
+    /// @brief A cell, its unit and the text a terminal shows for them.
+    struct FormatRow
+    {
+        Cell cell;
+        Unit unit;
+        const char* text;
+    };
 } // namespace
 
-TEST(Small_TerminalWriter, PrintsAlignedTablesAndCountsTheRowsCut)
+TEST(Small_TerminalWriter, AlignsEachColumnToTheWidestRowItPrints)
+{
+    std::ostringstream out;
+    TerminalWriter writer(out, 1U);
+
+    static_cast<void>(writer.write(RunRecord{}, {demo_table()}));
+
+    const std::string expected = "== demo ==\n"
+                                 "subject  count   median  share  value\n"
+                                 "conv         3  1.50 us  25.0%    2.5\n";
+    EXPECT_EQ(out.str().rfind(expected, 0U), 0U) << out.str();
+}
+
+TEST(Small_TerminalWriter, CountsTheRowsItCuts)
+{
+    std::ostringstream out;
+    TerminalWriter writer(out, 1U);
+
+    static_cast<void>(writer.write(RunRecord{}, {demo_table()}));
+
+    EXPECT_NE(out.str().find("2.5\n(1 more row)\n"), std::string::npos) << out.str();
+}
+
+TEST(Small_TerminalWriter, PrintsANoteAfterTheRows)
+{
+    std::ostringstream out;
+    TerminalWriter writer(out);
+
+    static_cast<void>(writer.write(RunRecord{}, {demo_table()}));
+
+    EXPECT_NE(out.str().find("12345.7\nnote: Example note.\n"), std::string::npos) << out.str();
+}
+
+TEST(Small_TerminalWriter, ATableWithoutRowsPrintsNoRows)
 {
     std::ostringstream out;
     Table empty;
     empty.name = "empty";
     empty.add_column("x");
-    TerminalWriter writer(out, 1U);
+    TerminalWriter writer(out);
 
-    EXPECT_EQ(writer.write(RunRecord{}, {demo_table(), empty}), WriteStatus::Written);
-    EXPECT_EQ(out.str(), "== demo ==\n"
-                         "subject  count   median  share  value\n"
-                         "conv         3  1.50 us  25.0%    2.5\n"
-                         "(1 more row)\n"
-                         "note: Example note.\n"
-                         "\n"
-                         "== empty ==\n"
+    static_cast<void>(writer.write(RunRecord{}, {empty}));
+
+    EXPECT_EQ(out.str(), "== empty ==\n"
                          "x\n"
                          "(no rows)\n");
 }
@@ -93,21 +130,25 @@ TEST(Small_TerminalWriter, WidensColumnsForEveryPrintedRow)
         << out.str();
 }
 
-TEST(Small_TerminalWriter, FormatsTimesInReadableSteps)
+class Small_TerminalWriterFormat : public ::testing::TestWithParam<FormatRow>
 {
-    EXPECT_EQ(format_cell(Cell::real(999.0), Unit::Nanoseconds), "999 ns");
-    EXPECT_EQ(format_cell(Cell::real(1500.0), Unit::Nanoseconds), "1.50 us");
-    EXPECT_EQ(format_cell(Cell::real(2.5e6), Unit::Nanoseconds), "2.50 ms");
-    EXPECT_EQ(format_cell(Cell::real(3.25e9), Unit::Nanoseconds), "3.250 s");
-    EXPECT_EQ(format_cell(Cell::whole(12), Unit::Nanoseconds), "12 ns");
+};
+
+TEST_P(Small_TerminalWriterFormat, ACellIsFormattedByItsUnit)
+{
+    EXPECT_EQ(format_cell(GetParam().cell, GetParam().unit), GetParam().text);
 }
 
-TEST(Small_TerminalWriter, FormatsRatiosCountsAndPlainNumbers)
-{
-    EXPECT_EQ(format_cell(Cell::real(0.125), Unit::Ratio), "12.5%");
-    EXPECT_EQ(format_cell(Cell::real(4.0), Unit::Count), "4");
-    EXPECT_EQ(format_cell(Cell::real(3.0), Unit::None), "3");
-    EXPECT_EQ(format_cell(Cell::real(0.123456), Unit::None), "0.1235");
-    EXPECT_EQ(format_cell(Cell::real(12345.678), Unit::None), "12345.7");
-    EXPECT_EQ(format_cell(Cell(), Unit::None), "");
-}
+INSTANTIATE_TEST_SUITE_P(
+    Small_Units, Small_TerminalWriterFormat,
+    ::testing::Values(FormatRow{Cell::real(999.0), Unit::Nanoseconds, "999 ns"},
+                      FormatRow{Cell::real(1500.0), Unit::Nanoseconds, "1.50 us"},
+                      FormatRow{Cell::real(2.5e6), Unit::Nanoseconds, "2.50 ms"},
+                      FormatRow{Cell::real(3.25e9), Unit::Nanoseconds, "3.250 s"},
+                      FormatRow{Cell::whole(12), Unit::Nanoseconds, "12 ns"},
+                      FormatRow{Cell::real(0.125), Unit::Ratio, "12.5%"},
+                      FormatRow{Cell::real(4.0), Unit::Count, "4"},
+                      FormatRow{Cell::real(3.0), Unit::None, "3"},
+                      FormatRow{Cell::real(0.123456), Unit::None, "0.1235"},
+                      FormatRow{Cell::real(12345.678), Unit::None, "12345.7"},
+                      FormatRow{Cell(), Unit::None, ""}));

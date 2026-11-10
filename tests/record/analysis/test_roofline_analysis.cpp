@@ -37,7 +37,6 @@
 #include <string>
 
 #include "analysis_record.hpp"
-#include "support/tolerance.hpp"
 
 using SushiProfiler::Cell;
 using SushiProfiler::PeriodRecord;
@@ -51,9 +50,6 @@ using SushiProfilerTests::whole;
 
 namespace
 {
-    /// @brief Rounded operations behind a rate cell: nanoseconds to seconds, then the quotient.
-    constexpr std::size_t K_RATE_OPERATIONS = 2U;
-
     /// @brief Appends a span of @p name on @p track from 0 to @p length ns with its cost.
     void add_span(PeriodRecord& period, SushiProfiler::NameID name, SushiProfiler::TrackID track,
                   std::uint64_t length, std::int64_t flops, std::int64_t bytes)
@@ -210,28 +206,32 @@ TEST(Small_RooflineAnalysis, LeavesTheCeilingCellsEmptyWhenTheTrackHasNoFacts)
     const Table table = SushiProfiler::RooflineAnalysis().run(roofline_record(), {});
 
     ASSERT_EQ(table.rows.size(), 3U);
-    const SushiProfiler::Row& row = table.rows[2];
-    EXPECT_EQ(*row[0].as_whole(), 2);
-    EXPECT_EQ(*row[4].as_text(), "queue 1");
-    EXPECT_TRUE(TestSupport::is_within(
-        TestSupport::measure_relative_error<double>(*row[11].as_real(), 1e11, K_RATE_OPERATIONS)));
-    EXPECT_TRUE(TestSupport::is_within(
-        TestSupport::measure_relative_error<double>(*row[13].as_real(), 20.0, K_RATE_OPERATIONS)));
-    for (std::size_t column = 14U; column < row.size(); ++column)
-        EXPECT_TRUE(row[column].empty()) << "column " << column;
+    expect_row(table.rows[2],
+               {whole(2), Cell(), Cell(), text("gemm"), text("queue 1"), Cell(), Cell(), whole(1),
+                whole(200'000), whole(20'000'000), whole(1'000'000), real(1e11), real(5e9),
+                real(20.0), Cell(), Cell(), Cell(), Cell(), Cell()});
 }
 
-TEST(Small_RooflineAnalysis, CountsSpansWithoutBothAttributesAndSkipsWarmupPeriods)
+TEST(Small_RooflineAnalysis, CountsSpansWithoutBothAttributesInOneNote)
 {
     const Table table = SushiProfiler::RooflineAnalysis().run(roofline_record(), {});
 
     ASSERT_EQ(table.notes.size(), 1U);
     EXPECT_EQ(table.notes[0], "2 spans without both flops and bytes were skipped.");
-    for (const SushiProfiler::Row& row : table.rows)
-        EXPECT_NE(*row[0].as_whole(), 0);
 }
 
-TEST(Small_RooflineAnalysis, ARecordWithoutCostAttributesHasNoRowsAndCountsEverySpan)
+TEST(Small_RooflineAnalysis, ASpanOfAWarmupPeriodHasNoRow)
+{
+    RunRecord record = roofline_record();
+    record.periods = {record.periods[0]};
+
+    const Table table = SushiProfiler::RooflineAnalysis().run(record, {});
+
+    EXPECT_TRUE(table.rows.empty());
+    EXPECT_TRUE(table.notes.empty());
+}
+
+TEST(Small_RooflineAnalysis, ARecordWithoutCostAttributesHasNoRowsAndCountsItsNonWarmupSpans)
 {
     const Table table =
         SushiProfiler::RooflineAnalysis().run(SushiProfilerTests::span_record(), {});

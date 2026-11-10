@@ -54,6 +54,10 @@ namespace
 TEST(Small_Dispersion, TheMeanOfNothingIsZero)
 {
     EXPECT_EQ(mean({}), 0.0);
+}
+
+TEST(Small_Dispersion, TheMeanOfValuesIsTheirAverage)
+{
     EXPECT_EQ(mean({1.0, 2.0, 6.0}), 3.0);
 }
 
@@ -66,11 +70,28 @@ TEST(Small_Dispersion, TheCoefficientOfVariationUsesTheSampleDeviation)
         K_EIGHT_SAMPLE_CV_OPERATIONS)));
 }
 
-TEST(Small_Dispersion, TheCoefficientOfVariationIsZeroWithoutASpread)
+TEST(Small_Dispersion, TheCoefficientOfVariationOfOneSampleIsZero)
 {
     EXPECT_EQ(coefficient_of_variation({3.0}), 0.0);
+}
+
+TEST(Small_Dispersion, TheCoefficientOfVariationWithAMeanOfZeroIsZero)
+{
     EXPECT_EQ(coefficient_of_variation({-1.0, 1.0}), 0.0);
+}
+
+TEST(Small_Dispersion, TheCoefficientOfVariationWithoutASpreadIsZero)
+{
     EXPECT_EQ(coefficient_of_variation({4.0, 4.0, 4.0}), 0.0);
+}
+
+TEST(Small_Dispersion, TheCoefficientOfVariationOfANegativeMeanIsPositive)
+{
+    const double expected = std::sqrt(32.0 / 7.0) / 5.0;
+
+    EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
+        coefficient_of_variation({-2.0, -4.0, -4.0, -4.0, -5.0, -5.0, -7.0, -9.0}), expected,
+        K_EIGHT_SAMPLE_CV_OPERATIONS)));
 }
 
 TEST(Small_Dispersion, JitterIsTheMedianSuccessiveStep)

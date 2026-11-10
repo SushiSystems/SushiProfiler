@@ -22,7 +22,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M3 | the tests of `cli/services` (1 file): 28 rewrite, 1 delete | T1, T2, T3, T4, T5, T6 | done |
 | M4 | the tests of `foundation` (10 files): 12 rewrite, 1 resize, 12 split, 4 delete | T1, T2, T3, T4, T5, T6 | done |
 | M5 | the tests of `package` (1 file): 1 resize | T1, T2, T3, T4, T5, T6 | done |
-| M6 | the tests of `record` (34 files): 24 rewrite, 9 split, 10 merge, 4 delete, 1 characterize | T1, T2, T3, T4, T5, T6 | todo |
+| M6 | the tests of `record` (34 files): 24 rewrite, 9 split, 10 merge, 4 delete, 1 characterize | T1, T2, T3, T4, T5, T6 | done |
 | M7 | the tests of `session` (24 files): 66 rewrite, 6 resize, 26 split, 6 merge, 2 delete | T1, T2, T3, T4, T5, T6 | todo |
 | M8 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6 | done |
 | M9 | the tests of `tools/record_tool` (1 file): 5 split | T1, T2, T3, T4, T5, T6 | done |
@@ -30,8 +30,8 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 ## Resume note
 
-M1 to M5 and M8 to M10 are done and pushed. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
-folder README `cli/tests/README.md`. M6 (`record`, 34 files) is next, then M7 (`session`, 24 files);
+M1 to M6 and M8 to M10 are done. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
+folder README `cli/tests/README.md`. M7 (`session`, 24 files) is next;
 take each module's records from `REPORT.md` by grepping the headings of its test folder and read each
 record range with offset and limit. A test that needs the environment or a `which` takes the `Host`
 port; no test patches `os.environ` or `shutil.which`. Nothing built or ran: the first `sp test` over

@@ -35,16 +35,57 @@
 using SushiProfiler::FlowPoint;
 using SushiProfiler::SampleSeries;
 
-TEST(Small_SampleSeries, EqualityComparesEveryColumn)
+namespace
 {
-    SampleSeries first;
-    first.site = 3U;
-    first.time_ns = {1U, 2U};
-    first.items = {7U, 7U};
-    first.points = {FlowPoint::Begin, FlowPoint::End};
-    SampleSeries second = first;
+    /// @brief Returns a series whose every column differs from the default.
+    SampleSeries full_series()
+    {
+        SampleSeries series;
+        series.site = 3U;
+        series.thread = 1U;
+        series.time_ns = {1U, 2U};
+        series.values = {0.5, 1.5};
+        series.items = {7U, 7U};
+        series.points = {FlowPoint::Begin, FlowPoint::End};
+        return series;
+    }
+
+    /// @brief A column of a series and a change to it alone.
+    struct ColumnChange
+    {
+        const char* column;
+        void (*change)(SampleSeries&);
+    };
+} // namespace
+
+TEST(Small_SampleSeries, ACopyIsEqual)
+{
+    const SampleSeries first = full_series();
+    const SampleSeries second = first;
 
     EXPECT_EQ(first, second);
-    second.points[1] = FlowPoint::Step;
-    EXPECT_FALSE(first == second);
 }
+
+class Small_SampleSeriesColumn : public ::testing::TestWithParam<ColumnChange>
+{
+};
+
+TEST_P(Small_SampleSeriesColumn, EqualityReachesTheColumn)
+{
+    const SampleSeries first = full_series();
+    SampleSeries second = first;
+    GetParam().change(second);
+
+    EXPECT_FALSE(first == second) << GetParam().column;
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Small_Columns, Small_SampleSeriesColumn,
+    ::testing::Values(
+        ColumnChange{"site", [](SampleSeries& series) { series.site = 9U; }},
+        ColumnChange{"thread", [](SampleSeries& series) { series.thread = 9U; }},
+        ColumnChange{"time_ns", [](SampleSeries& series) { series.time_ns[1] = 9U; }},
+        ColumnChange{"values", [](SampleSeries& series) { series.values[1] = 9.0; }},
+        ColumnChange{"items", [](SampleSeries& series) { series.items[1] = 9U; }},
+        ColumnChange{"points",
+                     [](SampleSeries& series) { series.points[1] = FlowPoint::Step; }}));

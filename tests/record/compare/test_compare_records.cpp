@@ -94,21 +94,43 @@ namespace
     }
 } // namespace
 
-TEST(Small_CompareRecords, NamesAChangeWhenTheIntervalsAreApart)
+/// @brief A baseline and a candidate whose four periods all last the given nanoseconds, the ratio
+/// of their medians and the word that names the change.
+struct ChangeRow
 {
+    std::uint64_t baseline;
+    std::uint64_t candidate;
+    double ratio;
+    const char* word;
+};
+
+class Small_CompareRecordsChange : public ::testing::TestWithParam<ChangeRow>
+{
+};
+
+TEST_P(Small_CompareRecordsChange, AChangeIsNamedWhenTheIntervalsAreApart)
+{
+    const ChangeRow& param = GetParam();
     const Comparison comparison = SushiProfiler::compare_records(
-        record_of({100U, 100U, 100U, 100U}), record_of({50U, 50U, 50U, 50U}));
+        record_of({param.baseline, param.baseline, param.baseline, param.baseline}),
+        record_of({param.candidate, param.candidate, param.candidate, param.candidate}));
 
     ASSERT_TRUE(comparison.ok()) << comparison.error;
     const Row* const row = row_of(comparison, "", "timeline:step");
     ASSERT_NE(row, nullptr);
-    const Row expected = {Cell::text(""),       Cell::text("timeline:step"), Cell::text("ns"),
-                          Cell::real(100.0),    Cell::real(100.0),           Cell::real(100.0),
-                          Cell::real(50.0),     Cell::real(50.0),            Cell::real(50.0),
-                          Cell::real(0.5),      Cell::real(0.5),             Cell::real(0.5),
-                          Cell::text("faster")};
+    const double baseline = static_cast<double>(param.baseline);
+    const double candidate = static_cast<double>(param.candidate);
+    const Row expected = {Cell::text(""),         Cell::text("timeline:step"), Cell::text("ns"),
+                          Cell::real(baseline),   Cell::real(baseline),        Cell::real(baseline),
+                          Cell::real(candidate),  Cell::real(candidate),       Cell::real(candidate),
+                          Cell::real(param.ratio), Cell::real(param.ratio),    Cell::real(param.ratio),
+                          Cell::text(param.word)};
     EXPECT_EQ(*row, expected);
 }
+
+INSTANTIATE_TEST_SUITE_P(Small_Changes, Small_CompareRecordsChange,
+                         ::testing::Values(ChangeRow{100U, 50U, 0.5, "faster"},
+                                           ChangeRow{40U, 80U, 2.0, "slower"}));
 
 TEST(Small_CompareRecords, OverlappingIntervalsAreNoChange)
 {
@@ -122,15 +144,7 @@ TEST(Small_CompareRecords, OverlappingIntervalsAreNoChange)
         *(*row)[9].as_real(), 115.0 / 110.0, K_RATIO_OPERATIONS)));
 }
 
-TEST(Small_CompareRecords, ASlowerCandidateIsNamed)
-{
-    const Comparison comparison =
-        SushiProfiler::compare_records(record_of({50U, 50U, 50U}), record_of({80U, 80U, 80U}));
-
-    EXPECT_EQ((*row_of(comparison, "", "timeline:step"))[12], Cell::text("slower"));
-}
-
-TEST(Small_CompareRecords, RefusesDifferingBuildsUnlessAllowed)
+TEST(Small_CompareRecords, RefusesDifferingBuildsNamingTheFieldAndBothValues)
 {
     RunRecord baseline = record_of({100U});
     RunRecord candidate = record_of({100U});
@@ -138,13 +152,23 @@ TEST(Small_CompareRecords, RefusesDifferingBuildsUnlessAllowed)
     candidate.build = {{"type", "Debug"}};
 
     const Comparison refused = SushiProfiler::compare_records(baseline, candidate);
+
     EXPECT_FALSE(refused.ok());
     EXPECT_EQ(refused.error, "the builds differ at \"type\": Release against Debug; allow the "
                              "mismatch to compare them anyway");
+}
 
+TEST(Small_CompareRecords, AnAllowedBuildMismatchBecomesANote)
+{
+    RunRecord baseline = record_of({100U});
+    RunRecord candidate = record_of({100U});
+    baseline.build = {{"type", "Release"}};
+    candidate.build = {{"type", "Debug"}};
     CompareOptions options;
     options.allow_build_mismatch = true;
+
     const Comparison allowed = SushiProfiler::compare_records(baseline, candidate, options);
+
     ASSERT_TRUE(allowed.ok());
     EXPECT_EQ(allowed.table.notes,
               std::vector<std::string>{"The builds differ at \"type\": Release against Debug."});

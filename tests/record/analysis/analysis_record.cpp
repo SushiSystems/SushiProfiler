@@ -166,6 +166,31 @@ namespace SushiProfilerTests
         return record;
     }
 
+    RunRecord unbudgeted_analysis_record()
+    {
+        RunRecord record = analysis_record();
+        for (PeriodRecord& period : record.periods)
+            period.budget_ns = 0U;
+        return record;
+    }
+
+    RunRecord split_flow_analysis_record()
+    {
+        RunRecord record = analysis_record();
+        record.sites.push_back(record.sites[7]);
+        const auto end_id = static_cast<SushiProfiler::SiteID>(record.sites.size() - 1U);
+        for (PeriodRecord& period : record.periods)
+        {
+            for (SampleSeries& series : period.samples)
+            {
+                if (series.site == 7U && !series.points.empty() &&
+                    series.points.front() == FlowPoint::End)
+                    series.site = end_id;
+            }
+        }
+        return record;
+    }
+
     RunRecord span_record()
     {
         RunRecord record;

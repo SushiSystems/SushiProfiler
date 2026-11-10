@@ -44,7 +44,25 @@ using SushiProfilerTests::real;
 using SushiProfilerTests::text;
 using SushiProfilerTests::whole;
 
-TEST(Small_OverheadAnalysis, CountsEventsAndDropsAndNotesAMissingBaseline)
+namespace
+{
+    /// @brief Returns a run without profiling whose `step` periods last 90, 100 and 110 ns.
+    RunRecord baseline_record()
+    {
+        RunRecord baseline;
+        baseline.names = {"", "step"};
+        for (const std::uint64_t length : {90U, 100U, 110U})
+        {
+            PeriodRecord period;
+            period.timeline = 1U;
+            period.end_ns = length;
+            baseline.periods.push_back(period);
+        }
+        return baseline;
+    }
+} // namespace
+
+TEST(Small_OverheadAnalysis, CountsEventsAndDrops)
 {
     const Table table = SushiProfiler::OverheadAnalysis().run(analysis_record(), {});
 
@@ -58,20 +76,19 @@ TEST(Small_OverheadAnalysis, CountsEventsAndDropsAndNotesAMissingBaseline)
     expect_row(table.rows[6], {text("open_at_stop"), real(2.0)});
     expect_row(table.rows[7], {text("spans_dropped"), real(3.0)});
     expect_row(table.rows[8], {text("clock_read_ns"), real(6.5)});
-    EXPECT_EQ(table.notes.size(), 1U);
+}
+
+TEST(Small_OverheadAnalysis, NotesAMissingBaseline)
+{
+    const Table table = SushiProfiler::OverheadAnalysis().run(analysis_record(), {});
+
+    ASSERT_EQ(table.notes.size(), 1U);
+    EXPECT_EQ(table.notes[0], "No baseline record was given, so the cost is not measured.");
 }
 
 TEST(Small_OverheadAnalysis, MeasuresTheCostAgainstABaseline)
 {
-    RunRecord baseline;
-    baseline.names = {"", "step"};
-    for (const std::uint64_t length : {90U, 100U, 110U})
-    {
-        PeriodRecord period;
-        period.timeline = 1U;
-        period.end_ns = length;
-        baseline.periods.push_back(period);
-    }
+    const RunRecord baseline = baseline_record();
     AnalysisOptions options;
     options.baseline = &baseline;
     const Table table = SushiProfiler::OverheadAnalysis().run(analysis_record(), options);

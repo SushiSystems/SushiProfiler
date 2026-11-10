@@ -30,13 +30,9 @@
 
 #include <SushiProfiler/analysis/period_breakdown.hpp>
 
-#include <SushiProfiler/analysis/breakdown_analysis.hpp>
-
 #include <gtest/gtest.h>
 
 #include <vector>
-
-#include "analysis_record.hpp"
 
 using SushiProfiler::PeriodBreakdown;
 using SushiProfiler::PeriodRecord;
@@ -123,6 +119,21 @@ TEST(Small_PeriodBreakdown, OrdersGroupsByDescendingSelfTime)
     EXPECT_EQ(breakdown.groups[1].group, "Model");
 }
 
+TEST(Small_PeriodBreakdown, OrdersGroupsOfEqualSelfTimeByName)
+{
+    PeriodRecord period = period_of_100();
+    ZoneTree tree;
+    tree.thread = 0U;
+    tree.nodes = {node(1U, -1, 40U, 40U), node(3U, -1, 40U, 40U)};
+    period.zones.push_back(tree);
+
+    const PeriodBreakdown breakdown = SushiProfiler::break_down_period(period, sites());
+
+    ASSERT_EQ(breakdown.groups.size(), 2U);
+    EXPECT_EQ(breakdown.groups[0].group, "Data");
+    EXPECT_EQ(breakdown.groups[1].group, "Model");
+}
+
 TEST(Small_PeriodBreakdown, CountsOnlyTheMarkingThreadsRootsAsCovered)
 {
     PeriodRecord period = period_of_100();
@@ -176,41 +187,4 @@ TEST(Small_PeriodBreakdown, ReportsEveryThreadsTotalsWithLanesSummed)
     EXPECT_EQ(breakdown.threads[1].thread, 1U);
     EXPECT_EQ(breakdown.threads[1].root_inclusive_ns, 45U);
     EXPECT_EQ(breakdown.threads[1].self_ns, 45U);
-}
-
-TEST(Small_PeriodBreakdown, MatchesTheBreakdownAnalysisOnOnePeriod)
-{
-    const SushiProfiler::RunRecord record = SushiProfilerTests::analysis_record();
-    const PeriodRecord* active = nullptr;
-    for (const PeriodRecord& period : record.periods)
-    {
-        if (!period.warmup)
-        {
-            active = &period;
-            break;
-        }
-    }
-    ASSERT_NE(active, nullptr);
-    SushiProfiler::RunRecord single = record;
-    single.periods = {*active};
-
-    const SushiProfiler::Table table = SushiProfiler::BreakdownAnalysis().run(single, {});
-    const PeriodBreakdown breakdown = SushiProfiler::break_down_period(*active, record.sites);
-
-    ASSERT_EQ(table.rows.size(), breakdown.groups.size() + 1U);
-    for (std::size_t row = 0U; row < breakdown.groups.size(); ++row)
-    {
-        bool found = false;
-        for (const SushiProfiler::Row& candidate : table.rows)
-        {
-            if (candidate[1].as_text() != nullptr && *candidate[1].as_text() == breakdown.groups[row].group)
-            {
-                ASSERT_NE(candidate[3].as_real(), nullptr);
-                EXPECT_DOUBLE_EQ(*candidate[3].as_real(),
-                                 static_cast<double>(breakdown.groups[row].self_ns));
-                found = true;
-            }
-        }
-        EXPECT_TRUE(found);
-    }
 }

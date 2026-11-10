@@ -66,11 +66,15 @@ TEST(Small_Check, ReadsTimeAndPlainChecks)
     EXPECT_EQ(result.checks[1].at_most, 9.0);
 }
 
-TEST(Small_Check, NamesEveryStatistic)
+TEST(Small_Check, ReadsATimeLowerBoundAsAtLeast)
 {
-    EXPECT_EQ(SushiProfiler::statistic_word(Statistic::Median), "median");
-    EXPECT_EQ(SushiProfiler::statistic_word(Statistic::P95), "p95");
-    EXPECT_EQ(SushiProfiler::statistic_word(Statistic::Min), "min");
+    const ChecksReadResult result = read_checks(
+        R"([{"subject": "timeline:dsp.block", "statistic": "median", "at_least_ns": 1000}])");
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    ASSERT_EQ(result.checks.size(), 1U);
+    EXPECT_EQ(result.checks[0].at_least, 1000.0);
+    EXPECT_FALSE(result.checks[0].at_most.has_value());
 }
 
 TEST(Small_Check, RefusesATimeBoundOnAPlainSubjectAndTheReverse)
@@ -83,19 +87,43 @@ TEST(Small_Check, RefusesATimeBoundOnAPlainSubjectAndTheReverse)
               "at_least");
 }
 
-TEST(Small_Check, RefusesWhatTheFormatDoesNotHold)
+TEST(Small_Check, RefusesAnObjectInPlaceOfTheArray)
 {
     EXPECT_EQ(refusal(R"({"subject": "timeline:a"})"), "checks: an array of checks was expected");
+}
+
+TEST(Small_Check, RefusesASubjectWithoutAKnownPrefix)
+{
     EXPECT_EQ(refusal(R"([{"subject": "frame:a", "statistic": "p99", "at_most_ns": 1}])"),
               "checks[0].subject: \"frame:a\" does not start with timeline:, group:, zone:, "
               "span:, flow:, counter: or value:");
+}
+
+TEST(Small_Check, RefusesAnUnknownStatistic)
+{
     EXPECT_EQ(refusal(R"([{"subject": "zone:a", "statistic": "p42", "at_most_ns": 1}])"),
               "checks[0].statistic: not one of median, p50, p90, p95, p99, min, max");
+}
+
+TEST(Small_Check, RefusesACheckWithoutAStatistic)
+{
     EXPECT_EQ(refusal(R"([{"subject": "zone:a", "at_most_ns": 1}])"),
               "checks[0]: missing key \"statistic\"");
+}
+
+TEST(Small_Check, RefusesACheckWithoutABound)
+{
     EXPECT_EQ(refusal(R"([{"subject": "zone:a", "statistic": "max"}])"),
               "checks[0]: a check needs at_most_ns or at_least_ns");
+}
+
+TEST(Small_Check, RefusesABoundThatIsNotANumber)
+{
     EXPECT_EQ(refusal(R"([{"subject": "zone:a", "statistic": "max", "at_most_ns": "1"}])"),
               "checks[0].at_most_ns: a number was expected");
+}
+
+TEST(Small_Check, RefusesTextThatIsNotJsonNamingItsPlace)
+{
     EXPECT_EQ(refusal("[1"), "line 1, column 3: ',' or ']' was expected");
 }

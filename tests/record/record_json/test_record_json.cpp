@@ -132,6 +132,27 @@ namespace
         return record;
     }
 
+    /// @brief Returns the record with no field set.
+    RunRecord empty_record()
+    {
+        return RunRecord{};
+    }
+
+    /// @brief A record maker and the name that says which record it makes.
+    struct RecordRow
+    {
+        const char* name;
+        RunRecord (*make)();
+    };
+
+    /// @brief A replacement that breaks the full record's text, and the refusal it must give.
+    struct RefusalRow
+    {
+        const char* from;
+        const char* to;
+        const char* error;
+    };
+
     /// @brief Returns @p text with its one occurrence of @p from replaced by @p to.
     std::string replaced(const std::string& text, const std::string& from, const std::string& to)
     {
@@ -153,9 +174,13 @@ namespace
     }
 } // namespace
 
-TEST(Small_RecordJson, AFullRecordRoundTripsByteForByte)
+class Small_RecordJsonRoundTrip : public ::testing::TestWithParam<RecordRow>
 {
-    const RunRecord record = full_record();
+};
+
+TEST_P(Small_RecordJsonRoundTrip, ARecordRoundTripsToAnEqualRecordAndTheSameBytes)
+{
+    const RunRecord record = GetParam().make();
     const std::string text = write_record(record);
     const RecordReadResult result = read_record(text);
 
@@ -164,14 +189,9 @@ TEST(Small_RecordJson, AFullRecordRoundTripsByteForByte)
     EXPECT_EQ(write_record(*result.record), text);
 }
 
-TEST(Small_RecordJson, AnEmptyRecordRoundTrips)
-{
-    const RunRecord record;
-    const RecordReadResult result = read_record(write_record(record));
-
-    ASSERT_TRUE(result.ok()) << result.error;
-    EXPECT_EQ(*result.record, record);
-}
+INSTANTIATE_TEST_SUITE_P(Small_Records, Small_RecordJsonRoundTrip,
+                         ::testing::Values(RecordRow{"full", &full_record},
+                                           RecordRow{"empty", &empty_record}));
 
 TEST(Small_RecordJson, ColumnsSitOnOneLine)
 {
@@ -197,17 +217,22 @@ TEST(Small_RecordJson, NonFiniteRealsAreWrittenAsWords)
     EXPECT_EQ(result.record->clock.nanoseconds_per_tick, -std::numeric_limits<double>::infinity());
 }
 
-TEST(Small_RecordJson, ANewerVersionIsRefused)
+class Small_RecordJsonVersion : public ::testing::TestWithParam<RefusalRow>
 {
-    EXPECT_EQ(refusal("\"sushiprofiler_record\": 2,", "\"sushiprofiler_record\": 3,"),
-              "sushiprofiler_record: version 3 is not the version this build reads, 2");
+};
+
+TEST_P(Small_RecordJsonVersion, AVersionOtherThanTheOneThisBuildReadsIsRefusedByItsNumber)
+{
+    EXPECT_EQ(refusal(GetParam().from, GetParam().to), GetParam().error);
 }
 
-TEST(Small_RecordJson, TheVersionBeforeZoneRunsIsRefusedByItsNumber)
-{
-    EXPECT_EQ(refusal("\"sushiprofiler_record\": 2,", "\"sushiprofiler_record\": 1,"),
-              "sushiprofiler_record: version 1 is not the version this build reads, 2");
-}
+INSTANTIATE_TEST_SUITE_P(
+    Small_Versions, Small_RecordJsonVersion,
+    ::testing::Values(
+        RefusalRow{"\"sushiprofiler_record\": 2,", "\"sushiprofiler_record\": 3,",
+                   "sushiprofiler_record: version 3 is not the version this build reads, 2"},
+        RefusalRow{"\"sushiprofiler_record\": 2,", "\"sushiprofiler_record\": 1,",
+                   "sushiprofiler_record: version 1 is not the version this build reads, 2"}));
 
 TEST(Small_RecordJson, AnUnknownKeyIsRefusedWithItsPath)
 {
@@ -239,28 +264,27 @@ TEST(Small_RecordJson, ColumnsOfUnequalLengthAreRefused)
               "periods[0].spans.start_ns: has 1 entries where 2 were expected");
 }
 
-TEST(Small_RecordJson, ASiteThatPointsNowhereIsRefused)
+class Small_RecordJsonSite : public ::testing::TestWithParam<RefusalRow>
 {
-    EXPECT_EQ(refusal("\"site\": [1, 2]", "\"site\": [1, 99]"),
-              "periods[0].zones[0].site[1]: points past the sites table");
+};
+
+TEST_P(Small_RecordJsonSite, ASiteThatPointsNowhereIsRefused)
+{
+    EXPECT_EQ(refusal(GetParam().from, GetParam().to), GetParam().error);
 }
 
-TEST(Small_RecordJson, AZoneRunOnASiteThatPointsNowhereIsRefused)
-{
-    EXPECT_EQ(refusal("\"site\": [1, 1]", "\"site\": [1, 99]"),
-              "periods[0].runs.site[1]: points past the sites table");
-}
+INSTANTIATE_TEST_SUITE_P(
+    Small_Tables, Small_RecordJsonSite,
+    ::testing::Values(
+        RefusalRow{"\"site\": [1, 2]", "\"site\": [1, 99]",
+                   "periods[0].zones[0].site[1]: points past the sites table"},
+        RefusalRow{"\"site\": [1, 1]", "\"site\": [1, 99]",
+                   "periods[0].runs.site[1]: points past the sites table"}));
 
 TEST(Small_RecordJson, AZoneRunThatEndsBeforeItBeginsIsRefused)
 {
     EXPECT_EQ(refusal("\"end_ns\": [1400, 1200]", "\"end_ns\": [1400, 1050]"),
               "periods[0].runs.end_ns[1]: ends before it begins");
-}
-
-TEST(Small_RecordJson, AZoneRunOnAThreadOutsideTheTableIsRefused)
-{
-    EXPECT_EQ(refusal("\"thread\": [7, 7]", "\"thread\": [7, 9]"),
-              "periods[0].runs.thread: thread 9 is not in the thread table");
 }
 
 TEST(Small_RecordJson, AParentThatIsNotEarlierIsRefused)
@@ -269,12 +293,22 @@ TEST(Small_RecordJson, AParentThatIsNotEarlierIsRefused)
               "periods[0].zones[0].parent[0]: points at no earlier node");
 }
 
-TEST(Small_RecordJson, AThreadOutsideTheTableIsRefused)
+class Small_RecordJsonThread : public ::testing::TestWithParam<RefusalRow>
 {
-    EXPECT_EQ(refusal("\"thread\": 7,\n      \"begin_ns\": 1000",
-                      "\"thread\": 9,\n      \"begin_ns\": 1000"),
-              "periods[0].thread: thread 9 is not in the thread table");
+};
+
+TEST_P(Small_RecordJsonThread, AThreadOutsideTheTableIsRefused)
+{
+    EXPECT_EQ(refusal(GetParam().from, GetParam().to), GetParam().error);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    Small_Tables, Small_RecordJsonThread,
+    ::testing::Values(
+        RefusalRow{"\"thread\": [7, 7]", "\"thread\": [7, 9]",
+                   "periods[0].runs.thread: thread 9 is not in the thread table"},
+        RefusalRow{"\"thread\": 7,\n      \"begin_ns\": 1000", "\"thread\": 9,\n      \"begin_ns\": 1000",
+                   "periods[0].thread: thread 9 is not in the thread table"}));
 
 TEST(Small_RecordJson, AnUnknownWordIsRefused)
 {

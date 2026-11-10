@@ -65,6 +65,18 @@ namespace
         return record;
     }
 
+    /// @brief Returns step_record() with a 500 ns warm-up period before its periods.
+    RunRecord step_record_with_warmup()
+    {
+        RunRecord record = step_record();
+        PeriodRecord warmup;
+        warmup.timeline = 1U;
+        warmup.end_ns = 500U;
+        warmup.warmup = true;
+        record.periods.insert(record.periods.begin(), warmup);
+        return record;
+    }
+
     /// @brief Returns a check of @p statistic of timeline `step`.
     Check step_check(Statistic statistic, std::optional<double> at_most,
                      std::optional<double> at_least = std::nullopt)
@@ -111,6 +123,25 @@ TEST(Small_Verdict, PercentilesFollowTheType7Rule)
 
     EXPECT_TRUE(TestSupport::is_within(TestSupport::measure_relative_error<double>(
         verdicts[0].value, 118.0, K_PERCENTILE_OPERATIONS)));
+}
+
+TEST(Small_Verdict, ACheckReadsTheActivePeriodsOnly)
+{
+    const std::vector<Verdict> verdicts =
+        SushiProfiler::check(step_record_with_warmup(), {step_check(Statistic::Max, 125.0)});
+
+    ASSERT_EQ(verdicts.size(), 1U);
+    EXPECT_TRUE(verdicts[0].passed);
+    EXPECT_EQ(verdicts[0].value, 120.0);
+}
+
+TEST(Small_Verdict, TheFiftiethPercentileGivesTheMedian)
+{
+    const std::vector<Verdict> verdicts = SushiProfiler::check(
+        step_record(), {step_check(Statistic::Median, 200.0), step_check(Statistic::P50, 200.0)});
+
+    ASSERT_EQ(verdicts.size(), 2U);
+    EXPECT_EQ(verdicts[1].value, verdicts[0].value);
 }
 
 TEST(Small_Verdict, AMissingSubjectFails)

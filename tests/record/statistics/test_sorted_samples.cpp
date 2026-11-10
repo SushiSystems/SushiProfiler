@@ -58,9 +58,13 @@ TEST(Small_SortedSamples, SortsAndAnswersTheEnds)
     EXPECT_EQ(samples.values(), (std::vector<double>{1.0, 2.0, 3.0, 4.0, 5.0}));
 }
 
-TEST(Small_SortedSamples, TheMedianOfAnEvenCountIsTheMidpoint)
+TEST(Small_SortedSamples, TheMedianOfAnOddCountIsTheMiddleValue)
 {
     EXPECT_EQ(SortedSamples({5.0, 1.0, 4.0, 2.0, 3.0}).median(), 3.0);
+}
+
+TEST(Small_SortedSamples, TheMedianOfAnEvenCountIsTheMidpoint)
+{
     EXPECT_EQ(SortedSamples({4.0, 1.0, 3.0, 2.0}).median(), 2.5);
 }
 

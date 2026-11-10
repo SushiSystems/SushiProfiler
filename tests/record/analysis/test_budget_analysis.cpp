@@ -34,8 +34,6 @@
 
 #include "analysis_record.hpp"
 
-using SushiProfiler::PeriodRecord;
-using SushiProfiler::RunRecord;
 using SushiProfiler::Table;
 using SushiProfilerTests::analysis_record;
 using SushiProfilerTests::expect_row;
@@ -54,9 +52,8 @@ TEST(Small_BudgetAnalysis, FindsThePeriodsOverBudgetAndTheWorst)
 
 TEST(Small_BudgetAnalysis, ATimelineWithoutABudgetHasNoRow)
 {
-    RunRecord record = analysis_record();
-    for (PeriodRecord& period : record.periods)
-        period.budget_ns = 0U;
+    const Table table =
+        SushiProfiler::BudgetAnalysis().run(SushiProfilerTests::unbudgeted_analysis_record(), {});
 
-    EXPECT_TRUE(SushiProfiler::BudgetAnalysis().run(record, {}).rows.empty());
+    EXPECT_TRUE(table.rows.empty());
 }
