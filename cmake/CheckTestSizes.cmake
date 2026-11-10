@@ -16,7 +16,7 @@ foreach(source IN LISTS sources)
         declarations "${text}")
     foreach(declaration IN LISTS declarations)
         string(REGEX REPLACE "^[A-Z_]+\\([ \t\r\n]*" "" suite "${declaration}")
-        if(NOT suite MATCHES "^(Characterization_)?(Small|Medium|Large)_")
+        if(NOT suite MATCHES "^(Small|Medium|Large)_")
             message(FATAL_ERROR
                 "${source}: the suite ${suite} has no size prefix (Small_, Medium_ or Large_); "
                 "tests/README.md gives the sizes.")

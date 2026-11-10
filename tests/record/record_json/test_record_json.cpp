@@ -28,6 +28,7 @@
  * @see tests/record/record_json/README.md
  */
 
+#include <SushiProfiler/record/device_span_keys.hpp>
 #include <SushiProfiler/record_json/record_json.hpp>
 
 #include <gtest/gtest.h>
@@ -35,6 +36,7 @@
 #include <cmath>
 #include <limits>
 #include <string>
+#include <string_view>
 
 using SushiProfiler::AttributeKind;
 using SushiProfiler::CounterOp;
@@ -323,3 +325,33 @@ TEST(Small_RecordJson, TextThatIsNotJsonNamesItsPlace)
     EXPECT_FALSE(result.ok());
     EXPECT_EQ(result.error.rfind("line 1, column 2: ", 0U), 0U) << result.error;
 }
+
+namespace
+{
+    /// @brief One device span key: the constant the header names and the text the format fixes.
+    struct SpanKeyRow
+    {
+        std::string_view key;
+        const char* written;
+    };
+} // namespace
+
+class Small_RecordJsonSpanKey : public ::testing::TestWithParam<SpanKeyRow>
+{
+};
+
+TEST_P(Small_RecordJsonSpanKey, ADeviceSpanKeyIsWrittenWithItsFixedSpelling)
+{
+    RunRecord record;
+    record.names = {"", std::string(GetParam().key)};
+
+    EXPECT_NE(write_record(record).find(GetParam().written), std::string::npos);
+}
+
+namespace Keys = SushiProfiler::DeviceSpanKeys;
+
+INSTANTIATE_TEST_SUITE_P(Small_Keys, Small_RecordJsonSpanKey,
+                         ::testing::Values(SpanKeyRow{Keys::K_INVOCATION, "\"invocation\""},
+                                           SpanKeyRow{Keys::K_OPERATION, "\"operation\""},
+                                           SpanKeyRow{Keys::K_LAUNCHED_WIDTH, "\"launched_width\""},
+                                           SpanKeyRow{Keys::K_LIVE_WIDTH, "\"live_width\""}));

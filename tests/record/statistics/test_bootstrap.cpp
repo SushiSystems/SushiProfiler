@@ -52,7 +52,7 @@ TEST(Small_Bootstrap, TheSameSeedGivesTheSameInterval)
     EXPECT_EQ(first.high, second.high);
 }
 
-TEST(Characterization_Small_Bootstrap, TheDefaultSeedGivesThePinnedInterval)
+TEST(Small_CharacterizationBootstrap, TheDefaultSeedGivesThePinnedInterval)
 {
     // The pinned ends come from a Python reimplementation that RW-27 commits.
     const Interval interval = bootstrap_median_interval(K_STEPS);

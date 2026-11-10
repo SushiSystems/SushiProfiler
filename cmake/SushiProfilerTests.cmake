@@ -54,7 +54,7 @@ function(sushiprofiler_register_sized_tests program module)
         endforeach()
         list(JOIN quarantined ":" quarantined_filter)
 
-        set(filter "${prefix}*:Characterization_${prefix}*")
+        set(filter "${prefix}*")
         if(quarantined_filter)
             string(APPEND filter "-${quarantined_filter}")
             gtest_discover_tests(${program}

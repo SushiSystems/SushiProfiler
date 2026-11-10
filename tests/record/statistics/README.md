@@ -7,7 +7,7 @@ Every test uses fixed inputs and exact expected values.
 - `test_dispersion.cpp`: the mean of nothing and of values; the coefficient of variation against its
   closed form, positive for a negative mean, and 0 for one sample, for a zero mean and without a
   spread; the jitter of fixed series.
-- `test_bootstrap.cpp`: the same seed gives the same interval; `Characterization_Small_Bootstrap`
+- `test_bootstrap.cpp`: the same seed gives the same interval; `Small_CharacterizationBootstrap`
   pins the default-seed interval, 11.0 to 13.5, which a Python reimplementation of the generator
   computed and which is not in the repository (RW-27 commits it and ends the characterization); the
   interval holds the median and excludes the outlier; one sample gives a point.

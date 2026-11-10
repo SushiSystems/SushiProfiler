@@ -7,4 +7,5 @@
   past its table in a zone node or in a zone run, a thread outside the table in a zone run or in a
   period; and one test for each of a zone run ending before it begins, an unknown key, a missing
   key, a value out of range, a value of the wrong kind, columns of unequal length, a parent that is
-  not earlier, an unknown word, and text that is not JSON.
+  not earlier, an unknown word, and text that is not JSON. One row each checks that `invocation`,
+  `operation`, `launched_width` and `live_width` are written with their fixed spelling.
