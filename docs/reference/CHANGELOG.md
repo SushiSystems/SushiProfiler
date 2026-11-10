@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — cli: Required sushicore 0.12.2, which narrows a sharded test run by `--filter` and reruns a failed shard's cases.
 - 2026-11-10 — continuous_integration: Registered each test program's cases as CTest shards per size (RW-33, `7f8ad1a`).
 - 2026-11-10 — tests: Registered the cases of each test program as CTest shards per size and taught the time reader the per-case XML of the shards (`SushiProfilerTests.cmake`, `test_budget.py`).
 - 2026-11-10 — stream_writers: Added `ChromeTraceEvents`, which builds the Chrome trace events apart from the file `ChromeTraceWriter` writes (RW-32, `a6ece9b`).
