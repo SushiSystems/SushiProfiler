@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — stream_writers: Added `ChromeTraceEvents`, which builds the Chrome trace events apart from the file `ChromeTraceWriter` writes (RW-32, `a6ece9b`).
 - 2026-11-10 — session: Gave Session a poll clock for the consumer and the pause log the collector's clock, so its tests need no sleep (RW-31, `e855927`).
 - 2026-11-10 — session: Inject a clock into Consumer so the live poll tests need no wall clock (RW-30, `53e95f6`).
 - 2026-11-10 — continuous_integration: Cleared the known findings of the shared checkers (RW-25, `5289974`).
