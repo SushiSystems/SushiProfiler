@@ -9,9 +9,11 @@
     to the record, and the Chrome trace parses. The `flows` table has a `total` and a `step`
     row, the record compares with itself, and a check that the flow's maximum is at most 1 ns
     fails while a check that every step lasts at least 1 ns passes.
-  - An unknown analysis and an unknown writer refuse the start, listing the known names.
+  - An unknown analysis and an unknown writer each refuse the start, listing the known names.
   - A second session is refused while the first runs, and allowed once it stopped.
-  - A disabled session records nothing, states its facts, and a second `stop` says so.
+  - A disabled session records nothing, states its facts, and a second `stop` says so, one test
+    each; `keep_periods` unset, 0 and 7 are the facts `all`, `0` and `7` (rows of one test).
+  - These tests start the process-wide session, so they are medium tests.
   - A live view shows each closed period with consecutive sequences and resolvable names, outlives
     the session, and keeps working across a restart with the new run's periods.
   - `keep_periods` leaves the newest N periods in the stopped record; 0 leaves none while the view
@@ -25,7 +27,12 @@
     placed; a delay above 60 000 ms refuses the start naming the source.
   - Every-period windows record all periods after the warm-up; a restart reads a second record
     that holds none of the first; a source's fact survives the record file; control calls from
-    one thread against `stop` and `restart` from another return only what the contract names.
+    one thread against `stop` and `restart` from another return only what the contract names;
+    a restart while the session runs is refused; the source fact is checked in the record and, in
+    a test of its own, in the record file.
+  - The end-to-end run is one fixture; each promise (ten periods, both threads in every period,
+    thread names, the four tables, the `flows` rows, the self comparison, the checks, the record
+    file and the trace) is its own test.
 
 `test_session.cpp` keeps two sources of its own, which read the collector's wish for sources inside
 `begin`, `collect` and `end`; `MemorySource` cannot see the collector.

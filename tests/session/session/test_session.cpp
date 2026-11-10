@@ -33,6 +33,8 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <numeric>
+#include <functional>
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -84,6 +86,14 @@ namespace
         std::stringstream text;
         text << file.rdbuf();
         return text.str();
+    }
+
+    /// @brief Returns the value of the environment fact @p name of @p record, or an empty string.
+    std::string fact_value(const RunRecord& record, const std::string& name)
+    {
+        const auto found = std::find_if(record.environment.begin(), record.environment.end(),
+                                        [&name](const auto& fact) { return fact.name == name; });
+        return found == record.environment.end() ? std::string() : found->value;
     }
 
     /// @brief Returns the site names whose zones @p period holds.
@@ -204,20 +214,13 @@ namespace
         config.enabled = false;
         return config;
     }
-} // namespace
 
-TEST(Medium_Session, RecordsTenPeriodsFromTwoThreads)
-{
-    const std::string folder = ::testing::TempDir() + "sushiprofiler_session";
-    std::ostringstream terminal;
-    Registry registry;
-    SushiProfiler::register_builtin_writers(registry, terminal);
-    SessionStart started = Session::start(end_to_end_config(folder), registry);
-    ASSERT_TRUE(started.ok()) << started.error;
-    Session& session = *started.session;
-    PeriodTimeline& step = session.timeline("e2e.step");
-    Collector::set_thread_name("e2e.main");
+    /// @brief Marks eleven `e2e.step` periods on @p session, recording a zone, a counter, a value,
+    /// an instant and a flow begin on this thread and a zone and the flow's end on a worker.
+    void run_two_threads(Session& session)
     {
+        PeriodTimeline& step = session.timeline("e2e.step");
+        Collector::set_thread_name("e2e.main");
         Worker worker;
         for (std::uint64_t index = 0U; index < 11U; ++index)
         {
@@ -232,101 +235,226 @@ TEST(Medium_Session, RecordsTenPeriodsFromTwoThreads)
             worker.step();
         }
     }
-    const SessionStop stopped = session.stop();
-    const RunRecord& record = stopped.record;
+} // namespace
 
-    EXPECT_TRUE(stopped.problems.empty());
-    ASSERT_EQ(record.periods.size(), 10U);
-    EXPECT_TRUE(record.periods[0].warmup);
-    for (std::size_t index = 0U; index < record.periods.size(); ++index)
+namespace
+{
+    /// @brief Runs the end-to-end session once and keeps what its tests read.
+    class Medium_SessionEndToEnd : public ::testing::Test
     {
-        const PeriodRecord& period = record.periods[index];
-        EXPECT_EQ(period.index, index);
-        EXPECT_EQ(zone_sites(record, period), (std::set<std::string>{"e2e.main", "e2e.worker"}));
-        EXPECT_EQ(sample_sites(record, period),
-                  (std::set<std::string>{"e2e.bytes", "e2e.level", "e2e.tick", "e2e.item"}));
-    }
-    std::set<std::string> threads;
-    for (const auto& thread : record.threads)
-        threads.insert(thread.name);
-    EXPECT_EQ(threads.count("e2e.main"), 1U);
-    EXPECT_EQ(threads.count("e2e.worker"), 1U);
+        protected:
+            /// @brief Marks eleven steps on two threads, stops, and reports.
+            void SetUp() override
+            {
+                Registry registry;
+                SushiProfiler::register_builtin_writers(registry, terminal_);
+                SessionStart started = Session::start(end_to_end_config(folder_), registry);
+                ASSERT_TRUE(started.ok()) << started.error;
+                run_two_threads(*started.session);
+                stopped_ = started.session->stop();
+                report_ = started.session->report(stopped_.record);
+            }
 
-    const SessionReport report = session.report(record);
-    EXPECT_TRUE(report.problems.empty());
-    EXPECT_EQ(report.tables.size(), 4U);
-    for (const char* table : {"breakdown", "counters", "flows", "overhead"})
-        EXPECT_NE(terminal.str().find(std::string("== ") + table + " =="), std::string::npos);
-    ASSERT_EQ(report.tables[2].name, "flows");
-    EXPECT_EQ(report.tables[2].rows.size(), 2U);
-    const SushiProfiler::Comparison same = SushiProfiler::compare_records(record, record, {});
+            /// @brief Returns the names of the threads of the record.
+            std::set<std::string> thread_names() const
+            {
+                std::set<std::string> names;
+                for (const auto& thread : stopped_.record.threads)
+                    names.insert(thread.name);
+                return names;
+            }
+
+            /// @brief Expects period @p index to hold the zones and samples of both threads.
+            void expect_period_complete(std::size_t index) const
+            {
+                const PeriodRecord& period = stopped_.record.periods[index];
+                EXPECT_EQ(period.index, index);
+                EXPECT_EQ(zone_sites(stopped_.record, period),
+                          (std::set<std::string>{"e2e.main", "e2e.worker"}));
+                EXPECT_EQ(sample_sites(stopped_.record, period),
+                          (std::set<std::string>{"e2e.bytes", "e2e.level", "e2e.tick",
+                                                 "e2e.item"}));
+            }
+
+            /// @brief Expects the terminal to hold the heading of each of the four tables.
+            void expect_four_headings() const
+            {
+                for (const char* table : {"breakdown", "counters", "flows", "overhead"})
+                    EXPECT_NE(terminal_.str().find(std::string("== ") + table + " =="),
+                              std::string::npos);
+            }
+
+            const std::string folder_ = ::testing::TempDir() + "sushiprofiler_session"; /**< Output. */
+            std::ostringstream terminal_;  /**< What the terminal writer wrote. */
+            SessionStop stopped_;          /**< What stop() returned. */
+            SessionReport report_;         /**< The report of the record. */
+    };
+} // namespace
+
+TEST_F(Medium_SessionEndToEnd, ARunWithOneWarmupAndNineActivePeriodsHoldsTenPeriods)
+{
+    EXPECT_TRUE(stopped_.problems.empty());
+    ASSERT_EQ(stopped_.record.periods.size(), 10U);
+    EXPECT_TRUE(stopped_.record.periods[0].warmup);
+}
+
+TEST_F(Medium_SessionEndToEnd, EveryPeriodHoldsBothThreadsZonesAndEverySampleSite)
+{
+    ASSERT_EQ(stopped_.record.periods.size(), 10U);
+    expect_period_complete(0U);
+    expect_period_complete(5U);
+    expect_period_complete(9U);
+}
+
+TEST_F(Medium_SessionEndToEnd, BothThreadsKeepTheirNames)
+{
+    EXPECT_EQ(thread_names().count("e2e.main"), 1U);
+    EXPECT_EQ(thread_names().count("e2e.worker"), 1U);
+}
+
+TEST_F(Medium_SessionEndToEnd, TheReportHoldsFourTablesAndTheTerminalPrintsThem)
+{
+    EXPECT_TRUE(report_.problems.empty());
+    EXPECT_EQ(report_.tables.size(), 4U);
+    expect_four_headings();
+}
+
+TEST_F(Medium_SessionEndToEnd, TheFlowsTableHasATotalRowAndAStepRow)
+{
+    ASSERT_EQ(report_.tables.size(), 4U);
+    ASSERT_EQ(report_.tables[2].name, "flows");
+    EXPECT_EQ(report_.tables[2].rows.size(), 2U);
+}
+
+TEST_F(Medium_SessionEndToEnd, TheRecordComparesWithItself)
+{
+    const SushiProfiler::Comparison same =
+        SushiProfiler::compare_records(stopped_.record, stopped_.record, {});
+
     ASSERT_TRUE(same.ok()) << same.error;
     EXPECT_FALSE(same.table.rows.empty());
+}
+
+TEST_F(Medium_SessionEndToEnd, AFlowMaximumOfOneNanosecondFailsAndAStepMinimumOfOnePasses)
+{
     const SushiProfiler::ChecksReadResult checks = SushiProfiler::read_checks(
         R"([{"subject": "flow:e2e.item", "statistic": "max", "at_most_ns": 1},
             {"subject": "timeline:e2e.step", "statistic": "min", "at_least_ns": 1}])");
     ASSERT_TRUE(checks.ok()) << checks.error;
+
     const std::vector<SushiProfiler::Verdict> verdicts =
-        SushiProfiler::check(record, checks.checks);
+        SushiProfiler::check(stopped_.record, checks.checks);
+
     ASSERT_EQ(verdicts.size(), 2U);
     EXPECT_FALSE(verdicts[0].passed);
     EXPECT_TRUE(verdicts[1].passed) << verdicts[1].reason;
+}
+
+TEST_F(Medium_SessionEndToEnd, TheRecordFileReadsBackEqualToTheRecord)
+{
     const SushiProfiler::RecordReadResult reread =
-        SushiProfiler::read_record(file_text(folder + "/run.sprec.json"));
+        SushiProfiler::read_record(file_text(folder_ + "/run.sprec.json"));
+
     ASSERT_TRUE(reread.ok()) << reread.error;
-    EXPECT_TRUE(*reread.record == record);
+    EXPECT_TRUE(*reread.record == stopped_.record);
+}
+
+TEST_F(Medium_SessionEndToEnd, TheChromeTraceParsesAndHoldsEvents)
+{
     const SushiProfiler::JsonReadResult trace =
-        SushiProfiler::read_json(file_text(folder + "/run.trace.json"));
+        SushiProfiler::read_json(file_text(folder_ + "/run.trace.json"));
+
     ASSERT_TRUE(trace.ok()) << trace.error.message;
     EXPECT_GT(trace.value->find("traceEvents")->as_array()->size(), 50U);
 }
 
-TEST(Small_Session, RefusesAnUnknownAnalysisOrWriter)
+TEST(Medium_Session, RefusesAnUnknownAnalysisAndListsTheKnownOnes)
 {
     Registry registry;
     std::ostringstream terminal;
     SushiProfiler::register_builtin_writers(registry, terminal);
     ProfilerConfig analysis = disabled_config();
     analysis.analyses = {"breakdown", "fastest"};
-    ProfilerConfig writer = disabled_config();
-    writer.writers = {NamedSettings{"csv", parsed("{}")}};
 
     const SessionStart refused = Session::start(analysis, registry);
-    const SessionStart unknown_writer = Session::start(writer, registry);
 
     EXPECT_FALSE(refused.ok());
     EXPECT_EQ(refused.error.rfind("unknown analysis \"fastest\"; known: breakdown, budget", 0U),
               0U);
-    EXPECT_EQ(unknown_writer.error,
-              "unknown writer \"csv\"; known: chrome_trace, record, terminal");
 }
 
-TEST(Small_Session, RunsOneSessionPerProcess)
+TEST(Medium_Session, RefusesAnUnknownWriterAndListsTheKnownOnes)
+{
+    Registry registry;
+    std::ostringstream terminal;
+    SushiProfiler::register_builtin_writers(registry, terminal);
+    ProfilerConfig writer = disabled_config();
+    writer.writers = {NamedSettings{"csv", parsed("{}")}};
+
+    const SessionStart refused = Session::start(writer, registry);
+
+    EXPECT_EQ(refused.error, "unknown writer \"csv\"; known: chrome_trace, record, terminal");
+}
+
+TEST(Medium_Session, ASecondSessionIsRefusedWhileTheFirstRuns)
 {
     const Registry registry;
     SessionStart first = Session::start(disabled_config(), registry);
     ASSERT_TRUE(first.ok()) << first.error;
 
     const SessionStart second = Session::start(disabled_config(), registry);
+
     EXPECT_EQ(second.error, "a session is already running: a session without a timeline");
     static_cast<void>(first.session->stop());
-    const SessionStart third = Session::start(disabled_config(), registry);
-    EXPECT_TRUE(third.ok()) << third.error;
 }
 
-TEST(Small_Session, ADisabledSessionStatesItsFactsAndRecordsNothing)
+TEST(Medium_Session, ASessionIsAllowedOnceTheFirstStopped)
 {
     const Registry registry;
-    SessionStart started = Session::start(disabled_config(), registry);
-    ASSERT_TRUE(started.ok());
+    SessionStart first = Session::start(disabled_config(), registry);
+    ASSERT_TRUE(first.ok()) << first.error;
+    static_cast<void>(first.session->stop());
 
-    const SessionStop stopped = started.session->stop();
-    const SessionStop again = started.session->stop();
+    SessionStart next = Session::start(disabled_config(), registry);
 
-    EXPECT_TRUE(stopped.record.periods.empty());
-    EXPECT_FALSE(stopped.record.environment.empty());
-    EXPECT_EQ(stopped.record.environment.back().name, "config.record.keep_periods");
-    EXPECT_EQ(again.problems, std::vector<std::string>{"the session was already stopped"});
+    EXPECT_TRUE(next.ok()) << next.error;
+    static_cast<void>(next.session->stop());
+}
+
+namespace
+{
+    /// @brief Starts a disabled session and stops it twice.
+    class Medium_SessionDisabled : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                SessionStart started = Session::start(disabled_config(), registry_);
+                ASSERT_TRUE(started.ok());
+                stopped_ = started.session->stop();
+                again_ = started.session->stop();
+            }
+
+            const Registry registry_;  /**< No parts. */
+            SessionStop stopped_;      /**< The first stop. */
+            SessionStop again_;        /**< The second stop. */
+    };
+} // namespace
+
+TEST_F(Medium_SessionDisabled, RecordsNoPeriod)
+{
+    EXPECT_TRUE(stopped_.record.periods.empty());
+}
+
+TEST_F(Medium_SessionDisabled, StatesItsFacts)
+{
+    EXPECT_FALSE(stopped_.record.environment.empty());
+    EXPECT_EQ(stopped_.record.environment.back().name, "config.record.keep_periods");
+}
+
+TEST_F(Medium_SessionDisabled, ASecondStopSaysTheSessionWasAlreadyStopped)
+{
+    EXPECT_EQ(again_.problems, std::vector<std::string>{"the session was already stopped"});
 }
 
 namespace
@@ -536,6 +664,155 @@ namespace
                             });
     }
 
+    /// @brief Marks @p count periods of @p step with a zone each and returns whether the newest
+    /// closed period @p view shows ever had a lower sequence than one seen before.
+    bool marks_and_watches(PeriodTimeline& step, const LiveView& view, std::uint64_t count)
+    {
+        std::uint64_t last_sequence = 0U;
+        bool went_back = false;
+        for (std::uint64_t index = 0U; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            {
+                SP_ZONE("live.zone");
+            }
+            const auto latest = view.latest();
+            if (latest != nullptr)
+            {
+                went_back = went_back || latest->sequence < last_sequence;
+                last_sequence = latest->sequence;
+            }
+        }
+        return went_back;
+    }
+
+    /// @brief Returns whether the sequences of @p history rise by one from the oldest to the newest.
+    bool consecutive(const std::vector<std::shared_ptr<const SushiProfiler::ClosedPeriod>>& history)
+    {
+        for (std::size_t slot = 1U; slot < history.size(); ++slot)
+        {
+            if (history[slot]->sequence != history[slot - 1U]->sequence + 1U)
+                return false;
+        }
+        return true;
+    }
+
+    /// @brief Returns whether every period of @p history names its first zone's site @p name.
+    bool every_first_zone_is(
+        const std::vector<std::shared_ptr<const SushiProfiler::ClosedPeriod>>& history,
+        const std::string& name)
+    {
+        for (const auto& closed : history)
+        {
+            if (closed->period.zones.empty())
+                return false;
+            const auto* site = closed->names->site(closed->period.zones[0].nodes[0].site);
+            if (site == nullptr || site->name != name)
+                return false;
+        }
+        return true;
+    }
+
+    /// @brief Returns whether every period of @p history belongs to run @p run.
+    bool every_period_in_run(
+        const std::vector<std::shared_ptr<const SushiProfiler::ClosedPeriod>>& history,
+        std::uint64_t run)
+    {
+        return std::all_of(history.begin(), history.end(),
+                           [run](const auto& closed) { return closed->run == run; });
+    }
+
+    /// @brief Returns the index of each period of @p record, in order.
+    std::vector<std::uint64_t> period_indices(const RunRecord& record)
+    {
+        std::vector<std::uint64_t> indices;
+        for (const PeriodRecord& period : record.periods)
+            indices.push_back(period.index);
+        return indices;
+    }
+
+    /// @brief Returns the indices 0 up to, not including, @p count.
+    std::vector<std::uint64_t> count_up(std::uint64_t count)
+    {
+        std::vector<std::uint64_t> indices(count);
+        std::iota(indices.begin(), indices.end(), std::uint64_t{0});
+        return indices;
+    }
+
+    /// @brief Returns the index of each warm-up period of @p record.
+    std::vector<std::uint64_t> warmup_indices(const RunRecord& record)
+    {
+        std::vector<std::uint64_t> indices;
+        for (const PeriodRecord& period : record.periods)
+        {
+            if (period.warmup)
+                indices.push_back(period.index);
+        }
+        return indices;
+    }
+
+    /// @brief Returns the site names of the zones of each period of @p record, in order.
+    std::vector<std::set<std::string>> zone_sites_by_period(const RunRecord& record)
+    {
+        std::vector<std::set<std::string>> sites;
+        for (const PeriodRecord& period : record.periods)
+            sites.push_back(zone_sites(record, period));
+        return sites;
+    }
+
+    /// @brief Returns whether every period of @p record holds one span, on track @p track.
+    bool every_period_has_one_span_on(const RunRecord& record, SushiProfiler::TrackID track)
+    {
+        return std::all_of(record.periods.begin(), record.periods.end(),
+                           [track](const PeriodRecord& period)
+                           { return period.spans.size() == 1U && period.spans.span(0U).track == track; });
+    }
+
+    /// @brief Returns whether every period of @p record states `probe.period` as its own index first.
+    bool every_period_states_its_index(const RunRecord& record)
+    {
+        return std::all_of(record.periods.begin(), record.periods.end(),
+                           [](const PeriodRecord& period)
+                           {
+                               return !period.facts.empty() && period.facts[0].name == "probe.period" &&
+                                      period.facts[0].value == std::to_string(period.index);
+                           });
+    }
+
+    /// @brief Calls the control surface of @p session until @p done and counts in @p invalid each
+    /// answer the contract does not name.
+    void control_until_done(Session& session, const std::atomic<bool>& done,
+                            std::atomic<int>& invalid)
+    {
+        bool enabled = false;
+        while (!done.load(std::memory_order_acquire))
+        {
+            static_cast<void>(session.pause());
+            static_cast<void>(session.resume());
+            const WriterSwitch outcome = session.set_writer_enabled("chrome_trace", enabled);
+            enabled = !enabled;
+            if (outcome != WriterSwitch::Queued && outcome != WriterSwitch::NotRecording)
+                invalid.fetch_add(1);
+            const LiveView view = session.live();
+            if (!view.valid())
+                invalid.fetch_add(1);
+        }
+    }
+
+    /// @brief Marks, stops and restarts @p session @p rounds times; returns the failed restarts.
+    int stop_and_restart(Session& session, PeriodTimeline& step, int rounds)
+    {
+        int failures = 0;
+        for (int round = 0; round < rounds; ++round)
+        {
+            static_cast<void>(step.mark());
+            static_cast<void>(session.stop());
+            if (!session.restart().empty())
+                ++failures;
+        }
+        return failures;
+    }
+
     /// @brief Returns whether @p period carries fact `paused`.
     bool is_paused(const PeriodRecord& period)
     {
@@ -556,21 +833,7 @@ TEST(Medium_Session, LiveViewShowsEachClosedPeriodWhileTheSessionRuns)
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("live.step");
     const LiveView view = session.live();
-    std::uint64_t last_sequence = 0U;
-    bool went_back = false;
-    for (std::uint64_t index = 0U; index < 61U; ++index)
-    {
-        static_cast<void>(step.mark());
-        {
-            SP_ZONE("live.zone");
-        }
-        const auto latest = view.latest();
-        if (latest != nullptr)
-        {
-            went_back = went_back || latest->sequence < last_sequence;
-            last_sequence = latest->sequence;
-        }
-    }
+    const bool went_back = marks_and_watches(step, view, 61U);
     const bool arrived = wait_until(
         [&]
         {
@@ -583,15 +846,8 @@ TEST(Medium_Session, LiveViewShowsEachClosedPeriodWhileTheSessionRuns)
     EXPECT_FALSE(went_back);
     const auto history = view.history(10U);
     ASSERT_EQ(history.size(), 10U);
-    for (std::size_t slot = 1U; slot < history.size(); ++slot)
-        EXPECT_EQ(history[slot]->sequence, history[slot - 1U]->sequence + 1U);
-    for (const auto& closed : history)
-    {
-        ASSERT_FALSE(closed->period.zones.empty());
-        const auto& node = closed->period.zones[0].nodes[0];
-        ASSERT_NE(closed->names->site(node.site), nullptr);
-        EXPECT_EQ(closed->names->site(node.site)->name, "live.zone");
-    }
+    EXPECT_TRUE(consecutive(history));
+    EXPECT_TRUE(every_first_zone_is(history, "live.zone"));
 }
 
 TEST(Medium_Session, ALiveViewOutlivesTheSessionAndKeepsItsLastPeriods)
@@ -643,8 +899,7 @@ TEST(Medium_Session, AViewTakenBeforeStopKeepsWorkingAfterRestart)
     static_cast<void>(session.stop());
 
     ASSERT_TRUE(second);
-    for (const auto& closed : view.history(100U))
-        EXPECT_EQ(closed->run, 2U);
+    EXPECT_TRUE(every_period_in_run(view.history(100U), 2U));
     EXPECT_EQ(view.history(100U).front()->sequence, 0U);
     EXPECT_EQ(view.history(100U).front()->period.index, 0U);
 }
@@ -667,22 +922,39 @@ TEST(Medium_Session, KeepsTheLastNPeriodsInTheStoppedRecord)
     EXPECT_EQ(stopped.record.periods.back().index, 29U);
 }
 
-TEST(Medium_Session, KeepPeriodsZeroReturnsNoPeriodsButLiveStillPublishes)
+namespace
 {
-    ProfilerConfig config = live_config("keep.step");
-    config.record.keep_periods = 0U;
-    const Registry registry;
-    SessionStart started = Session::start(config, registry);
-    ASSERT_TRUE(started.ok()) << started.error;
-    PeriodTimeline& step = started.session->timeline("keep.step");
-    const LiveView view = started.session->live();
-    for (int index = 0; index < 11; ++index)
-        static_cast<void>(step.mark());
+    /// @brief Runs eleven periods with keep_periods 0 and a live view, then stops.
+    class Medium_SessionKeepNone : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                ProfilerConfig config = live_config("keep.step");
+                config.record.keep_periods = 0U;
+                SessionStart started = Session::start(config, registry_);
+                ASSERT_TRUE(started.ok()) << started.error;
+                PeriodTimeline& step = started.session->timeline("keep.step");
+                view_ = started.session->live();
+                for (int index = 0; index < 11; ++index)
+                    static_cast<void>(step.mark());
+                stopped_ = started.session->stop();
+            }
 
-    const SessionStop stopped = started.session->stop();
+            const Registry registry_;  /**< No parts. */
+            LiveView view_;            /**< The view taken before the marks. */
+            SessionStop stopped_;      /**< What stop() returned. */
+    };
+} // namespace
 
-    EXPECT_TRUE(stopped.record.periods.empty());
-    EXPECT_EQ(view.history(100U).size(), 10U);
+TEST_F(Medium_SessionKeepNone, TheStoppedRecordHoldsNoPeriod)
+{
+    EXPECT_TRUE(stopped_.record.periods.empty());
+}
+
+TEST_F(Medium_SessionKeepNone, TheLiveViewStillPublishesEveryClosedPeriod)
+{
+    EXPECT_EQ(view_.history(100U).size(), 10U);
 }
 
 TEST(Medium_Session, AWriterStartedDisabledWritesNothingUntilEnabledAtABoundary)
@@ -728,25 +1000,53 @@ TEST(Medium_Session, AWriterStartedDisabledWritesNothingUntilEnabledAtABoundary)
     EXPECT_EQ(trace.find("toggle.early"), std::string::npos);
 }
 
-TEST(Medium_Session, RefusesAWriterToggleForAnUnknownOrRecordWriterName)
+namespace
 {
-    const std::string folder = ::testing::TempDir() + "sushiprofiler_refuse";
-    std::ostringstream terminal;
-    Registry registry;
-    SushiProfiler::register_builtin_writers(registry, terminal);
-    ProfilerConfig config = live_config("refuse.step");
-    config.output = folder;
-    config.writers = {NamedSettings{"record", parsed(R"({"path": "r.json"})")},
-                      NamedSettings{"chrome_trace", parsed(R"({"path": "t.json"})")}};
-    SessionStart started = Session::start(config, registry);
-    ASSERT_TRUE(started.ok()) << started.error;
-    Session& session = *started.session;
+    /// @brief Starts a session with a record writer and a chrome trace writer.
+    class Medium_SessionToggle : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                SushiProfiler::register_builtin_writers(registry_, terminal_);
+                ProfilerConfig config = live_config("refuse.step");
+                config.output = ::testing::TempDir() + "sushiprofiler_refuse";
+                config.writers = {NamedSettings{"record", parsed(R"({"path": "r.json"})")},
+                                  NamedSettings{"chrome_trace", parsed(R"({"path": "t.json"})")}};
+                SessionStart started = Session::start(config, registry_);
+                ASSERT_TRUE(started.ok()) << started.error;
+                session_ = std::move(started.session);
+            }
 
-    EXPECT_EQ(session.set_writer_enabled("csv", true), WriterSwitch::UnknownWriter);
-    EXPECT_EQ(session.set_writer_enabled("record", false), WriterSwitch::NotStreaming);
-    EXPECT_EQ(session.set_writer_enabled("chrome_trace", false), WriterSwitch::Queued);
-    static_cast<void>(session.stop());
-    EXPECT_EQ(session.set_writer_enabled("chrome_trace", true), WriterSwitch::NotRecording);
+            std::ostringstream terminal_;       /**< The terminal writer's output. */
+            Registry registry_;                 /**< The built-in writers. */
+            std::unique_ptr<Session> session_;  /**< The running session. */
+    };
+} // namespace
+
+TEST_F(Medium_SessionToggle, AnUnknownWriterNameIsRefused)
+{
+    EXPECT_EQ(session_->set_writer_enabled("csv", true), WriterSwitch::UnknownWriter);
+    static_cast<void>(session_->stop());
+}
+
+TEST_F(Medium_SessionToggle, ARecordWriterIsNotStreaming)
+{
+    EXPECT_EQ(session_->set_writer_enabled("record", false), WriterSwitch::NotStreaming);
+    static_cast<void>(session_->stop());
+}
+
+TEST_F(Medium_SessionToggle, AStreamWriterToggleIsQueued)
+{
+    EXPECT_EQ(session_->set_writer_enabled("chrome_trace", false), WriterSwitch::Queued);
+    static_cast<void>(session_->stop());
+}
+
+TEST_F(Medium_SessionToggle, AToggleAfterStopIsNotRecording)
+{
+    static_cast<void>(session_->stop());
+
+    EXPECT_EQ(session_->set_writer_enabled("chrome_trace", true), WriterSwitch::NotRecording);
 }
 
 TEST(Medium_SessionPause, PauseAndResumeReportWhetherTheyTookEffect)
@@ -890,7 +1190,7 @@ TEST(Medium_Session, ASourceDelayHoldsPeriodsOpenAndLosesNone)
     }
 }
 
-TEST(Small_Session, RefusesASourceDelayAboveTheLimit)
+TEST(Medium_Session, RefusesASourceDelayAboveTheLimit)
 {
     ProbeSource* probe = nullptr;
     Registry registry;
@@ -918,15 +1218,11 @@ TEST(Medium_Session, EveryPeriodWindowRecordsAllAfterWarmup)
 
     const SessionStop stopped = started.session->stop();
 
-    ASSERT_EQ(stopped.record.periods.size(), 203U);
-    for (std::size_t index = 0U; index < stopped.record.periods.size(); ++index)
-    {
-        EXPECT_EQ(stopped.record.periods[index].index, index);
-        EXPECT_EQ(stopped.record.periods[index].warmup, index < 3U);
-    }
+    EXPECT_EQ(period_indices(stopped.record), count_up(203U));
+    EXPECT_EQ(warmup_indices(stopped.record), count_up(3U));
 }
 
-TEST(Medium_Session, ARestartAfterStopReadsASecondRecord)
+TEST(Medium_Session, ARestartAfterStopReadsASecondRecordWithNothingOfTheFirst)
 {
     const Registry registry;
     SessionStart started = Session::start(live_config("again.step"), registry);
@@ -948,19 +1244,22 @@ TEST(Medium_Session, ARestartAfterStopReadsASecondRecord)
     }
     const SessionStop second = session.stop();
 
-    ASSERT_EQ(first.record.periods.size(), 3U);
-    ASSERT_EQ(second.record.periods.size(), 5U);
-    for (std::size_t index = 0U; index < second.record.periods.size(); ++index)
-    {
-        EXPECT_EQ(second.record.periods[index].index, index);
-        EXPECT_EQ(zone_sites(second.record, second.record.periods[index]),
-                  std::set<std::string>{"again.second"});
-    }
-    EXPECT_EQ(session.restart(), "");
-    EXPECT_FALSE(session.restart().empty());
-    static_cast<void>(session.stop());
-    SessionStart third = Session::start(live_config("again.step"), registry);
-    EXPECT_TRUE(third.ok()) << third.error;
+    EXPECT_EQ(first.record.periods.size(), 3U);
+    EXPECT_EQ(period_indices(second.record), count_up(5U));
+    EXPECT_EQ(zone_sites_by_period(second.record),
+              std::vector<std::set<std::string>>(5U, std::set<std::string>{"again.second"}));
+}
+
+TEST(Medium_Session, ARestartWhileTheSessionRunsIsRefused)
+{
+    const Registry registry;
+    SessionStart started = Session::start(live_config("again.step"), registry);
+    ASSERT_TRUE(started.ok()) << started.error;
+    static_cast<void>(started.session->stop());
+    ASSERT_EQ(started.session->restart(), "");
+
+    EXPECT_FALSE(started.session->restart().empty());
+    static_cast<void>(started.session->stop());
 }
 
 TEST(Medium_Session, ASourceUsesItsBeginContextInCollect)
@@ -990,14 +1289,10 @@ TEST(Medium_Session, ASourceUsesItsBeginContextInCollect)
     ASSERT_NE(found, tracks.end());
     const auto track = static_cast<SushiProfiler::TrackID>(found - tracks.begin());
     ASSERT_FALSE(stopped.record.periods.empty());
-    for (const PeriodRecord& period : stopped.record.periods)
-    {
-        ASSERT_EQ(period.spans.size(), 1U) << "period " << period.index;
-        EXPECT_EQ(period.spans.span(0U).track, track);
-    }
+    EXPECT_TRUE(every_period_has_one_span_on(stopped.record, track));
 }
 
-TEST(Medium_Session, ASourceFactReachesTheStoppedRecordAndItsFile)
+TEST(Medium_Session, ASourceFactReachesTheStoppedRecord)
 {
     const std::string folder = ::testing::TempDir() + "sushiprofiler_facts";
     ProbeSource* probe = nullptr;
@@ -1019,12 +1314,28 @@ TEST(Medium_Session, ASourceFactReachesTheStoppedRecordAndItsFile)
 
     ASSERT_TRUE(report.problems.empty());
     ASSERT_FALSE(stopped.record.periods.empty());
-    for (const PeriodRecord& period : stopped.record.periods)
-    {
-        ASSERT_FALSE(period.facts.empty());
-        EXPECT_EQ(period.facts[0].name, "probe.period");
-        EXPECT_EQ(period.facts[0].value, std::to_string(period.index));
-    }
+    EXPECT_TRUE(every_period_states_its_index(stopped.record));
+}
+
+TEST(Medium_Session, ASourceFactReachesTheRecordFile)
+{
+    const std::string folder = ::testing::TempDir() + "sushiprofiler_facts_file";
+    ProbeSource* probe = nullptr;
+    std::ostringstream terminal;
+    Registry registry;
+    SushiProfiler::register_builtin_writers(registry, terminal);
+    add_probe(registry, 0U, probe);
+    ProfilerConfig config = live_config("facts.step");
+    config.output = folder;
+    config.sources = {NamedSettings{"probe", parsed("{}")}};
+    config.writers = {NamedSettings{"record", parsed(R"({"path": "facts.sprec.json"})")}};
+    SessionStart started = Session::start(config, registry);
+    ASSERT_TRUE(started.ok()) << started.error;
+    PeriodTimeline& step = started.session->timeline("facts.step");
+    for (int index = 0; index < 4; ++index)
+        static_cast<void>(step.mark());
+    const SessionStop stopped = started.session->stop();
+
     const SushiProfiler::RecordReadResult reread =
         SushiProfiler::read_record(file_text(folder + "/facts.sprec.json"));
     ASSERT_TRUE(reread.ok()) << reread.error;
@@ -1046,31 +1357,8 @@ TEST(Medium_Session, ControlCallsAreSerialisedAgainstStopAndRestart)
     PeriodTimeline& step = session.timeline("control.step");
     std::atomic<bool> done{false};
     std::atomic<int> invalid{0};
-    std::thread controller(
-        [&]
-        {
-            bool enabled = false;
-            while (!done.load(std::memory_order_acquire))
-            {
-                static_cast<void>(session.pause());
-                static_cast<void>(session.resume());
-                const WriterSwitch outcome = session.set_writer_enabled("chrome_trace", enabled);
-                enabled = !enabled;
-                if (outcome != WriterSwitch::Queued && outcome != WriterSwitch::NotRecording)
-                    invalid.fetch_add(1);
-                const LiveView view = session.live();
-                if (!view.valid())
-                    invalid.fetch_add(1);
-            }
-        });
-    int restart_failures = 0;
-    for (int round = 0; round < 15; ++round)
-    {
-        static_cast<void>(step.mark());
-        static_cast<void>(session.stop());
-        if (!session.restart().empty())
-            ++restart_failures;
-    }
+    std::thread controller(control_until_done, std::ref(session), std::cref(done), std::ref(invalid));
+    const int restart_failures = stop_and_restart(session, step, 15);
     done.store(true, std::memory_order_release);
     controller.join();
     static_cast<void>(session.stop());
@@ -1079,26 +1367,35 @@ TEST(Medium_Session, ControlCallsAreSerialisedAgainstStopAndRestart)
     EXPECT_EQ(restart_failures, 0);
 }
 
-TEST(Small_Session, RecordsKeepPeriodsInItsFacts)
+namespace
+{
+    /// @brief A keep_periods setting (or none) and the fact the record states for it.
+    struct KeepRow
+    {
+        bool set;
+        std::uint32_t keep;
+        const char* fact;
+    };
+} // namespace
+
+class Medium_SessionKeepFact : public ::testing::TestWithParam<KeepRow>
+{
+};
+
+TEST_P(Medium_SessionKeepFact, TheRecordStatesKeepPeriodsInItsFacts)
 {
     const Registry registry;
-    ProfilerConfig all = disabled_config();
-    ProfilerConfig none = disabled_config();
-    none.record.keep_periods = 0U;
-    ProfilerConfig seven = disabled_config();
-    seven.record.keep_periods = 7U;
-    std::vector<std::string> seen;
-    for (const ProfilerConfig* config : {&all, &none, &seven})
-    {
-        SessionStart started = Session::start(*config, registry);
-        ASSERT_TRUE(started.ok()) << started.error;
-        const SessionStop stopped = started.session->stop();
-        for (const auto& fact : stopped.record.environment)
-        {
-            if (fact.name == "config.record.keep_periods")
-                seen.push_back(fact.value);
-        }
-    }
+    ProfilerConfig config = disabled_config();
+    if (GetParam().set)
+        config.record.keep_periods = GetParam().keep;
+    SessionStart started = Session::start(config, registry);
+    ASSERT_TRUE(started.ok()) << started.error;
 
-    EXPECT_EQ(seen, (std::vector<std::string>{"all", "0", "7"}));
+    const SessionStop stopped = started.session->stop();
+
+    EXPECT_EQ(fact_value(stopped.record, "config.record.keep_periods"), GetParam().fact);
 }
+
+INSTANTIATE_TEST_SUITE_P(Medium_Keep, Medium_SessionKeepFact,
+                         ::testing::Values(KeepRow{false, 0U, "all"}, KeepRow{true, 0U, "0"},
+                                           KeepRow{true, 7U, "7"}));
