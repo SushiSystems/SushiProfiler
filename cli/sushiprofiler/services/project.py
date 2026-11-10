@@ -26,6 +26,7 @@ from sushicore.build_tree import K_DEFAULT_BUILD_TYPE, refuse_another_build_type
 from sushicore.cmake_driver import CMakeDriver
 from sushicore.proc import CommandRunner, ConsoleLike, Runner
 from sushicore.testing import ModuleTests, TestLabel, run_tests, select_labels
+from sushicore.testing.program_runner import ProgramRunner
 from sushicore.toolchain_args import c_compiler_for
 
 from .. import console
@@ -331,7 +332,8 @@ def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (), c
     module = ModuleTests(
         profile=PROFILE, project_root=lambda: root, console=lambda: space.console,
         build_tree=lambda: tree, run=space.runner.run,
-        run_ctest=lambda directory, **options: driver.ctest_run(cfg, directory, env, config=config, **options))
+        run_ctest=lambda directory, **options: driver.ctest_run(cfg, directory, env, config=config, **options),
+        run_program=ProgramRunner(tree, space.runner.run, env))
     selection = select_labels(sizes, every_size=every_size)
     rc = run_tests(module, selection, name_filter=filter, repeat=repeat, jobs=jobs, every_size=every_size)
     if rc != 0 or not package:
