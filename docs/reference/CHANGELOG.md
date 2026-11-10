@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — session: Gave Session a poll clock for the consumer and the pause log the collector's clock, so its tests need no sleep (RW-31, `e855927`).
 - 2026-11-10 — session: Inject a clock into Consumer so the live poll tests need no wall clock (RW-30, `53e95f6`).
 - 2026-11-10 — continuous_integration: Cleared the known findings of the shared checkers (RW-25, `5289974`).
 - 2026-11-10 — lock_wait: Added `SP_LOCK_WAIT_IN`, `SP_LOCK_WAIT_IN_AT`, `SP_LOCK_WAIT_NAMED_IN` and `SP_LOCK_WAIT_NAMED_IN_AT`, which record the wait in a `Collector` the caller passes; the existing macros keep the process-wide one.
