@@ -30,16 +30,13 @@
 
 #pragma once
 
+#include <SushiProfiler/stream_writers/chrome_trace_events.hpp>
 #include <SushiProfiler/stream_writers/stream_writer.hpp>
 #include <SushiProfiler/version/export.hpp>
 
-#include <cstdint>
 #include <fstream>
-#include <map>
-#include <set>
 #include <string>
-#include <string_view>
-#include <utility>
+#include <vector>
 
 SUSHIPROFILER_DLL_WARNINGS_PUSH
 namespace SushiProfiler
@@ -47,8 +44,8 @@ namespace SushiProfiler
     /**
      * @brief Streams a run as Chrome trace JSON: one event array, written period by period.
      *
-     * Process 1 holds the host: one row per thread, one per lane under it and one per timeline.
-     * Process 2 holds one row per device track. Times are microseconds since the record's origin.
+     * ChromeTraceEvents builds the events, with the rows and times the trace holds; this writer
+     * puts them in the file.
      */
     class SUSHIPROFILER_API ChromeTraceWriter final : public StreamWriter
     {
@@ -68,23 +65,8 @@ namespace SushiProfiler
             [[nodiscard]] WriteStatus end(const RunRecord& record) override;
 
         private:
-            /// @brief Writes one event object, @p event, after a separator.
-            void emit(std::string_view event);
-
-            /// @brief Returns the host row of @p thread and @p lane, naming it on first use.
-            std::int64_t host_row(const RunRecord& record, std::uint32_t thread, NameID lane);
-
-            /// @brief Returns the host row of @p timeline, naming it on first use.
-            std::int64_t timeline_row(const RunRecord& record, NameID timeline);
-
-            /// @brief Names the row of device track @p track on first use.
-            void name_track(const RunRecord& record, TrackID track);
-
-            /// @brief Writes @p period's samples.
-            void write_samples(const RunRecord& record, const PeriodRecord& period);
-
-            /// @brief Writes @p period's spans.
-            void write_spans(const RunRecord& record, const PeriodRecord& period);
+            /// @brief Writes each of @p events after a separator.
+            void emit_all(const std::vector<std::string>& events);
 
             /// @brief Returns the status the file's state gives.
             [[nodiscard]] WriteStatus status() const;
@@ -98,14 +80,8 @@ namespace SushiProfiler
             /// @brief Whether no event has been written yet.
             bool first_ = true;
 
-            /// @brief Host rows by thread and lane; a timeline row has thread UINT32_MAX.
-            std::map<std::pair<std::uint32_t, NameID>, std::int64_t> rows_;
-
-            /// @brief Device tracks already named.
-            std::set<TrackID> named_tracks_;
-
-            /// @brief The next row id for a lane or timeline.
-            std::int64_t next_row_ = 1'000'000;
+            /// @brief Builds the events the file receives.
+            ChromeTraceEvents events_;
     };
 } // namespace SushiProfiler
 SUSHIPROFILER_DLL_WARNINGS_POP

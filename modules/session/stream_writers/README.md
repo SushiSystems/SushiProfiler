@@ -13,6 +13,11 @@ and privately on `json` and `sites`.
   run as Chrome trace JSON, which Perfetto and `chrome://tracing` open. The file is one object,
   `{"displayTimeUnit": "ns", "traceEvents": [...]}`, one event per line. Times are microseconds
   since the record's origin.
+- `SushiProfiler/stream_writers/chrome_trace_events.hpp`: `ChromeTraceEvents` builds the events of
+  that trace as JSON text, one string per event, with no file: `opening()` gives the two process
+  names and `events_of(record, period, instances)` gives a period's events, each row's name event
+  before its first event. `ChromeTraceWriter` only writes them to the file; the rows below are the
+  builder's.
 
 | Row | Process | Holds |
 | --- | --- | --- |
