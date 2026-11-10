@@ -36,6 +36,8 @@
 #include <gtest/gtest.h>
 
 #include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -153,6 +155,21 @@ namespace
             NameID kernel_ = 0U;       /**< The span name. */
     };
 
+    /// @brief Expects @p history to hold @p count closed periods whose sequence and period index
+    /// both count up from 0 and whose names table holds `step`.
+    void expect_published_in_order(
+        const std::vector<std::shared_ptr<const SushiProfiler::ClosedPeriod>>& history,
+        std::size_t count)
+    {
+        ASSERT_EQ(history.size(), count);
+        for (std::size_t index = 0U; index < history.size(); ++index)
+        {
+            EXPECT_EQ(history[index]->sequence, index);
+            EXPECT_EQ(history[index]->period.index, index);
+            EXPECT_EQ(history[index]->names->name(1U), "step");
+        }
+    }
+
     /// @brief Returns each period @p writer kept as `index:runs `, in the order written.
     std::string written(const MemoryStreamWriter& writer)
     {
@@ -163,6 +180,15 @@ namespace
                     std::to_string(writer.instances()[index].size()) + " ";
         }
         return text;
+    }
+
+    /// @brief Returns one warm-up and two active periods, once.
+    WindowSchedule warm_one_active_two()
+    {
+        WindowSchedule schedule;
+        schedule.warmup = 1U;
+        schedule.active = 2U;
+        return schedule;
     }
 
     /// @brief Holds the tables, the window and the record an assembler fills.
@@ -192,22 +218,93 @@ namespace
                 return event_of(EventKind::PeriodMark, time, index, step_);
             }
 
+            /// @brief Runs a lingering session: four marks, then a late and a still-open event.
+            void run_lingering_session()
+            {
+                const AssemblySettings settings = follow(warm_one_active_two(), 100U);
+                PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+                assembler.add(batch_at(450U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U),
+                                                             mark(2U, 300U), mark(3U, 400U)})}));
+                afterwards_ = record_.periods.size();
+                assembler.add(batch_at(600U, {drain_of(1U, {zone(310U, 500U), zone(150U, 520U)})}));
+                assembler.finish();
+            }
+
+            /// @brief Runs a session whose first period has a budget and whose second has a tag.
+            void run_budget_and_tag()
+            {
+                const AssemblySettings settings = follow(warm_one_active_two(), 0U);
+                PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+                const NameID key = names_.intern("variant");
+                const NameID value = names_.intern("fused");
+                const std::uint64_t tag_word = (std::uint64_t{key} << 32U) | value;
+                assembler.add(batch_at(
+                    500U, {drain_of(0U, {mark(0U, 100U),
+                                         event_of(EventKind::PeriodBudget, 100U, 80U, step_),
+                                         mark(1U, 200U),
+                                         event_of(EventKind::PeriodTag, 210U, tag_word, step_),
+                                         mark(2U, 300U)})}));
+                assembler.finish();
+            }
+
+            /// @brief Runs a thread that opens a lane, closes it, closes an unknown one and opens
+            /// one it never closes.
+            void run_lanes()
+            {
+                AssemblySettings settings;
+                settings.linger_ns = 0U;
+                PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+                assembler.add(batch_at(
+                    500U, {drain_of(2U, {event_of(EventKind::LaneBegin, 10U, 0U, 7U), zone(20U, 30U),
+                                         event_of(EventKind::LaneEnd, 40U, 0U, 7U),
+                                         event_of(EventKind::LaneEnd, 45U, 0U, 8U), zone(50U, 60U),
+                                         event_of(EventKind::LaneBegin, 70U, 0U, 9U)})}));
+                assembler.finish();
+            }
+
+            /// @brief Drains thread 5 named "worker" with 3 drops, thread 1 named "main", then
+            /// thread 5 again with no name.
+            void run_threads()
+            {
+                AssemblySettings settings;
+                PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+                ThreadDrain worker = drain_of(5U, {});
+                worker.name = "worker";
+                worker.dropped = 3U;
+                ThreadDrain main_thread = drain_of(1U, {});
+                main_thread.name = "main";
+                assembler.add(batch_at(10U, {worker, main_thread}));
+                worker.name.clear();
+                assembler.add(batch_at(20U, {worker}));
+                assembler.finish();
+            }
+
+            /// @brief Returns @p count marks of `step`; mark n sits at 10 times n.
+            std::vector<TraceEvent> marks_every_ten(std::uint64_t count) const
+            {
+                std::vector<TraceEvent> marks;
+                for (std::uint64_t index = 0U; index < count; ++index)
+                    marks.push_back(mark(index, 10U * index));
+                return marks;
+            }
+
+            /// @brief Returns the late events summed over the threads of the record.
+            std::uint64_t late_total() const
+            {
+                std::uint64_t late = 0U;
+                for (const auto& thread : record_.threads)
+                    late += thread.late;
+                return late;
+            }
+
             NameTable names_;                   /**< The session's names. */
             SiteRegistry sites_;                /**< The session's sites. */
             SiteHandle conv_{&K_CONV};          /**< Site 1's handle. */
             NameID step_ = 0U;                  /**< The followed timeline. */
             SushiProfilerTests::AssemblyRig rig_; /**< The collaborators of the assembler. */
             RunRecord record_;                  /**< The record filled. */
+            std::size_t afterwards_ = 0U;       /**< Periods the record held mid-session. */
     };
-
-    /// @brief Returns one warm-up and two active periods, once.
-    WindowSchedule warm_one_active_two()
-    {
-        WindowSchedule schedule;
-        schedule.warmup = 1U;
-        schedule.active = 2U;
-        return schedule;
-    }
 } // namespace
 
 TEST_F(Small_PeriodAssembler, RecordsARunWithoutATimelineAsOnePeriod)
@@ -228,20 +325,31 @@ TEST_F(Small_PeriodAssembler, RecordsARunWithoutATimelineAsOnePeriod)
     ASSERT_EQ(period.zones.size(), 1U);
     EXPECT_EQ(period.zones[0].nodes.size(), 1U);
     EXPECT_EQ(period.zones[0].nodes[0].calls, 2U);
+}
+
+TEST_F(Small_PeriodAssembler, CopiesTheNamesAndSitesIntoTheRecord)
+{
+    AssemblySettings settings;
+    settings.run_timeline = step_;
+    settings.linger_ns = 0U;
+    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+
+    assembler.add(batch_at(500U, {drain_of(0U, {zone(10U, 20U)})}));
+    assembler.finish();
+
     EXPECT_EQ(record_.names, (std::vector<std::string>{"", "step"}));
     ASSERT_EQ(record_.sites.size(), 2U);
     EXPECT_EQ(record_.sites[1].group, "Model");
 }
 
-TEST_F(Small_PeriodAssembler, KeepsTheWindowsPeriodsAndCountsTheRestOutside)
+TEST_F(Small_PeriodAssembler, KeepsTheWindowsPeriodsWithTheirWarmupFlags)
 {
     const AssemblySettings settings = follow(warm_one_active_two(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
 
     assembler.add(batch_at(
         1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U), mark(3U, 400U)}),
-                 drain_of(1U, {zone(150U, 160U), zone(250U, 260U), zone(350U, 390U),
-                               zone(450U, 460U), zone(50U, 60U)})}));
+                 drain_of(1U, {zone(150U, 160U), zone(250U, 260U), zone(350U, 390U)})}));
     assembler.finish();
 
     ASSERT_EQ(record_.periods.size(), 3U);
@@ -250,22 +358,34 @@ TEST_F(Small_PeriodAssembler, KeepsTheWindowsPeriodsAndCountsTheRestOutside)
     EXPECT_EQ(record_.periods[2].begin_ns, 300U);
     EXPECT_EQ(record_.periods[2].end_ns, 400U);
     EXPECT_EQ(record_.periods[2].zones[0].nodes[0].inclusive_ns, 40U);
+}
+
+TEST_F(Small_PeriodAssembler, CountsEventsOutsideTheWindowAsOutside)
+{
+    const AssemblySettings settings = follow(warm_one_active_two(), 0U);
+    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+
+    assembler.add(batch_at(
+        1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U), mark(3U, 400U)}),
+                 drain_of(1U, {zone(450U, 460U), zone(50U, 60U)})}));
+    assembler.finish();
+
     EXPECT_EQ(record_.drops.outside_periods, 2U);
 }
 
-TEST_F(Small_PeriodAssembler, LingerKeepsAPeriodOpenAndALaterEventIsLate)
+TEST_F(Small_PeriodAssembler, LingerKeepsAPeriodOpenAfterItsEndMark)
 {
-    const AssemblySettings settings = follow(warm_one_active_two(), 100U);
-    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+    run_lingering_session();
 
-    assembler.add(batch_at(450U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U), mark(2U, 300U),
-                                                 mark(3U, 400U)})}));
-    EXPECT_EQ(record_.periods.size(), 2U);
-    assembler.add(batch_at(600U, {drain_of(1U, {zone(310U, 500U), zone(150U, 520U)})}));
-    assembler.finish();
-
+    EXPECT_EQ(afterwards_, 2U);
     ASSERT_EQ(record_.periods.size(), 3U);
     EXPECT_EQ(record_.periods[2].zones[0].nodes[0].inclusive_ns, 190U);
+}
+
+TEST_F(Small_PeriodAssembler, AnEventAfterTheLingerIsCountedLate)
+{
+    run_lingering_session();
+
     ASSERT_EQ(record_.threads.size(), 2U);
     EXPECT_EQ(record_.threads[1].late, 1U);
 }
@@ -286,28 +406,22 @@ TEST_F(Small_PeriodAssembler, APeriodWithoutItsEndMarkIsNotKept)
     EXPECT_EQ(record_.drops.outside_periods, 2U);
 }
 
-TEST_F(Small_PeriodAssembler, AttachesBudgetsAndTags)
+TEST_F(Small_PeriodAssembler, AttachesABudgetToItsPeriod)
 {
-    const AssemblySettings settings = follow(warm_one_active_two(), 0U);
-    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
-    const NameID key = names_.intern("variant");
-    const NameID value = names_.intern("fused");
-    const std::uint64_t tag_word = (std::uint64_t{key} << 32U) | value;
-
-    assembler.add(batch_at(500U, {drain_of(0U, {mark(0U, 100U),
-                                                 event_of(EventKind::PeriodBudget, 100U, 80U,
-                                                          step_),
-                                                 mark(1U, 200U),
-                                                 event_of(EventKind::PeriodTag, 210U, tag_word,
-                                                          step_),
-                                                 mark(2U, 300U)})}));
-    assembler.finish();
+    run_budget_and_tag();
 
     ASSERT_EQ(record_.periods.size(), 2U);
     EXPECT_EQ(record_.periods[0].budget_ns, 80U);
+}
+
+TEST_F(Small_PeriodAssembler, AttachesATagToItsPeriod)
+{
+    run_budget_and_tag();
+
+    ASSERT_EQ(record_.periods.size(), 2U);
     ASSERT_EQ(record_.periods[1].tags.size(), 1U);
-    EXPECT_EQ(record_.periods[1].tags[0].key, key);
-    EXPECT_EQ(record_.periods[1].tags[0].value, value);
+    EXPECT_EQ(record_.periods[1].tags[0].key, names_.intern("variant"));
+    EXPECT_EQ(record_.periods[1].tags[0].value, names_.intern("fused"));
 }
 
 TEST_F(Small_PeriodAssembler, AsksSourcesForEachPeriodsSpans)
@@ -431,45 +545,51 @@ TEST_F(Small_PeriodAssembler, StreamsPeriodsInOrderAndStopsAFailingWriter)
               std::vector<std::string>{"writer \"bad\" failed on period 0 and was stopped"});
 }
 
-TEST_F(Small_PeriodAssembler, FoldsLanesAndCountsOpenAndUnmatchedLanes)
+TEST_F(Small_PeriodAssembler, FoldsALaneIntoItsOwnZoneTree)
 {
-    AssemblySettings settings;
-    settings.linger_ns = 0U;
-    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
-
-    assembler.add(batch_at(500U, {drain_of(2U, {event_of(EventKind::LaneBegin, 10U, 0U, 7U),
-                                                 zone(20U, 30U),
-                                                 event_of(EventKind::LaneEnd, 40U, 0U, 7U),
-                                                 event_of(EventKind::LaneEnd, 45U, 0U, 8U),
-                                                 zone(50U, 60U),
-                                                 event_of(EventKind::LaneBegin, 70U, 0U, 9U)})}));
-    assembler.finish();
+    run_lanes();
 
     ASSERT_EQ(record_.periods[0].zones.size(), 2U);
     EXPECT_EQ(record_.periods[0].zones[0].lane, 0U);
     EXPECT_EQ(record_.periods[0].zones[1].lane, 7U);
+}
+
+TEST_F(Small_PeriodAssembler, CountsALaneStillOpenAtStop)
+{
+    run_lanes();
+
     EXPECT_EQ(record_.drops.open_at_stop, 1U);
+}
+
+TEST_F(Small_PeriodAssembler, CountsALaneEndThatMatchesNoBegin)
+{
+    run_lanes();
+
     EXPECT_EQ(record_.threads[0].unmatched, 1U);
 }
 
-TEST_F(Small_PeriodAssembler, KeepsThreadsInIndexOrderWithNamesAndDrops)
+TEST_F(Small_PeriodAssembler, KeepsThreadsInIndexOrder)
 {
-    AssemblySettings settings;
-    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
-    ThreadDrain worker = drain_of(5U, {});
-    worker.name = "worker";
-    worker.dropped = 3U;
-    ThreadDrain main_thread = drain_of(1U, {});
-    main_thread.name = "main";
-
-    assembler.add(batch_at(10U, {worker, main_thread}));
-    worker.name.clear();
-    assembler.add(batch_at(20U, {worker}));
-    assembler.finish();
+    run_threads();
 
     ASSERT_EQ(record_.threads.size(), 2U);
     EXPECT_EQ(record_.threads[0].name, "main");
     EXPECT_EQ(record_.threads[1].name, "worker");
+}
+
+TEST_F(Small_PeriodAssembler, KeepsTheFirstThreadNameOverALaterEmptyOne)
+{
+    run_threads();
+
+    ASSERT_EQ(record_.threads.size(), 2U);
+    EXPECT_EQ(record_.threads[1].name, "worker");
+}
+
+TEST_F(Small_PeriodAssembler, SumsTheDropsOfAThreadAcrossBatches)
+{
+    run_threads();
+
+    ASSERT_EQ(record_.threads.size(), 2U);
     EXPECT_EQ(record_.threads[1].dropped, 6U);
 }
 
@@ -586,11 +706,8 @@ TEST_F(Small_PeriodAssembler, ALateEventOfATrimmedPeriodIsStillCountedLate)
     assembler.add(batch_at(2'000U, {drain_of(1U, {zone(120U, 130U)})}));
     assembler.finish();
 
-    ASSERT_EQ(record_.periods.size(), 1U);
-    std::uint64_t late = 0U;
-    for (const auto& thread : record_.threads)
-        late += thread.late;
-    EXPECT_EQ(late, 1U);
+    EXPECT_EQ(record_.periods.size(), 1U);
+    EXPECT_EQ(late_total(), 1U);
     EXPECT_EQ(record_.drops.outside_periods, 0U);
 }
 
@@ -603,35 +720,36 @@ TEST_F(Small_PeriodAssembler, ALateEventOlderThanTheTrackedSpansCountsAsOutside)
     gappy.repeat = 0U;
     const AssemblySettings settings = follow(gappy, 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
-    std::vector<TraceEvent> marks;
-    for (std::uint64_t index = 0U; index < 8'402U; ++index)
-        marks.push_back(mark(index, 10U * index));
-    assembler.add(batch_at(1'000'000U, {drain_of(0U, marks)}));
+    assembler.add(batch_at(1'000'000U, {drain_of(0U, marks_every_ten(8'402U))}));
     ASSERT_EQ(record_.periods.size(), 4'200U);
 
     assembler.add(batch_at(2'000'000U, {drain_of(1U, {zone(15U, 16U), zone(83'995U, 83'996U)})}));
     assembler.finish();
 
     EXPECT_EQ(record_.drops.outside_periods, 1U);
-    std::uint64_t late = 0U;
-    for (const auto& thread : record_.threads)
-        late += thread.late;
-    EXPECT_EQ(late, 1U);
+    EXPECT_EQ(late_total(), 1U);
 }
 
-TEST_F(Small_PeriodAssembler, TheRecordsTablesGrowWithoutRecopying)
+TEST_F(Small_PeriodAssembler, TheRecordsNamesFollowTheTableBetweenBatches)
 {
     const AssemblySettings settings = follow(every_period(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
     assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U)})}));
-    const std::vector<std::string> first = record_.names;
-    ASSERT_EQ(first, (std::vector<std::string>{"", "step"}));
+    ASSERT_EQ(record_.names, (std::vector<std::string>{"", "step"}));
 
-    const NameID later = names_.intern("later");
+    static_cast<void>(names_.intern("later"));
     assembler.add(batch_at(2'000U, {drain_of(0U, {mark(2U, 300U)})}));
 
     EXPECT_EQ(record_.names, (std::vector<std::string>{"", "step", "later"}));
-    EXPECT_EQ(later, 2U);
+}
+
+TEST_F(Small_PeriodAssembler, TheRecordsSitesFollowTheRegistryBetweenBatches)
+{
+    const AssemblySettings settings = follow(every_period(), 0U);
+    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+
+    assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), mark(1U, 200U)})}));
+
     ASSERT_EQ(record_.sites.size(), 2U);
     EXPECT_EQ(record_.sites[1].name, "conv");
 }
@@ -732,48 +850,49 @@ TEST_F(Small_PeriodAssembler, ALaneOpenAcrossAPauseIsResetAfterResume)
     EXPECT_EQ(record_.drops.open_at_stop, 0U);
 }
 
-TEST_F(Small_PeriodAssembler, OldPauseIntervalsAreForgottenOnceEveryLiveThreadWroteLater)
+namespace
+{
+    /// @brief One forget case: the drains of other threads and the pause intervals that remain.
+    struct ForgetRow
+    {
+        std::vector<ThreadDrain> others;
+        std::size_t remaining;
+    };
+
+    /// @brief Returns a thread 5 that wrote at 5 ns and retired.
+    ThreadDrain retired_thread()
+    {
+        ThreadDrain gone = drain_of(5U, {zone(5U, 10U)});
+        gone.retired = true;
+        return gone;
+    }
+
+    /// @brief Holds one forget row on top of the assembler fixture.
+    class Small_PeriodAssemblerForget : public Small_PeriodAssembler,
+                                        public ::testing::WithParamInterface<ForgetRow>
+    {
+    };
+} // namespace
+
+TEST_P(Small_PeriodAssemblerForget, AnOldPauseIntervalIsKeptOnlyWhileALiveThreadWroteEarlier)
 {
     rig_.pauses().begin(20U);
     rig_.pauses().end(30U);
     const AssemblySettings settings = follow(every_period(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
+    std::vector<ThreadDrain> threads = {drain_of(0U, {mark(0U, 100U), zone(110U, 120U),
+                                                       mark(1U, 200U), mark(2U, 300U)})};
+    threads.insert(threads.end(), GetParam().others.begin(), GetParam().others.end());
 
-    assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), zone(110U, 120U),
-                                                   mark(1U, 200U), mark(2U, 300U)})}));
+    assembler.add(batch_at(1'000U, threads));
 
-    EXPECT_TRUE(rig_.pauses().ends_after(0U).empty());
+    EXPECT_EQ(rig_.pauses().ends_after(0U).size(), GetParam().remaining);
 }
 
-TEST_F(Small_PeriodAssembler, ALiveThreadThatWroteEarlierKeepsAPauseInterval)
-{
-    rig_.pauses().begin(20U);
-    rig_.pauses().end(30U);
-    const AssemblySettings settings = follow(every_period(), 0U);
-    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
-
-    assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), zone(110U, 120U),
-                                                   mark(1U, 200U), mark(2U, 300U)}),
-                                    drain_of(5U, {zone(5U, 10U)})}));
-
-    EXPECT_EQ(rig_.pauses().ends_after(0U).size(), 1U);
-}
-
-TEST_F(Small_PeriodAssembler, ARetiredThreadDoesNotHoldBackForgettingAPause)
-{
-    rig_.pauses().begin(20U);
-    rig_.pauses().end(30U);
-    const AssemblySettings settings = follow(every_period(), 0U);
-    PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
-    ThreadDrain gone = drain_of(5U, {zone(5U, 10U)});
-    gone.retired = true;
-
-    assembler.add(batch_at(1'000U, {drain_of(0U, {mark(0U, 100U), zone(110U, 120U),
-                                                   mark(1U, 200U), mark(2U, 300U)}),
-                                    gone}));
-
-    EXPECT_TRUE(rig_.pauses().ends_after(0U).empty());
-}
+INSTANTIATE_TEST_SUITE_P(Small_Forget, Small_PeriodAssemblerForget,
+                         ::testing::Values(ForgetRow{{}, 0U},
+                                           ForgetRow{{drain_of(5U, {zone(5U, 10U)})}, 1U},
+                                           ForgetRow{{retired_thread()}, 0U}));
 
 TEST_F(Small_PeriodAssembler, AWriterEnabledBeforeACloseReceivesThatPeriod)
 {
@@ -835,14 +954,7 @@ TEST_F(Small_PeriodAssembler, PublishesEachClosedPeriodWhenAViewIsWatching)
                                                    mark(3U, 400U)})}));
     assembler.finish();
 
-    const auto history = rig_.channel().history(10U);
-    ASSERT_EQ(history.size(), 3U);
-    for (std::size_t index = 0U; index < history.size(); ++index)
-    {
-        EXPECT_EQ(history[index]->sequence, index);
-        EXPECT_EQ(history[index]->period.index, index);
-        EXPECT_EQ(history[index]->names->name(1U), "step");
-    }
+    expect_published_in_order(rig_.channel().history(10U), 3U);
 }
 
 TEST_F(Small_PeriodAssembler, PublishesNothingWithoutAView)

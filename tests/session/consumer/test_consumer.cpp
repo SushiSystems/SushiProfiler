@@ -35,7 +35,10 @@
 #include <SushiProfiler/zones/macros.hpp>
 
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <string>
 #include <thread>
 #include <vector>
 
@@ -60,6 +63,30 @@ TEST(Small_NextPoll, SpeedsUpWhenFullAndSlowsDownWhenQuiet)
     EXPECT_EQ(SushiProfiler::next_poll(milliseconds(1000), 0.0), milliseconds(1000));
 }
 
+namespace
+{
+    /// @brief Records three calls of the zone `consumer.work` on the calling thread.
+    void work_three_times()
+    {
+        for (int call = 0; call < 3; ++call)
+        {
+            SP_ZONE("consumer.work");
+        }
+    }
+
+    /// @brief Returns the calls of the zone named @p name in period @p index of @p record.
+    std::uint64_t calls_of(const RunRecord& record, std::size_t index, const std::string& name)
+    {
+        std::uint64_t calls = 0U;
+        for (const auto& tree : record.periods[index].zones)
+        {
+            for (const ZoneNode& node : tree.nodes)
+                calls += record.sites[node.site].name == name ? node.calls : 0U;
+        }
+        return calls;
+    }
+} // namespace
+
 TEST(Medium_Consumer, DrainsWhileRunningAndFinishesOnStop)
 {
     Collector& collector = Collector::instance();
@@ -78,25 +105,13 @@ TEST(Medium_Consumer, DrainsWhileRunningAndFinishesOnStop)
     Consumer consumer(collector, assembler);
 
     consumer.start();
-    for (int call = 0; call < 3; ++call)
-    {
-        SP_ZONE("consumer.work");
-    }
+    work_three_times();
     collector.close();
     consumer.stop();
     consumer.stop();
 
     ASSERT_EQ(record.periods.size(), 1U);
-    std::uint64_t calls = 0U;
-    for (const auto& tree : record.periods[0].zones)
-    {
-        for (const ZoneNode& node : tree.nodes)
-        {
-            if (record.sites[node.site].name == "consumer.work")
-                calls += node.calls;
-        }
-    }
-    EXPECT_EQ(calls, 3U);
+    EXPECT_EQ(calls_of(record, 0U, "consumer.work"), 3U);
     EXPECT_FALSE(record.threads.empty());
     EXPECT_GE(consumer.drains(), 1U);
 }

@@ -35,7 +35,9 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -74,6 +76,29 @@ namespace
                 return false;
         }
         return true;
+    }
+    /// @brief Requests "trace" on and off alternately @p rounds times, then sets @p done.
+    void toggle_requests(StreamWriterSet& set, int rounds, std::atomic<bool>& done)
+    {
+        bool enabled = false;
+        for (int round = 0; round < rounds; ++round)
+        {
+            static_cast<void>(set.request("trace", enabled));
+            enabled = !enabled;
+        }
+        done.store(true, std::memory_order_release);
+    }
+
+    /// @brief Applies requests and writes one period per turn, at least @p periods of them and
+    /// until @p done is set.
+    void write_until_done(StreamWriterSet& set, const RunRecord& record, std::uint64_t periods,
+                          const std::atomic<bool>& done, std::vector<std::string>& problems)
+    {
+        for (std::uint64_t index = 0U; index < periods || !done.load(std::memory_order_acquire); ++index)
+        {
+            set.apply_requests(record, problems);
+            set.write_period(record, period_of(index), {}, problems);
+        }
     }
 } // namespace
 
@@ -209,6 +234,29 @@ TEST(Small_StreamWriterSet, BeginEnabledStopsAtTheFirstFailure)
     EXPECT_EQ(second.begins(), 0U);
 }
 
+TEST(Small_StreamWriterSet, RequestsForOneWriterApplyInOrderAndTheLastOneWins)
+{
+    MemoryStreamWriter writer;
+    StreamWriterSet set({{"trace", &writer, false}});
+    const RunRecord record;
+    std::vector<std::string> problems;
+    ASSERT_EQ(set.begin_enabled(record), "");
+
+    ASSERT_TRUE(set.request("trace", true));
+    ASSERT_TRUE(set.request("trace", false));
+    ASSERT_TRUE(set.request("trace", true));
+    set.apply_requests(record, problems);
+    set.write_period(record, period_of(0U), {}, problems);
+    ASSERT_TRUE(set.request("trace", true));
+    ASSERT_TRUE(set.request("trace", false));
+    set.apply_requests(record, problems);
+    set.write_period(record, period_of(1U), {}, problems);
+
+    EXPECT_EQ(indices_of(writer), std::vector<std::uint64_t>{0U});
+    EXPECT_EQ(writer.begins(), 1U);
+    EXPECT_TRUE(problems.empty());
+}
+
 TEST(Medium_StreamWriterSet, RequestsFromAnotherThreadNeverTearAPeriod)
 {
     MemoryStreamWriter writer;
@@ -217,22 +265,9 @@ TEST(Medium_StreamWriterSet, RequestsFromAnotherThreadNeverTearAPeriod)
     std::vector<std::string> problems;
     ASSERT_EQ(set.begin_enabled(record), "");
     std::atomic<bool> done{false};
-    std::thread toggler(
-        [&]
-        {
-            bool enabled = false;
-            for (int round = 0; round < 1'000; ++round)
-            {
-                static_cast<void>(set.request("trace", enabled));
-                enabled = !enabled;
-            }
-            done.store(true, std::memory_order_release);
-        });
-    for (std::uint64_t index = 0U; index < 1'000U || !done.load(std::memory_order_acquire); ++index)
-    {
-        set.apply_requests(record, problems);
-        set.write_period(record, period_of(index), {}, problems);
-    }
+    std::thread toggler(toggle_requests, std::ref(set), 1'000, std::ref(done));
+
+    write_until_done(set, record, 1'000U, done, problems);
     toggler.join();
     set.apply_requests(record, problems);
     set.end_all(record, problems);

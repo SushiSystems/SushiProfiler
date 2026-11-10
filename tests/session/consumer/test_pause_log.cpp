@@ -163,6 +163,17 @@ TEST(Small_PauseLog, ForgetsClosedIntervalsBeforeATime)
     EXPECT_TRUE(log.overlaps(100U, 200U));
 }
 
+TEST(Small_PauseLog, ForgettingKeepsAnOpenInterval)
+{
+    PauseLog log;
+    log.begin(10U);
+
+    log.forget_before(50U);
+
+    EXPECT_TRUE(log.paused());
+    EXPECT_TRUE(log.overlaps(60U, 70U));
+}
+
 TEST(Small_PauseLog, EndsAfterReturnsOnlyLaterEnds)
 {
     PauseLog log;

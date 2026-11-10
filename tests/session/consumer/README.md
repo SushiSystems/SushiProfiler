@@ -8,8 +8,8 @@
   prints its drains per second over the next 8 s as `drainer_idle_wakeups`, the design's
   idle-drainer budget.
 - `test_period_assembler.cpp`: drained batches in steady ticks, by hand.
-  - A run without a timeline is one period from 0 to the last drain, with the names and sites
-    copied.
+  - A run without a timeline is one period from 0 to the last drain; its names and sites are
+    copied into the record.
   - With one warm-up and two active periods, three periods are kept, the first marked warm-up,
     and zones before the first mark or after the last end count as outside.
   - A linger of 100 ns keeps the third period open across a drain; a zone that begins in an
@@ -33,18 +33,18 @@
   periods in order for 5 periods and a `keep` of 2, and for 10 and 4.
 - `test_pause_log.cpp`: rows of one test for an overlap across the start, across the end and inside
   a pause, a boundary touch that is none, an open pause, an `end` without a `begin` and a second
-  `begin` that are ignored, forgetting, `ends_after`, the cap, and one writer against two readers
+  `begin` that are ignored, forgetting (an open interval stays), `ends_after`, the cap, and one writer against two readers
   (a named driver counts the wrong answers).
 - `test_stream_writer_set.cpp`: a disabled writer is not begun until enabled; a request applies
   only in `apply_requests`; turning off keeps the output open until the end; a failed begin or
   write stops the writer and is named; `end_all` ends each begun writer once; an unknown name is
-  refused; a thread toggling 1 000 times never tears a writer's begin, write and end order.
+  refused; requests for one writer apply in order and the last one wins; a thread toggling 1 000 times never tears a writer's begin, write and end order.
 - `test_period_assembler.cpp` also covers retention (`keep_periods`, trimmed periods still count
-  late events, an event older than the tracked spans counts as outside, tables grow without
-  being recopied), a source's fact reaching the period, pauses (the `paused` fact, a paused
+  late events, an event older than the tracked spans counts as outside, the record's
+  names and sites follow the tables between batches), a source's fact reaching the period, pauses (the `paused` fact, a paused
   period keeps its marks and has no zones, its sources are still collected, a lane open across a
   pause is reset, old pause intervals are forgotten once every live thread wrote later and a
-  retired thread does not hold that back), writer switches at a close, and publication (each
+  retired thread does not hold that back, as three rows of one test), writer switches at a close, and publication (each
   period in order, nothing unwatched, a run cap that leaves the record whole, a period that
   outlives the assembler, publication after the writers and the record, `keep_periods` 0).
 - `test_consumer.cpp` also covers the poll ceiling and a watched consumer's drain rate, and that

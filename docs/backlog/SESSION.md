@@ -11,6 +11,7 @@
 | RW-21 | P2 | open | Add run tags to the configuration | `ProfilerConfig` holds tags and the record's `tags` table carries them |  |  | 2026-10-26 |
 | RW-22 | P2 | open | Drain a burst before a ring fills | a burst after a quiet second loses no event on a ring sized by the configuration |  |  | 2026-10-26 |
 | RW-26 | P3 | open | Move benchmark_consumer.cpp out of the tests and beside the benchmarks | tests/session/consumer holds no main() that sleeps and prints; the benchmark builds under benchmarks/ |  | `docs/agent/2026_11_05_TEST_REVIEW/REPORT.md` | 2026-11-09 |
+| RW-30 | P3 | open | Inject a clock into Consumer so the live poll tests need no wall clock | The two live-poll consumer tests advance an injected clock and wait on no sleep or deadline. |  | `docs/agent/2026_11_05_TEST_REVIEW/REPORT.md` | 2026-11-10 |
 
 ## Known issues
 
