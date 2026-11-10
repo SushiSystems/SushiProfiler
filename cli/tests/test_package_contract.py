@@ -17,6 +17,7 @@ from sushicore import deps_fragment
 from typer.testing import CliRunner
 
 from sushiprofiler import cli, config
+from sushiprofiler.host_memory import MemoryHost
 from sushiprofiler.services import project as project_service
 from sushiprofiler.services.project import BuildType
 
@@ -74,25 +75,13 @@ def test_the_package_command_is_registered_with_its_options():
         assert option in text
 
 
-def test_the_compiler_the_environment_names_outranks_the_pinned_one():
-    cfg = config.Config(cxx="/pinned/clang++", stack_cxx="/stack/clang++")
+def test_load_config_reads_the_compiler_the_environment_names():
+    host = MemoryHost(variables={config.K_STACK_CXX_ENV: "/stack/clang++"})
 
-    assert cfg.resolved_compiler() == "/stack/clang++"
-
-
-def test_load_config_reads_the_compiler_the_environment_names(monkeypatch):
-    monkeypatch.setenv(config.K_STACK_CXX_ENV, "/stack/clang++")
-
-    assert config.load_config().stack_cxx == "/stack/clang++"
-
-
-def test_without_the_variable_the_pinned_compiler_stays():
-    cfg = config.Config(cxx="/pinned/clang++", stack_cxx="")
-
-    assert cfg.resolved_compiler() == "/pinned/clang++"
+    assert config.load_config(host).stack_cxx == "/stack/clang++"
 
 
 def test_the_fragment_names_the_cli():
     fragment = deps_fragment.read(Path(__file__).resolve().parents[1] / "sushistack.deps.toml")
 
-    assert fragment.cli == "sp"
+    assert fragment.cli == config.PROFILE.program

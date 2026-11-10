@@ -19,6 +19,14 @@ workspace is the folder `SUSHISTACK_HOME` names, else the one the module's `[lin
 names, else the nearest parent holding `.sushistack`. A standalone checkout has none and reads
 only its own files.
 
+## host.py
+
+The `Host` port is how `sp` reads the environment and finds an executable: `environment()` (a copy),
+`variable(name)` and `which(name)`. `host_system.py` answers it from `os.environ` and `shutil.which`;
+`host_memory.py` answers it from two maps, for tests. `Config.resolved_compiler`, `resolved_ninja`,
+`resolved_generator` and `is_multi_config`, `load_config` and `env.load_build_env` take a `host`; none
+means the system one.
+
 ## Package contract
 
 SushiCore builds a SushiProfiler package for a consumer by running `sp build --type <type>
@@ -38,7 +46,7 @@ checkout.
 
 ## env.py
 
-With a compiler found, cmake and ctest run under the current environment, with the compiler's
+With a compiler found, cmake and ctest run under the environment of the host (the process's), with the compiler's
 folder first on PATH and, on Windows with `vs_vcvars` set, the Visual Studio environment that
 `vcvars64.bat` produces, cached in the build tree.
 

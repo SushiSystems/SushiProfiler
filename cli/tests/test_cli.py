@@ -40,12 +40,13 @@ def _plant_program(folder: Path, name: str) -> None:
     (folder / name).write_text("", encoding="utf-8")
 
 
-def test_help_lists_the_four_commands(project):
+@pytest.mark.parametrize(
+    "command", ["build", "test", "bench", "check", "record", "docs", "backlog", "design"])
+def test_help_lists_each_command(project, command):
     result = _invoke(project, "--help")
 
     assert result.exit_code == 0
-    for command in ("build", "test", "bench", "check"):
-        assert command in result.output
+    assert command in result.output
 
 
 def test_build_passes_type_sanitizer_and_defines(project):
@@ -116,6 +117,16 @@ def test_test_passes_labels_jobs_filter_and_package(project):
     assert any("--install" in command for command in project.commands)
 
 
+def test_test_with_all_selects_every_size(project):
+    project.configure_tree("Debug")
+
+    result = _invoke(project, "test", "--all")
+
+    assert result.exit_code == 0
+    ctest = next(command for command in project.commands if "-L" in command)
+    assert _value_after(ctest, "-L") == "^(small|medium|large)$"
+
+
 def test_test_refuses_zero_jobs(project):
     result = _invoke(project, "test", "--jobs", "0")
 
@@ -134,13 +145,6 @@ def test_check_passes_report_and_rule(project):
     assert result.exit_code == 0
     (command,) = project.commands
     assert command[-3:] == ["--report", "--rule", "rule_a"]
-
-
-def test_help_lists_the_docs_group(project):
-    result = _invoke(project, "--help")
-
-    assert result.exit_code == 0
-    assert "docs" in result.output
 
 
 def test_docs_bundle_asks_for_a_release(project):
