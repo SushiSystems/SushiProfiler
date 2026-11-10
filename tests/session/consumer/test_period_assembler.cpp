@@ -529,9 +529,9 @@ TEST_F(Small_PeriodAssembler, StreamsPeriodsInOrderAndStopsAFailingWriter)
 {
     MemoryStreamWriter good;
     MemoryStreamWriter bad;
-    bad.fail_with(WriteStatus::StreamFailed);
     rig_.set_writers({{"good", &good, true}, {"bad", &bad, true}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
+    bad.fail_with(WriteStatus::StreamFailed);
     const AssemblySettings settings = follow(warm_one_active_two(), 0U);
     PeriodAssembler assembler(settings, record_, names_, sites_, {}, rig_.parts());
 
