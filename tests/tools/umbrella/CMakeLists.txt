@@ -8,4 +8,4 @@
 sushiprofiler_add_module_tests(
     MODULE umbrella
     SOURCES
-        test_SushiProfiler.cpp)
+        compile_SushiProfiler.cpp)
