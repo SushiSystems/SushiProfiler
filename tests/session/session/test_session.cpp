@@ -44,6 +44,7 @@
 #include <mutex>
 #include <set>
 #include <sstream>
+#include <system_error>
 #include <string>
 #include <thread>
 #include <vector>
@@ -91,6 +92,36 @@ namespace
     {
         return *SushiProfiler::read_json(text).value;
     }
+
+    /// @brief Owns a folder under the temporary folder: empty on construction, removed on exit.
+    class ScopedFolder final
+    {
+        public:
+            /// @brief Names the folder `@p name` under the temporary folder and empties it.
+            explicit ScopedFolder(const std::string& name) : path_(::testing::TempDir() + name)
+            {
+                std::filesystem::remove_all(path_);
+            }
+
+            ScopedFolder(const ScopedFolder&) = delete;
+            ScopedFolder& operator=(const ScopedFolder&) = delete;
+
+            /// @brief Removes the folder and what the test wrote in it.
+            ~ScopedFolder()
+            {
+                std::error_code ignored;
+                std::filesystem::remove_all(path_, ignored);
+            }
+
+            /// @brief Returns the folder's path.
+            [[nodiscard]] const std::string& path() const noexcept
+            {
+                return path_;
+            }
+
+        private:
+            std::string path_; /**< The folder's path. */
+    };
 
     /// @brief Returns the text of the file at @p path.
     std::string file_text(const std::string& path)
@@ -266,6 +297,13 @@ namespace
                 run_two_threads(*started.session);
                 stopped_ = started.session->stop();
                 report_ = started.session->report(stopped_.record);
+            }
+
+            /// @brief Removes the folder the run wrote.
+            void TearDown() override
+            {
+                std::error_code ignored;
+                std::filesystem::remove_all(folder_, ignored);
             }
 
             /// @brief Returns the names of the threads of the record.
@@ -527,6 +565,66 @@ namespace
         for (int index = 0; index < count; ++index)
         {
             static_cast<void>(step.mark());
+            run.pass(std::chrono::milliseconds(1));
+        }
+    }
+
+    /// @brief Marks @p step @p count times with no pass of time between the marks.
+    void mark_bare(PeriodTimeline& step, int count)
+    {
+        for (int index = 0; index < count; ++index)
+            static_cast<void>(step.mark());
+    }
+
+    /// @brief Marks @p step @p count times, each with a zone `again.first` in the period.
+    void mark_first_run(PeriodTimeline& step, int count)
+    {
+        for (int index = 0; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            SP_ZONE("again.first");
+        }
+    }
+
+    /// @brief Marks @p step @p count times, each with a zone `again.second` in the period.
+    void mark_second_run(PeriodTimeline& step, int count)
+    {
+        for (int index = 0; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            SP_ZONE("again.second");
+        }
+    }
+
+    /// @brief Marks @p step @p count times, each with a zone `live.outlives` and a millisecond.
+    void mark_outliving_zones(ManualRun& run, PeriodTimeline& step, int count)
+    {
+        for (int index = 0; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            SESSION_TEST_ZONE_IN(run.collector, "live.outlives");
+            run.pass(std::chrono::milliseconds(1));
+        }
+    }
+
+    /// @brief Marks @p step @p count times, each with a zone `toggle.early` and a millisecond.
+    void mark_early_toggle_zones(ManualRun& run, PeriodTimeline& step, int count)
+    {
+        for (int index = 0; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            SESSION_TEST_ZONE_IN(run.collector, "toggle.early");
+            run.pass(std::chrono::milliseconds(1));
+        }
+    }
+
+    /// @brief Marks @p step @p count times, each with a zone `toggle.late` and a millisecond.
+    void mark_late_toggle_zones(ManualRun& run, PeriodTimeline& step, int count)
+    {
+        for (int index = 0; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            SESSION_TEST_ZONE_IN(run.collector, "toggle.late");
             run.pass(std::chrono::milliseconds(1));
         }
     }
@@ -904,12 +1002,7 @@ TEST(Medium_Session, ALiveViewOutlivesTheSessionAndKeepsItsLastPeriods)
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("live.step");
     const LiveView view = run.watch(*started.session);
-    for (int index = 0; index < 6; ++index)
-    {
-        static_cast<void>(step.mark());
-        SESSION_TEST_ZONE_IN(run.collector, "live.outlives");
-        run.pass(std::chrono::milliseconds(1));
-    }
+    mark_outliving_zones(run, step, 6);
     run.drain();
     ASSERT_NE(view.latest(), nullptr);
     static_cast<void>(started.session->stop());
@@ -1004,8 +1097,8 @@ TEST_F(Medium_SessionKeepNone, TheLiveViewStillPublishesEveryClosedPeriod)
 TEST(Medium_Session, AWriterStartedDisabledWritesNothingUntilEnabledAtABoundary)
 {
     ManualRun run;
-    const std::string folder = ::testing::TempDir() + "sushiprofiler_toggle";
-    std::filesystem::remove_all(folder);
+    const ScopedFolder scoped("sushiprofiler_toggle");
+    const std::string& folder = scoped.path();
     std::ostringstream terminal;
     Registry registry;
     SushiProfiler::register_builtin_writers(registry, terminal);
@@ -1016,29 +1109,18 @@ TEST(Medium_Session, AWriterStartedDisabledWritesNothingUntilEnabledAtABoundary)
     ASSERT_TRUE(started.ok()) << started.error;
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("toggle.step");
-    for (int index = 0; index < 4; ++index)
-    {
-        static_cast<void>(step.mark());
-        SESSION_TEST_ZONE_IN(run.collector, "toggle.early");
-        run.pass(std::chrono::milliseconds(1));
-    }
+    mark_early_toggle_zones(run, step, 4);
     static_cast<void>(step.mark());
     run.pass(std::chrono::milliseconds(1));
     run.drain();
     EXPECT_FALSE(std::filesystem::exists(folder + "/late.trace.json"));
 
     EXPECT_EQ(session.set_writer_enabled("chrome_trace", true), WriterSwitch::Queued);
-    for (int index = 0; index < 6; ++index)
-    {
-        static_cast<void>(step.mark());
-        SESSION_TEST_ZONE_IN(run.collector, "toggle.late");
-        run.pass(std::chrono::milliseconds(1));
-    }
+    mark_late_toggle_zones(run, step, 6);
     const SessionStop stopped = session.stop();
 
     EXPECT_TRUE(stopped.problems.empty());
     const std::string trace = file_text(folder + "/late.trace.json");
-    std::filesystem::remove_all(folder);
     EXPECT_NE(trace.find("toggle.late"), std::string::npos);
     EXPECT_EQ(trace.find("toggle.early"), std::string::npos);
 }
@@ -1336,8 +1418,7 @@ TEST(Medium_Session, EveryPeriodWindowRecordsAllAfterWarmup)
     SessionStart started = Session::start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("all.step");
-    for (int index = 0; index < 204; ++index)
-        static_cast<void>(step.mark());
+    mark_bare(step, 204);
 
     const SessionStop stopped = started.session->stop();
 
@@ -1352,19 +1433,11 @@ TEST(Medium_Session, ARestartAfterStopReadsASecondRecordWithNothingOfTheFirst)
     ASSERT_TRUE(started.ok()) << started.error;
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("again.step");
-    for (int index = 0; index < 4; ++index)
-    {
-        static_cast<void>(step.mark());
-        SP_ZONE("again.first");
-    }
+    mark_first_run(step, 4);
     const SessionStop first = session.stop();
 
     ASSERT_EQ(session.restart(), "");
-    for (int index = 0; index < 6; ++index)
-    {
-        static_cast<void>(step.mark());
-        SP_ZONE("again.second");
-    }
+    mark_second_run(step, 6);
     const SessionStop second = session.stop();
 
     EXPECT_EQ(first.record.periods.size(), 3U);
@@ -1414,7 +1487,8 @@ TEST(Medium_Session, ASourceUsesItsBeginContextInCollect)
 
 TEST(Medium_Session, ASourceFactReachesTheStoppedRecord)
 {
-    const std::string folder = ::testing::TempDir() + "sushiprofiler_facts";
+    const ScopedFolder scoped("sushiprofiler_facts");
+    const std::string& folder = scoped.path();
     ManualRun run;
     ProbeSource* probe = nullptr;
     std::ostringstream terminal;
@@ -1439,7 +1513,8 @@ TEST(Medium_Session, ASourceFactReachesTheStoppedRecord)
 
 TEST(Medium_Session, ASourceFactReachesTheRecordFile)
 {
-    const std::string folder = ::testing::TempDir() + "sushiprofiler_facts_file";
+    const ScopedFolder scoped("sushiprofiler_facts_file");
+    const std::string& folder = scoped.path();
     ManualRun run;
     ProbeSource* probe = nullptr;
     std::ostringstream terminal;
@@ -1466,7 +1541,8 @@ TEST(Medium_Session, ASourceFactReachesTheRecordFile)
 
 TEST(Medium_Session, ControlCallsAreSerialisedAgainstStopAndRestart)
 {
-    const std::string folder = ::testing::TempDir() + "sushiprofiler_control";
+    const ScopedFolder scoped("sushiprofiler_control");
+    const std::string& folder = scoped.path();
     std::ostringstream terminal;
     Registry registry;
     SushiProfiler::register_builtin_writers(registry, terminal);

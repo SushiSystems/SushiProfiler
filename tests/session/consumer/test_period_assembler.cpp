@@ -61,19 +61,13 @@ using SushiProfiler::SiteID;
 using SushiProfiler::SiteRegistry;
 using SushiProfiler::SiteRole;
 using SushiProfiler::PeriodSpan;
-using SushiProfiler::Source;
 using SushiProfiler::SourceContext;
-using SushiProfiler::SourceStatus;
-using SushiProfiler::Span;
-using SushiProfiler::SpanSink;
-using SushiProfiler::StreamWriter;
 using SushiProfiler::ThreadDrain;
 using SushiProfiler::TraceEvent;
 using SushiProfiler::TrackID;
 using SushiProfiler::Window;
 using SushiProfiler::WindowSchedule;
 using SushiProfiler::WriteStatus;
-using SushiProfiler::ZoneRun;
 
 namespace
 {
@@ -110,50 +104,6 @@ namespace
         drain.events = std::move(events);
         return drain;
     }
-
-    /// @brief A source that hands over one span per period on its track.
-    class StepSource final : public Source
-    {
-        public:
-            /// @brief Returns `step`.
-            [[nodiscard]] std::string_view name() const noexcept override
-            {
-                return "step";
-            }
-
-            /// @brief Adds track `device` and the span name `kernel`.
-            [[nodiscard]] SourceStatus begin(SourceContext& context) override
-            {
-                track_ = context.add_track("device");
-                kernel_ = context.intern("kernel");
-                return SourceStatus{};
-            }
-
-            /// @brief Adds a 5 ns span 10 ns after the period's index times 100.
-            void collect(const PeriodSpan& period, SpanSink& sink) override
-            {
-                Span span;
-                span.start_ns = period.index * 100U + 110U;
-                span.queued_ns = span.start_ns;
-                span.end_ns = span.start_ns + 5U;
-                span.track = track_;
-                span.name = kernel_;
-                static_cast<void>(sink.append(span));
-                Span stray = span;
-                stray.track = 9U;
-                static_cast<void>(sink.append(stray));
-            }
-
-            /// @brief Ends.
-            void end() override
-            {
-
-            }
-
-        private:
-            std::uint32_t track_ = 0U; /**< The device track. */
-            NameID kernel_ = 0U;       /**< The span name. */
-    };
 
     /// @brief Expects @p history to hold @p count closed periods whose sequence and period index
     /// both count up from 0 and whose names table holds `step`.
@@ -426,7 +376,11 @@ TEST_F(Small_PeriodAssembler, AttachesATagToItsPeriod)
 
 TEST_F(Small_PeriodAssembler, AsksSourcesForEachPeriodsSpans)
 {
-    StepSource source;
+    MemorySource source("step");
+    source.queue(MemoryWork{"device", "kernel", 110U, 110U, 115U});
+    source.queue(MemoryWork{"device", "kernel", 210U, 210U, 215U});
+    source.queue(MemoryWork{"device", "unordered", 125U, 120U, 130U});
+    source.queue(MemoryWork{"device", "unordered", 225U, 220U, 230U});
     SourceContext context(names_, record_.tracks, 0U);
     ASSERT_TRUE(source.begin(context).ok());
     const AssemblySettings settings = follow(warm_one_active_two(), 0U);
@@ -436,6 +390,8 @@ TEST_F(Small_PeriodAssembler, AsksSourcesForEachPeriodsSpans)
     assembler.finish();
 
     ASSERT_EQ(record_.periods.size(), 2U);
+    ASSERT_EQ(record_.periods[0].spans.size(), 1U);
+    EXPECT_EQ(record_.periods[0].spans.span(0U).start_ns, 110U);
     ASSERT_EQ(record_.periods[1].spans.size(), 1U);
     EXPECT_EQ(record_.periods[1].spans.span(0U).start_ns, 210U);
     EXPECT_EQ(record_.drops.spans_dropped, 2U);
@@ -604,50 +560,12 @@ namespace
         return schedule;
     }
 
-    /// @brief A stream writer that notes what the live channel and the record held at each write.
-    class ProbingWriter final : public StreamWriter
+    /// @brief Returns the newest sequence @p channel published, or -1 when none.
+    std::int64_t newest_sequence(const SushiProfiler::LiveChannel& channel)
     {
-        public:
-            /// @brief Builds a writer that reads @p channel at each write.
-            explicit ProbingWriter(const SushiProfiler::LiveChannel& channel) : channel_(channel)
-            {
-
-            }
-
-            /// @brief Starts.
-            [[nodiscard]] WriteStatus begin(const RunRecord& record) override
-            {
-                static_cast<void>(record);
-                return WriteStatus::Written;
-            }
-
-            /// @brief Notes the newest published sequence (-1 for none) and the record's periods.
-            [[nodiscard]] WriteStatus write_period(
-                const RunRecord& record, const PeriodRecord& period,
-                const std::vector<ZoneRun>& instances) override
-            {
-                static_cast<void>(period);
-                static_cast<void>(instances);
-                const auto latest = channel_.latest();
-                published.push_back(latest == nullptr ? -1
-                                                      : static_cast<std::int64_t>(latest->sequence));
-                recorded.push_back(record.periods.size());
-                return WriteStatus::Written;
-            }
-
-            /// @brief Ends.
-            [[nodiscard]] WriteStatus end(const RunRecord& record) override
-            {
-                static_cast<void>(record);
-                return WriteStatus::Written;
-            }
-
-            std::vector<std::int64_t> published; /**< The newest sequence at each write. */
-            std::vector<std::size_t> recorded;   /**< The record's period count at each write. */
-
-        private:
-            const SushiProfiler::LiveChannel& channel_; /**< The channel read. */
-    };
+        const auto latest = channel.latest();
+        return latest == nullptr ? -1 : static_cast<std::int64_t>(latest->sequence);
+    }
 } // namespace
 
 TEST_F(Small_PeriodAssembler, KeepsTheLastNPeriodsAtStop)
@@ -1012,7 +930,14 @@ TEST_F(Small_PeriodAssembler, AClosedPeriodOutlivesTheAssembler)
 TEST_F(Small_PeriodAssembler, PublishesAfterTheWritersAndTheRecord)
 {
     rig_.channel().attach();
-    ProbingWriter writer(rig_.channel());
+    MemoryStreamWriter writer;
+    std::vector<std::int64_t> published;
+    std::vector<std::size_t> recorded;
+    writer.watch_writes([&](const RunRecord& record, const PeriodRecord&)
+    {
+        published.push_back(newest_sequence(rig_.channel()));
+        recorded.push_back(record.periods.size());
+    });
     rig_.set_writers({{"probe", &writer, true}});
     ASSERT_EQ(rig_.begin_writers(record_), "");
     const AssemblySettings settings = follow(every_period(), 0U);
@@ -1022,8 +947,8 @@ TEST_F(Small_PeriodAssembler, PublishesAfterTheWritersAndTheRecord)
                                                    mark(3U, 400U)})}));
     assembler.finish();
 
-    EXPECT_EQ(writer.published, (std::vector<std::int64_t>{-1, 0, 1}));
-    EXPECT_EQ(writer.recorded, (std::vector<std::size_t>{0U, 1U, 2U}));
+    EXPECT_EQ(published, (std::vector<std::int64_t>{-1, 0, 1}));
+    EXPECT_EQ(recorded, (std::vector<std::size_t>{0U, 1U, 2U}));
     EXPECT_EQ(rig_.channel().latest()->sequence, 2U);
 }
 

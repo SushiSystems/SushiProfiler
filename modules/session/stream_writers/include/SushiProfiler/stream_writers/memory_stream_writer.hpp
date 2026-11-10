@@ -37,6 +37,7 @@
 #include <SushiProfiler/version/export.hpp>
 
 #include <cstddef>
+#include <functional>
 #include <vector>
 
 SUSHIPROFILER_DLL_WARNINGS_PUSH
@@ -47,12 +48,17 @@ namespace SushiProfiler
      *
      * Every call returns the status fail_with() set, Written until then; a period whose write
      * does not return Written is not kept. Read it once the session that writes it has stopped.
+     * A watcher set with watch_writes() runs at the start of each write, so a test can read the
+     * state the writer's caller holds at that moment.
      */
     class SUSHIPROFILER_API MemoryStreamWriter final : public StreamWriter
     {
         public:
             /// @brief Makes every later call return @p status.
             void fail_with(WriteStatus status) noexcept;
+
+            /// @brief Runs @p watcher with the record and the period at the start of each write.
+            void watch_writes(std::function<void(const RunRecord&, const PeriodRecord&)> watcher);
 
             /// @brief Counts the begin.
             [[nodiscard]] WriteStatus begin(const RunRecord& record) override;
@@ -83,6 +89,9 @@ namespace SushiProfiler
         private:
             /// @brief The status every call returns.
             WriteStatus status_ = WriteStatus::Written;
+
+            /// @brief Runs at the start of each write, or empty.
+            std::function<void(const RunRecord&, const PeriodRecord&)> watcher_;
 
             /// @brief How many times begin() ran.
             std::size_t begins_ = 0U;

@@ -52,7 +52,7 @@ TEST(Small_ManualPollClock, NotesTheLimitOfEachWait)
     EXPECT_EQ(clock.limits(), expected);
 }
 
-TEST(Small_ManualPollClock, PollOnceEndsAWaitAndReturnsOnTheNextOne)
+TEST(Medium_ManualPollClock, PollOnceEndsAWaitAndReturnsOnTheNextOne)
 {
     ManualPollClock clock;
     std::thread consumer(

@@ -53,7 +53,8 @@
   1 s wait at once and the next wait is the ceiling.
 - `test_poll_clock.cpp`: `SteadyPollClock` and `ManualPollClock` each end a wait on a wake, end it
   with false on a stop and wait again after a rearm.
-- `test_manual_poll_clock.cpp`: `ManualPollClock` lists the limit of each wait.
+- `test_manual_poll_clock.cpp`: `ManualPollClock` lists the limit of each wait, and `poll_once()` ends a wait
+  on a consumer thread (`Medium_`, one thread).
 - `test_steady_poll_clock.cpp`: `SteadyPollClock` ends a 1 ms wait with true (`Medium_`, real time).
 
 The period assembler and stream writer set tests use `MemorySource` and `MemoryStreamWriter`;

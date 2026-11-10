@@ -35,6 +35,7 @@ A path that cannot be opened is `PathUnwritable` from `begin`; every later call 
 `SushiProfiler/stream_writers/memory_stream_writer.hpp`: `MemoryStreamWriter`, the in-memory stream
 writer. It keeps a copy of each period and its zone runs in the order written and counts `begins()`,
 `writes()` and `ends()`; `fail_with(status)` makes every later call return that status, and a period
-whose write fails is not kept.
+whose write fails is not kept. `watch_writes(watcher)` runs a function with the record and the period
+at the start of each write, so a test reads what the writer's caller holds at that moment.
 
 The tests are in `tests/session/stream_writers/`.

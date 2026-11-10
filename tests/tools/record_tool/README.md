@@ -7,4 +7,4 @@
   when the mismatch is allowed; `check` prints a passing check, fails when one check fails and refuses a
   check file that does not parse. The small tests cover usage with no command, `help`, an unknown
   command, an unknown option and an option without its value. Records and check files are written to
-  the test's temporary folder.
+  the test's temporary folder; the fixture removes them in `TearDown`.

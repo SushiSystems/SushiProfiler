@@ -30,11 +30,19 @@
 
 #include <SushiProfiler/stream_writers/memory_stream_writer.hpp>
 
+#include <utility>
+
 namespace SushiProfiler
 {
     void MemoryStreamWriter::fail_with(WriteStatus status) noexcept
     {
         status_ = status;
+    }
+
+    void MemoryStreamWriter::watch_writes(
+        std::function<void(const RunRecord&, const PeriodRecord&)> watcher)
+    {
+        watcher_ = std::move(watcher);
     }
 
     WriteStatus MemoryStreamWriter::begin(const RunRecord& record)
@@ -48,7 +56,8 @@ namespace SushiProfiler
                                                  const PeriodRecord& period,
                                                  const std::vector<ZoneRun>& instances)
     {
-        static_cast<void>(record);
+        if (watcher_)
+            watcher_(record, period);
         ++writes_;
         if (status_ != WriteStatus::Written)
             return status_;

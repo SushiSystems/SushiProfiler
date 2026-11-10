@@ -57,6 +57,26 @@ TEST(Small_MemoryStreamWriter, KeepsThePeriodsAndTheirRunsInTheOrderWritten)
     EXPECT_TRUE(writer.instances()[1].empty());
 }
 
+TEST(Small_MemoryStreamWriter, AWatcherSeesTheRecordAndThePeriodAtEachWrite)
+{
+    MemoryStreamWriter writer;
+    RunRecord record;
+    PeriodRecord period;
+    period.index = 7U;
+    std::size_t seen_index = 0U;
+    std::size_t seen_periods = 99U;
+    writer.watch_writes([&](const RunRecord& held, const PeriodRecord& written)
+    {
+        seen_index = written.index;
+        seen_periods = held.periods.size();
+    });
+
+    static_cast<void>(writer.write_period(record, period, {}));
+
+    EXPECT_EQ(seen_index, 7U);
+    EXPECT_EQ(seen_periods, 0U);
+}
+
 TEST(Small_MemoryStreamWriter, AFailingWriteReturnsItsStatusAndKeepsNothing)
 {
     MemoryStreamWriter writer;

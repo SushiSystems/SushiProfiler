@@ -32,9 +32,12 @@
 
 #include <gtest/gtest.h>
 
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <system_error>
+#include <vector>
 
 #include <SushiProfiler/record_json/record_json.hpp>
 
@@ -66,15 +69,6 @@ namespace
         return result;
     }
 
-    /// @brief Writes @p text to the temporary file @p name and returns its path.
-    std::string temporary_file(const std::string& name, const std::string& text)
-    {
-        const std::string path = ::testing::TempDir() + name;
-        std::ofstream file(path, std::ios::binary | std::ios::trunc);
-        file << text;
-        return path;
-    }
-
     /// @brief Returns a record of timeline `step` whose four periods each last @p length ns.
     RunRecord steps_of(std::uint64_t length, const std::string& build_type = "release")
     {
@@ -95,14 +89,42 @@ namespace
         return record;
     }
 
-    /// @brief Writes @p record to the temporary file @p name and returns its path.
-    std::string record_file(const std::string& name, const RunRecord& record)
+    /// @brief Writes the files a test names under the temporary folder and removes them after it.
+    class Medium_RecordTool : public ::testing::Test
     {
-        return temporary_file(name, SushiProfiler::write_record(record));
-    }
+        protected:
+            /// @brief Removes every file the test wrote.
+            void TearDown() override
+            {
+                for (const std::string& path : written_)
+                {
+                    std::error_code ignored;
+                    std::filesystem::remove(path, ignored);
+                }
+            }
+
+            /// @brief Writes @p text to the temporary file @p name and returns its path.
+            std::string temporary_file(const std::string& name, const std::string& text)
+            {
+                const std::string path = ::testing::TempDir() + name;
+                written_.push_back(path);
+                std::ofstream file(path, std::ios::binary | std::ios::trunc);
+                file << text;
+                return path;
+            }
+
+            /// @brief Writes @p record to the temporary file @p name and returns its path.
+            std::string record_file(const std::string& name, const RunRecord& record)
+            {
+                return temporary_file(name, SushiProfiler::write_record(record));
+            }
+
+        private:
+            std::vector<std::string> written_; /**< The files written. */
+    };
 } // namespace
 
-TEST(Medium_RecordTool, ValidateAcceptsAGoodRecordAndNamesItsPeriodsAndThreads)
+TEST_F(Medium_RecordTool, ValidateAcceptsAGoodRecordAndNamesItsPeriodsAndThreads)
 {
     const std::string good = record_file("tool_validate_good.sprec.json", steps_of(100U));
 
@@ -112,7 +134,7 @@ TEST(Medium_RecordTool, ValidateAcceptsAGoodRecordAndNamesItsPeriodsAndThreads)
     EXPECT_EQ(valid.out, good + ": valid, 4 periods, 1 threads\n");
 }
 
-TEST(Medium_RecordTool, ValidateFailsOnAnUnsupportedFormatVersion)
+TEST_F(Medium_RecordTool, ValidateFailsOnAnUnsupportedFormatVersion)
 {
     const std::string bad =
         temporary_file("tool_validate_bad.sprec.json", R"({"sushiprofiler_record": 9})");
@@ -123,7 +145,7 @@ TEST(Medium_RecordTool, ValidateFailsOnAnUnsupportedFormatVersion)
     EXPECT_EQ(invalid.err.rfind(bad + ": ", 0U), 0U);
 }
 
-TEST(Medium_RecordTool, ValidateRefusesAMissingFileWithTheUsageCode)
+TEST_F(Medium_RecordTool, ValidateRefusesAMissingFileWithTheUsageCode)
 {
     const std::string none = ::testing::TempDir() + "tool_validate_none.sprec.json";
 
@@ -133,7 +155,7 @@ TEST(Medium_RecordTool, ValidateRefusesAMissingFileWithTheUsageCode)
     EXPECT_NE(missing.err.find("could not be read"), std::string::npos);
 }
 
-TEST(Medium_RecordTool, ShowPrintsOnlyTheNamedAnalysis)
+TEST_F(Medium_RecordTool, ShowPrintsOnlyTheNamedAnalysis)
 {
     const std::string path = record_file("tool_show_named.sprec.json", steps_of(100U));
 
@@ -144,7 +166,7 @@ TEST(Medium_RecordTool, ShowPrintsOnlyTheNamedAnalysis)
     EXPECT_EQ(shown.out.find("== breakdown =="), std::string::npos);
 }
 
-TEST(Medium_RecordTool, ShowPrintsTheDefaultAnalysesWhenNoneIsNamed)
+TEST_F(Medium_RecordTool, ShowPrintsTheDefaultAnalysesWhenNoneIsNamed)
 {
     const std::string path = record_file("tool_show_default.sprec.json", steps_of(100U));
 
@@ -154,7 +176,7 @@ TEST(Medium_RecordTool, ShowPrintsTheDefaultAnalysesWhenNoneIsNamed)
     EXPECT_NE(defaults.out.find("== overhead =="), std::string::npos);
 }
 
-TEST(Medium_RecordTool, ShowRefusesAnUnknownAnalysis)
+TEST_F(Medium_RecordTool, ShowRefusesAnUnknownAnalysis)
 {
     const std::string path = record_file("tool_show_unknown.sprec.json", steps_of(100U));
 
@@ -164,7 +186,7 @@ TEST(Medium_RecordTool, ShowRefusesAnUnknownAnalysis)
     EXPECT_NE(unknown.err.find("unknown analysis \"fastest\""), std::string::npos);
 }
 
-TEST(Medium_RecordTool, ShowRefusesATopThatIsNotANumber)
+TEST_F(Medium_RecordTool, ShowRefusesATopThatIsNotANumber)
 {
     const std::string path = record_file("tool_show_top.sprec.json", steps_of(100U));
 
@@ -173,7 +195,7 @@ TEST(Medium_RecordTool, ShowRefusesATopThatIsNotANumber)
     EXPECT_EQ(bad_top.code, K_TOOL_USAGE);
 }
 
-TEST(Medium_RecordTool, CompareNamesTheFasterRecord)
+TEST_F(Medium_RecordTool, CompareNamesTheFasterRecord)
 {
     const std::string baseline = record_file("tool_compare_base.sprec.json", steps_of(100U));
     const std::string faster = record_file("tool_compare_fast.sprec.json", steps_of(50U));
@@ -185,7 +207,7 @@ TEST(Medium_RecordTool, CompareNamesTheFasterRecord)
     EXPECT_NE(compared.out.find("faster"), std::string::npos);
 }
 
-TEST(Medium_RecordTool, CompareRefusesRecordsOfDifferentBuilds)
+TEST_F(Medium_RecordTool, CompareRefusesRecordsOfDifferentBuilds)
 {
     const std::string baseline = record_file("tool_refuse_base.sprec.json", steps_of(100U));
     const std::string debug = record_file("tool_refuse_debug.sprec.json", steps_of(50U, "debug"));
@@ -196,7 +218,7 @@ TEST(Medium_RecordTool, CompareRefusesRecordsOfDifferentBuilds)
     EXPECT_NE(refused.err.find("the builds differ at \"build_type\""), std::string::npos);
 }
 
-TEST(Medium_RecordTool, CompareComparesDifferentBuildsWhenTheMismatchIsAllowed)
+TEST_F(Medium_RecordTool, CompareComparesDifferentBuildsWhenTheMismatchIsAllowed)
 {
     const std::string baseline = record_file("tool_allow_base.sprec.json", steps_of(100U));
     const std::string debug = record_file("tool_allow_debug.sprec.json", steps_of(50U, "debug"));
@@ -206,7 +228,7 @@ TEST(Medium_RecordTool, CompareComparesDifferentBuildsWhenTheMismatchIsAllowed)
     EXPECT_EQ(allowed.code, K_TOOL_OK);
 }
 
-TEST(Medium_RecordTool, CheckPrintsPassForACheckThatHolds)
+TEST_F(Medium_RecordTool, CheckPrintsPassForACheckThatHolds)
 {
     const std::string path = record_file("tool_check_pass.sprec.json", steps_of(100U));
     const std::string passing = temporary_file(
@@ -219,7 +241,7 @@ TEST(Medium_RecordTool, CheckPrintsPassForACheckThatHolds)
     EXPECT_EQ(passed.out, "pass  timeline:step median = 100\n1 of 1 checks passed\n");
 }
 
-TEST(Medium_RecordTool, CheckFailsWhenOneCheckFails)
+TEST_F(Medium_RecordTool, CheckFailsWhenOneCheckFails)
 {
     const std::string path = record_file("tool_check_fail.sprec.json", steps_of(100U));
     const std::string failing = temporary_file(
@@ -234,7 +256,7 @@ TEST(Medium_RecordTool, CheckFailsWhenOneCheckFails)
                           "pass  timeline:step min = 100\n1 of 2 checks passed\n");
 }
 
-TEST(Medium_RecordTool, CheckRefusesAFileOfChecksThatDoesNotParse)
+TEST_F(Medium_RecordTool, CheckRefusesAFileOfChecksThatDoesNotParse)
 {
     const std::string path = record_file("tool_check_broken.sprec.json", steps_of(100U));
     const std::string broken = temporary_file("tool_check_broken.json", R"([{"subject": 1}])");
