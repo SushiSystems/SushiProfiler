@@ -227,46 +227,86 @@ namespace
     }
 } // namespace
 
-TEST(Small_Registry, MakesASourceByNameAndRefusesAnUnknownOne)
+TEST(Small_Registry, MakesASourceByName)
 {
     std::ostringstream terminal;
     const Registry registry = registry_with_builtins(terminal);
 
     const Made<Source> quiet = registry.make_source("quiet", parsed("{}"));
-    const Made<Source> missing = registry.make_source("gpu", parsed("{}"));
 
     ASSERT_NE(quiet.part, nullptr);
     EXPECT_EQ(quiet.part->name(), "quiet");
+}
+
+TEST(Small_Registry, RefusesAnUnknownSourceAndListsTheKnownOnes)
+{
+    std::ostringstream terminal;
+    const Registry registry = registry_with_builtins(terminal);
+
+    const Made<Source> missing = registry.make_source("gpu", parsed("{}"));
+
     EXPECT_EQ(missing.part, nullptr);
     EXPECT_EQ(missing.error, "unknown source \"gpu\"; known: quiet");
 }
 
-TEST(Small_Registry, ALibraryRegistersItsSourceAndContributorThroughItsParts)
+namespace
 {
-    Registry registry;
-    FakeDeviceProfilerParts parts = register_profiler_parts(registry);
-    NameTable names;
-    std::vector<std::string> tracks;
-    SourceContext context(names, tracks, 0U);
-    SpanTable table;
-    SpanSink sink(table, names, tracks);
+    /// @brief Holds a registry with the fake device library's parts and what a source needs.
+    class Small_RegistryDevice : public ::testing::Test
+    {
+        protected:
+            /// @brief Makes the source, queues work at 50, 150 and 250 ns and collects the periods
+            /// [100, 200) and [200, 300).
+            void collect_two_periods()
+            {
+                Made<Source> made = registry_.make_source("fake_device", parsed("{}"));
+                ASSERT_NE(made.part, nullptr);
+                ASSERT_TRUE(made.part->begin(context_).ok());
+                parts_.queue().push(50U);
+                parts_.queue().push(150U);
+                parts_.queue().push(250U);
+                made.part->collect(PeriodSpan{0U, 100U, 200U}, sink_);
+                made.part->collect(PeriodSpan{1U, 200U, 300U}, sink_);
+                made.part->end();
+            }
 
-    Made<Source> made = registry.make_source("fake_device", parsed("{}"));
-    ASSERT_NE(made.part, nullptr);
-    ASSERT_TRUE(made.part->begin(context).ok());
-    parts.queue().push(50U);
-    parts.queue().push(150U);
-    parts.queue().push(250U);
-    made.part->collect(PeriodSpan{0U, 100U, 200U}, sink);
-    made.part->collect(PeriodSpan{1U, 200U, 300U}, sink);
-    made.part->end();
+            Registry registry_;                                           /**< The registry. */
+            FakeDeviceProfilerParts parts_ = register_profiler_parts(registry_); /**< Its parts. */
+            NameTable names_;                                             /**< The names. */
+            std::vector<std::string> tracks_;                             /**< The tracks. */
+            SourceContext context_{names_, tracks_, 0U};                  /**< The context. */
+            SpanTable table_;                                             /**< The spans. */
+            SpanSink sink_{table_, names_, tracks_};                      /**< Their sink. */
+    };
+} // namespace
 
-    ASSERT_EQ(table.size(), 2U);
-    EXPECT_EQ(table.span(0U).start_ns, 150U);
-    EXPECT_EQ(table.span(1U).start_ns, 250U);
-    EXPECT_EQ(sink.late(), 1U);
-    EXPECT_EQ(tracks, std::vector<std::string>{"fake_device.queue"});
-    const SushiProfiler::RecordFacts facts = SushiProfiler::gather_facts(registry.contributors());
+TEST_F(Small_RegistryDevice, TheRegisteredSourcePlacesWorkInThePeriodHoldingItsStart)
+{
+    collect_two_periods();
+
+    ASSERT_EQ(table_.size(), 2U);
+    EXPECT_EQ(table_.span(0U).start_ns, 150U);
+    EXPECT_EQ(table_.span(1U).start_ns, 250U);
+}
+
+TEST_F(Small_RegistryDevice, TheRegisteredSourceCountsOlderWorkAsLate)
+{
+    collect_two_periods();
+
+    EXPECT_EQ(sink_.late(), 1U);
+}
+
+TEST_F(Small_RegistryDevice, TheRegisteredSourceAddsItsTrack)
+{
+    collect_two_periods();
+
+    EXPECT_EQ(tracks_, std::vector<std::string>{"fake_device.queue"});
+}
+
+TEST_F(Small_RegistryDevice, TheRegisteredContributorsFactReachesTheGatheredFacts)
+{
+    const SushiProfiler::RecordFacts facts = SushiProfiler::gather_facts(registry_.contributors());
+
     ASSERT_FALSE(facts.environment.empty());
     EXPECT_EQ(facts.environment.back().name, "fake_device");
     EXPECT_EQ(facts.environment.back().value, "1.0");
@@ -285,32 +325,67 @@ TEST(Small_Registry, ANameIsTakenOnce)
     EXPECT_FALSE(registry.add_record_writer("chrome_trace", make_none));
 }
 
-TEST(Small_Registry, KnowsWhichWritersStreamAndListsEveryWriter)
+TEST(Small_Registry, KnowsWhichWritersStream)
 {
     std::ostringstream terminal;
     const Registry registry = registry_with_builtins(terminal);
 
     EXPECT_TRUE(registry.streams("chrome_trace"));
     EXPECT_FALSE(registry.streams("terminal"));
+}
+
+TEST(Small_Registry, AnUnknownWriterListsEveryWriter)
+{
+    std::ostringstream terminal;
+    const Registry registry = registry_with_builtins(terminal);
+
     EXPECT_EQ(registry.make_record_writer("chrome_trace", parsed("{}"), "").error,
               "unknown writer \"chrome_trace\"; known: chrome_trace, record, terminal");
     EXPECT_EQ(registry.make_stream_writer("csv", parsed("{}"), "").error,
               "unknown writer \"csv\"; known: chrome_trace, record, terminal");
 }
 
-TEST(Small_Registry, ReadsTheBuiltInWritersSettings)
+TEST(Small_Registry, TheTerminalWriterAcceptsTopOrNoSettings)
 {
     std::ostringstream terminal;
     const Registry registry = registry_with_builtins(terminal);
 
     EXPECT_NE(registry.make_record_writer("terminal", parsed(R"({"top": 5})"), "").part, nullptr);
     EXPECT_NE(registry.make_record_writer("terminal", parsed("{}"), "").part, nullptr);
+}
+
+TEST(Small_Registry, TheTerminalWriterRefusesAnUnknownKey)
+{
+    std::ostringstream terminal;
+    const Registry registry = registry_with_builtins(terminal);
+
     EXPECT_EQ(registry.make_record_writer("terminal", parsed(R"({"rows": 5})"), "").error,
               "writers.terminal: unknown key \"rows\"");
+}
+
+TEST(Small_Registry, TheRecordWriterAcceptsAPath)
+{
+    std::ostringstream terminal;
+    const Registry registry = registry_with_builtins(terminal);
+
     EXPECT_NE(registry.make_record_writer("record", parsed(R"({"path": "a.json"})"), "out").part,
               nullptr);
+}
+
+TEST(Small_Registry, TheRecordWriterRequiresAPath)
+{
+    std::ostringstream terminal;
+    const Registry registry = registry_with_builtins(terminal);
+
     EXPECT_EQ(registry.make_record_writer("record", parsed("{}"), "out").error,
               "writers.record: missing key \"path\"");
+}
+
+TEST(Small_Registry, TheChromeTraceWriterAcceptsAPath)
+{
+    std::ostringstream terminal;
+    const Registry registry = registry_with_builtins(terminal);
+
     EXPECT_NE(registry.make_stream_writer("chrome_trace", parsed(R"({"path": "t.json"})"), "")
                   .part,
               nullptr);

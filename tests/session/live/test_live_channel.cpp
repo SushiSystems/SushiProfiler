@@ -32,7 +32,10 @@
 
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
+#include <cstddef>
+#include <functional>
 #include <memory>
 #include <thread>
 #include <vector>
@@ -53,6 +56,46 @@ namespace
             std::vector<std::string>{}, std::vector<SushiProfiler::ThreadRecord>{});
         return period;
     }
+
+    /// @brief Publishes the sequences from @p first up to, not including, @p last.
+    void publish_range(LiveChannel& channel, std::uint64_t first, std::uint64_t last)
+    {
+        for (std::uint64_t sequence = first; sequence < last; ++sequence)
+            channel.publish(period_of(sequence));
+    }
+
+    /// @brief Returns whether @p history holds @p period.
+    bool holds(const std::vector<std::shared_ptr<const ClosedPeriod>>& history,
+               const ClosedPeriod* period)
+    {
+        return std::any_of(history.begin(), history.end(),
+                           [period](const auto& entry) { return entry.get() == period; });
+    }
+
+    /// @brief Reads @p channel until @p done is set and counts in @p violations each time its
+    /// history is not consecutive or its newest sequence goes backwards.
+    void read_until_done(const LiveChannel& channel, const std::atomic<bool>& done,
+                         std::atomic<std::uint64_t>& violations)
+    {
+        std::uint64_t last_latest = 0U;
+        while (!done.load(std::memory_order_acquire))
+        {
+            const auto history = channel.history(50U);
+            for (std::size_t index = 1U; index < history.size(); ++index)
+            {
+                if (history[index]->sequence != history[index - 1U]->sequence + 1U)
+                    violations.fetch_add(1U);
+            }
+            const auto latest = channel.latest();
+            if (latest == nullptr)
+                continue;
+            if (latest->sequence < last_latest)
+                violations.fetch_add(1U);
+            last_latest = latest->sequence;
+            if (!history.empty() && latest->sequence < history.back()->sequence)
+                violations.fetch_add(1U);
+        }
+    }
 } // namespace
 
 TEST(Small_LiveChannel, LatestIsNullBeforeAPublication)
@@ -67,8 +110,7 @@ TEST(Small_LiveChannel, LatestIsNullBeforeAPublication)
 TEST(Small_LiveChannel, HistoryReturnsTheLastNOldestFirst)
 {
     LiveChannel channel(8U);
-    for (std::uint64_t sequence = 0U; sequence < 5U; ++sequence)
-        channel.publish(period_of(sequence));
+    publish_range(channel, 0U, 5U);
 
     const auto last_three = channel.history(3U);
 
@@ -76,15 +118,30 @@ TEST(Small_LiveChannel, HistoryReturnsTheLastNOldestFirst)
     EXPECT_EQ(last_three[0]->sequence, 2U);
     EXPECT_EQ(last_three[2]->sequence, 4U);
     EXPECT_EQ(channel.history(100U).size(), 5U);
+}
+
+TEST(Small_LiveChannel, LatestIsTheNewestPublication)
+{
+    LiveChannel channel(8U);
+
+    publish_range(channel, 0U, 5U);
+
     EXPECT_EQ(channel.latest()->sequence, 4U);
+}
+
+TEST(Small_LiveChannel, PublishedCountsEveryPublication)
+{
+    LiveChannel channel(8U);
+
+    publish_range(channel, 0U, 5U);
+
     EXPECT_EQ(channel.published(), 5U);
 }
 
 TEST(Small_LiveChannel, TheRingOverwritesItsOldestWhenFull)
 {
     LiveChannel channel(3U);
-    for (std::uint64_t sequence = 0U; sequence < 7U; ++sequence)
-        channel.publish(period_of(sequence));
+    publish_range(channel, 0U, 7U);
 
     const auto history = channel.history(10U);
 
@@ -99,18 +156,20 @@ TEST(Small_LiveChannel, AReaderKeepsAnOverwrittenPeriodAlive)
     LiveChannel channel(3U);
     channel.publish(period_of(0U));
     const std::shared_ptr<const ClosedPeriod> held = channel.latest();
-    channel.publish(period_of(1U));
-    const std::weak_ptr<const ClosedPeriod> unheld = channel.latest();
-    for (std::uint64_t sequence = 2U; sequence < 12U; ++sequence)
-        channel.publish(period_of(sequence));
+    publish_range(channel, 1U, 12U);
 
-    for (const auto& period : channel.history(10U))
-    {
-        EXPECT_NE(period, held);
-        EXPECT_NE(period.get(), unheld.lock().get());
-    }
+    EXPECT_FALSE(holds(channel.history(10U), held.get()));
     EXPECT_EQ(held->sequence, 0U);
     EXPECT_EQ(held->names->name(1U), "name");
+}
+
+TEST(Small_LiveChannel, AnOverwrittenPeriodNobodyHoldsIsFreed)
+{
+    LiveChannel channel(3U);
+    channel.publish(period_of(0U));
+    const std::weak_ptr<const ClosedPeriod> unheld = channel.latest();
+    publish_range(channel, 1U, 12U);
+
     EXPECT_TRUE(unheld.expired());
 }
 
@@ -127,22 +186,38 @@ TEST(Small_LiveChannel, WatchedFollowsAttachAndDetach)
     EXPECT_FALSE(channel.watched());
 }
 
-TEST(Small_LiveChannel, BeginRunClearsTheHistoryAndBumpsTheRun)
+TEST(Small_LiveChannel, BeginRunEmptiesTheHistoryAndTheLatest)
 {
     LiveChannel channel(4U);
-    channel.publish(period_of(0U));
-    channel.publish(period_of(1U));
-    const auto held = channel.latest();
+    publish_range(channel, 0U, 2U);
 
-    EXPECT_EQ(channel.run(), 0U);
-    EXPECT_EQ(channel.begin_run(), 1U);
+    static_cast<void>(channel.begin_run());
 
-    EXPECT_EQ(channel.run(), 1U);
     EXPECT_EQ(channel.latest(), nullptr);
     EXPECT_TRUE(channel.history(10U).empty());
     EXPECT_EQ(channel.published(), 0U);
-    EXPECT_EQ(held->sequence, 1U);
+}
+
+TEST(Small_LiveChannel, BeginRunNumbersTheRun)
+{
+    LiveChannel channel(4U);
+    ASSERT_EQ(channel.run(), 0U);
+
+    EXPECT_EQ(channel.begin_run(), 1U);
+
+    EXPECT_EQ(channel.run(), 1U);
+}
+
+TEST(Small_LiveChannel, APeriodHeldAcrossBeginRunSurvivesIt)
+{
+    LiveChannel channel(4U);
+    publish_range(channel, 0U, 2U);
+    const auto held = channel.latest();
+
+    static_cast<void>(channel.begin_run());
     channel.publish(period_of(0U));
+
+    EXPECT_EQ(held->sequence, 1U);
     EXPECT_EQ(channel.history(10U).size(), 1U);
 }
 
@@ -154,32 +229,9 @@ TEST(Medium_LiveChannel, ReadersNeverSeeSequenceGoBackwards)
     std::atomic<std::uint64_t> violations{0U};
     std::vector<std::thread> readers;
     for (int reader = 0; reader < 4; ++reader)
-    {
-        readers.emplace_back(
-            [&]
-            {
-                std::uint64_t last_latest = 0U;
-                while (!done.load(std::memory_order_acquire))
-                {
-                    const auto history = channel.history(50U);
-                    for (std::size_t index = 1U; index < history.size(); ++index)
-                    {
-                        if (history[index]->sequence != history[index - 1U]->sequence + 1U)
-                            violations.fetch_add(1U);
-                    }
-                    const auto latest = channel.latest();
-                    if (latest == nullptr)
-                        continue;
-                    if (latest->sequence < last_latest)
-                        violations.fetch_add(1U);
-                    last_latest = latest->sequence;
-                    if (!history.empty() && latest->sequence < history.back()->sequence)
-                        violations.fetch_add(1U);
-                }
-            });
-    }
-    for (std::uint64_t sequence = 0U; sequence < K_PUBLISHES; ++sequence)
-        channel.publish(period_of(sequence));
+        readers.emplace_back(read_until_done, std::cref(channel), std::cref(done), std::ref(violations));
+
+    publish_range(channel, 0U, K_PUBLISHES);
     done.store(true, std::memory_order_release);
     for (std::thread& reader : readers)
         reader.join();

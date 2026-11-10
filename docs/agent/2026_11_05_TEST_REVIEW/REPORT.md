@@ -74,6 +74,8 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 
 16. M7 group 2 (`session/consumer`) applied the splits, the forget rows and the loop rewrites of `test_period_assembler.cpp`, put the repeated set-up of the split tests into fixture methods (`run_lanes`, `run_threads`, `run_budget_and_tag`, `run_lingering_session`), and wrote the owed adds for the pause log (an open interval survives `forget_before`) and the writer set (requests for one writer apply in order and the last one wins). `StepSource` and `ProbingWriter` stay, as the resume note of `PLAN.md` says: one appends a span on a track no source added, and one reads the live channel at the moment of each write, and `MemorySource` and `MemoryStreamWriter` observe neither. The two `Consumer` tests that wait on the wall clock (`AWatchedConsumerDrainsAtTheLiveCeiling`, `WakeShortensAnIdleSleep`) are not rewritten: `Consumer` has no clock to inject and a job of `PLAN.md` may not change production code, so RW-30 holds the seam.
 
+17. M7 group 3 (`session/live`, `session/registry`) split the tests that checked several results, turned the four snapshot changes into rows that serve both the rebuild test and the new `matches` test, and moved the reader loop of the channel test and the publication loop into named helpers. The owed adds `NameSnapshot::sites` and `NameSnapshot::matches` are written. The fake device library in `test_registry.cpp` stays as a fixture of its own, since the guide `docs/guides/CLIENT_LIBRARY.md` quotes it.
+
 ## Dispatches
 
 dispatch: J15 review, 6 chunks — haiku high, 1 round each, passed, rung 1

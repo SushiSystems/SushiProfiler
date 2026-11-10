@@ -117,7 +117,7 @@ TEST(Small_PeriodPublisher, SharesNamesUntilATableGrows)
     EXPECT_EQ(history[0]->names->name(2U), "");
 }
 
-TEST(Small_PeriodPublisher, SumsTheRecordsLateAndDroppedCounts)
+TEST(Small_PeriodPublisher, SumsTheThreadsLateAndDroppedCounts)
 {
     LiveChannel channel(4U);
     channel.attach();
@@ -129,6 +129,18 @@ TEST(Small_PeriodPublisher, SumsTheRecordsLateAndDroppedCounts)
     ASSERT_NE(latest, nullptr);
     EXPECT_EQ(latest->counts.late, 5U);
     EXPECT_EQ(latest->counts.dropped, 12U);
+}
+
+TEST(Small_PeriodPublisher, CarriesOverTheRecordsSpanAndOutsideCounts)
+{
+    LiveChannel channel(4U);
+    channel.attach();
+    PeriodPublisher publisher(channel, RunCap{10U, 0U}, 0U);
+
+    publisher.closed(PeriodRecord{}, counted_record());
+
+    const auto latest = channel.latest();
+    ASSERT_NE(latest, nullptr);
     EXPECT_EQ(latest->counts.spans_dropped, 11U);
     EXPECT_EQ(latest->counts.outside, 13U);
 }

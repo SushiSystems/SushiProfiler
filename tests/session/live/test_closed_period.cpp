@@ -32,7 +32,6 @@
 
 #include <gtest/gtest.h>
 
-#include <tuple>
 #include <vector>
 
 using SushiProfiler::ClosedPeriod;
@@ -63,6 +62,33 @@ namespace
         period.end_ns = 1000U;
         period.runs = {run_of(0U, 0U, 10U), run_of(0U, 100U, 50U), run_of(0U, 200U, 30U),
                        run_of(0U, 300U, 40U), run_of(0U, 400U, 20U)};
+        return period;
+    }
+
+    /// @brief Returns a period with runs and a value in every other field.
+    PeriodRecord full_period()
+    {
+        PeriodRecord period = period_with_runs();
+        period.timeline = 2U;
+        period.thread = 1U;
+        period.warmup = false;
+        period.budget_ns = 16'666'667U;
+        period.tags.push_back(SushiProfiler::Tag{1U, 2U});
+        period.facts.push_back(SushiProfiler::Fact{"paused", "true"});
+        SushiProfiler::ZoneTree tree;
+        tree.thread = 1U;
+        tree.nodes.push_back(SushiProfiler::ZoneNode{1U, 0U, -1, 100U, 60U, 2U});
+        period.zones.push_back(tree);
+        SushiProfiler::Span span;
+        span.start_ns = 5U;
+        span.queued_ns = 5U;
+        span.end_ns = 9U;
+        static_cast<void>(period.spans.append(span));
+        SushiProfiler::SampleSeries series;
+        series.site = 3U;
+        series.time_ns = {1U, 2U};
+        series.values = {0.5, 1.5};
+        period.samples.push_back(series);
         return period;
     }
 
@@ -103,14 +129,7 @@ TEST(Small_ClosedPeriod, KeepsRunsInThreadLaneBeginOrder)
     const auto closed = SushiProfiler::make_closed_period(period, 1U, 0U, 0U, RunCap{4U, 0U},
                                                           LiveCounts{}, nullptr);
 
-    ASSERT_EQ(closed->period.runs.size(), 4U);
-    for (std::size_t index = 1U; index < closed->period.runs.size(); ++index)
-    {
-        const ZoneRun& before = closed->period.runs[index - 1U];
-        const ZoneRun& after = closed->period.runs[index];
-        EXPECT_LT(std::tie(before.thread, before.lane, before.begin_ns),
-                  std::tie(after.thread, after.lane, after.begin_ns));
-    }
+    EXPECT_EQ(durations(*closed), (std::vector<std::uint64_t>{90U, 80U, 70U, 60U}));
 }
 
 TEST(Small_ClosedPeriod, ZeroMaxRunsKeepsNone)
@@ -166,29 +185,9 @@ TEST(Small_ClosedPeriod, CarriesItsRunSequenceOriginAndCounts)
     EXPECT_EQ(closed->counts.outside, 4U);
 }
 
-TEST(Small_ClosedPeriod, CopiesEveryFieldButTheRuns)
+TEST(Small_ClosedPeriod, WithACapThatKeepsEveryRunTheClosedPeriodEqualsItsSource)
 {
-    PeriodRecord period = period_with_runs();
-    period.timeline = 2U;
-    period.thread = 1U;
-    period.warmup = false;
-    period.budget_ns = 16'666'667U;
-    period.tags.push_back(SushiProfiler::Tag{1U, 2U});
-    period.facts.push_back(SushiProfiler::Fact{"paused", "true"});
-    SushiProfiler::ZoneTree tree;
-    tree.thread = 1U;
-    tree.nodes.push_back(SushiProfiler::ZoneNode{1U, 0U, -1, 100U, 60U, 2U});
-    period.zones.push_back(tree);
-    SushiProfiler::Span span;
-    span.start_ns = 5U;
-    span.queued_ns = 5U;
-    span.end_ns = 9U;
-    static_cast<void>(period.spans.append(span));
-    SushiProfiler::SampleSeries series;
-    series.site = 3U;
-    series.time_ns = {1U, 2U};
-    series.values = {0.5, 1.5};
-    period.samples.push_back(series);
+    const PeriodRecord period = full_period();
 
     const auto closed = SushiProfiler::make_closed_period(period, 1U, 0U, 0U, RunCap{100U, 0U},
                                                           LiveCounts{}, nullptr);

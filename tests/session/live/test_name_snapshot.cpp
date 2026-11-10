@@ -69,38 +69,114 @@ TEST(Small_NameSnapshotCache, ReusesTheSnapshotWhileTablesAreUnchanged)
     const auto second = cache.snapshot(record);
 
     EXPECT_EQ(first, second);
-    EXPECT_EQ(first->name(1U), "a");
-    ASSERT_NE(first->site(1U), nullptr);
-    EXPECT_EQ(first->site(1U)->group, "Model");
-    EXPECT_EQ(first->track(0U), "gpu");
-    EXPECT_EQ(first->thread_name(0U), "main");
 }
 
-TEST(Small_NameSnapshotCache, RebuildsWhenANameASiteATrackOrAThreadNameGrew)
+TEST(Small_NameSnapshotCache, ASnapshotResolvesTheIdsOfItsRecord)
+{
+    const RunRecord record = small_record();
+    NameSnapshotCache cache;
+
+    const auto snapshot = cache.snapshot(record);
+
+    EXPECT_EQ(snapshot->name(1U), "a");
+    ASSERT_NE(snapshot->site(1U), nullptr);
+    EXPECT_EQ(snapshot->site(1U)->group, "Model");
+    EXPECT_EQ(snapshot->track(0U), "gpu");
+    EXPECT_EQ(snapshot->thread_name(0U), "main");
+}
+
+namespace
+{
+    /// @brief One change to a record that a snapshot must notice.
+    struct ChangeRow
+    {
+        void (*change)(RunRecord&);
+    };
+
+    /// @brief Adds a name.
+    void grow_names(RunRecord& record)
+    {
+        record.names.push_back("b");
+    }
+
+    /// @brief Adds a site.
+    void grow_sites(RunRecord& record)
+    {
+        record.sites.push_back(SiteRecord{});
+    }
+
+    /// @brief Adds a track.
+    void grow_tracks(RunRecord& record)
+    {
+        record.tracks.push_back("copy");
+    }
+
+    /// @brief Renames thread 0.
+    void rename_thread(RunRecord& record)
+    {
+        record.threads[0].name = "render";
+    }
+} // namespace
+
+class Small_NameSnapshotChange : public ::testing::TestWithParam<ChangeRow>
+{
+};
+
+TEST_P(Small_NameSnapshotChange, TheCacheRebuildsWhenATableOrAThreadNameChanged)
 {
     RunRecord record = small_record();
     NameSnapshotCache cache;
-    auto previous = cache.snapshot(record);
+    const auto previous = cache.snapshot(record);
 
-    record.names.push_back("b");
-    auto current = cache.snapshot(record);
-    EXPECT_NE(current, previous);
-    previous = current;
+    GetParam().change(record);
 
-    record.sites.push_back(SiteRecord{});
-    current = cache.snapshot(record);
-    EXPECT_NE(current, previous);
-    previous = current;
+    EXPECT_NE(cache.snapshot(record), previous);
+}
 
-    record.tracks.push_back("copy");
-    current = cache.snapshot(record);
-    EXPECT_NE(current, previous);
-    previous = current;
+TEST_P(Small_NameSnapshotChange, ASnapshotDoesNotMatchARecordThatChanged)
+{
+    RunRecord record = small_record();
+    NameSnapshotCache cache;
+    const auto snapshot = cache.snapshot(record);
 
-    record.threads[0].name = "render";
-    current = cache.snapshot(record);
-    EXPECT_NE(current, previous);
-    EXPECT_EQ(current->thread_name(0U), "render");
+    GetParam().change(record);
+
+    EXPECT_FALSE(snapshot->matches(record));
+}
+
+INSTANTIATE_TEST_SUITE_P(Small_Tables, Small_NameSnapshotChange,
+                         ::testing::Values(ChangeRow{grow_names}, ChangeRow{grow_sites},
+                                           ChangeRow{grow_tracks}, ChangeRow{rename_thread}));
+
+TEST(Small_NameSnapshotCache, ARenamedThreadShowsItsNewNameInTheNextSnapshot)
+{
+    RunRecord record = small_record();
+    NameSnapshotCache cache;
+    static_cast<void>(cache.snapshot(record));
+
+    rename_thread(record);
+
+    EXPECT_EQ(cache.snapshot(record)->thread_name(0U), "render");
+}
+
+TEST(Small_NameSnapshotCache, ASnapshotMatchesTheRecordItCopied)
+{
+    const RunRecord record = small_record();
+    NameSnapshotCache cache;
+
+    EXPECT_TRUE(cache.snapshot(record)->matches(record));
+}
+
+TEST(Small_NameSnapshotCache, SitesReturnsEverySiteIndexedBySiteId)
+{
+    const RunRecord record = small_record();
+    NameSnapshotCache cache;
+
+    const auto snapshot = cache.snapshot(record);
+
+    ASSERT_EQ(snapshot->sites().size(), 2U);
+    EXPECT_EQ(snapshot->sites()[1].name, "zone");
+    EXPECT_EQ(snapshot->sites()[1].group, "Model");
 }
 
 TEST(Small_NameSnapshotCache, ASnapshotKeepsItsTextAfterTheRecordGrows)
