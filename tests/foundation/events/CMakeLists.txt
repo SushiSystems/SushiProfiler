@@ -6,5 +6,5 @@
 sushiprofiler_add_module_tests(
     MODULE events
     SOURCES
-        test_ids.cpp
+        compile_ids.cpp
         test_trace_event.cpp)

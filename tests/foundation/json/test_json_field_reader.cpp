@@ -48,55 +48,101 @@ namespace
     }
 } // namespace
 
-TEST(Small_JsonFieldReader, ReadsFieldsOfEveryKind)
+TEST(Small_JsonFieldReader, ReadsAWholeNumberField)
 {
-    const JsonValue value =
-        parsed(R"({"n": 7, "s": "x", "b": true, "r": "Infinity", "c": [1, 2]})");
+    const JsonValue value = parsed(R"({"n": 7})");
     JsonFieldReader reader;
     std::uint8_t whole = 0U;
-    std::string text;
-    bool flag = false;
-    double real = 0.0;
-    std::vector<std::uint32_t> column;
 
-    ASSERT_TRUE(reader.object(value, {"n", "s", "b", "r", "c"}));
+    ASSERT_TRUE(reader.object(value, {"n"}));
     EXPECT_TRUE(reader.whole(value, "n", whole));
-    EXPECT_TRUE(reader.text(value, "s", text));
-    EXPECT_TRUE(reader.flag(value, "b", flag));
-    EXPECT_TRUE(reader.real(value, "r", real));
-    EXPECT_TRUE(reader.wholes(value, "c", column));
     EXPECT_EQ(whole, 7U);
-    EXPECT_EQ(text, "x");
-    EXPECT_TRUE(flag);
-    EXPECT_EQ(real, HUGE_VAL);
-    EXPECT_EQ(column, (std::vector<std::uint32_t>{1U, 2U}));
-    EXPECT_TRUE(reader.error().empty());
 }
 
-TEST(Small_JsonFieldReader, AStrictObjectNeedsEveryKeyAndNoOther)
+TEST(Small_JsonFieldReader, ReadsATextField)
 {
-    JsonFieldReader missing("config");
-    EXPECT_FALSE(missing.object(parsed(R"({"a": 1})"), {"a", "b"}));
-    EXPECT_EQ(missing.error(), "config: missing key \"b\"");
+    const JsonValue value = parsed(R"({"s": "x"})");
+    JsonFieldReader reader;
+    std::string text;
 
-    JsonFieldReader unknown("config");
-    EXPECT_FALSE(unknown.object(parsed(R"({"a": 1, "z": 2})"), {"a"}));
-    EXPECT_EQ(unknown.error(), "config: unknown key \"z\"");
+    ASSERT_TRUE(reader.object(value, {"s"}));
+    EXPECT_TRUE(reader.text(value, "s", text));
+    EXPECT_EQ(text, "x");
+}
+
+TEST(Small_JsonFieldReader, ReadsAFlagField)
+{
+    const JsonValue value = parsed(R"({"b": true})");
+    JsonFieldReader reader;
+    bool flag = false;
+
+    ASSERT_TRUE(reader.object(value, {"b"}));
+    EXPECT_TRUE(reader.flag(value, "b", flag));
+    EXPECT_TRUE(flag);
+}
+
+TEST(Small_JsonFieldReader, ReadsARealFieldWrittenAsInfinity)
+{
+    const JsonValue value = parsed(R"({"r": "Infinity"})");
+    JsonFieldReader reader;
+    double real = 0.0;
+
+    ASSERT_TRUE(reader.object(value, {"r"}));
+    EXPECT_TRUE(reader.real(value, "r", real));
+    EXPECT_EQ(real, HUGE_VAL);
+}
+
+TEST(Small_JsonFieldReader, ReadsAColumnOfWholeNumbers)
+{
+    const JsonValue value = parsed(R"({"c": [1, 2]})");
+    JsonFieldReader reader;
+    std::vector<std::uint32_t> column;
+
+    ASSERT_TRUE(reader.object(value, {"c"}));
+    EXPECT_TRUE(reader.wholes(value, "c", column));
+    EXPECT_EQ(column, (std::vector<std::uint32_t>{1U, 2U}));
+}
+
+TEST(Small_JsonFieldReader, AStrictObjectNeedsEveryKey)
+{
+    JsonFieldReader reader("config");
+
+    EXPECT_FALSE(reader.object(parsed(R"({"a": 1})"), {"a", "b"}));
+    EXPECT_EQ(reader.error(), "config: missing key \"b\"");
+}
+
+TEST(Small_JsonFieldReader, AStrictObjectRefusesAKeyItDoesNotName)
+{
+    JsonFieldReader reader("config");
+
+    EXPECT_FALSE(reader.object(parsed(R"({"a": 1, "z": 2})"), {"a"}));
+    EXPECT_EQ(reader.error(), "config: unknown key \"z\"");
 }
 
 TEST(Small_JsonFieldReader, AnOptionalObjectAcceptsMissingKeys)
 {
-    const JsonValue value = parsed(R"({"a": 1})");
     JsonFieldReader reader;
 
-    EXPECT_TRUE(reader.object_within(value, {"a", "b"}));
+    EXPECT_TRUE(reader.object_within(parsed(R"({"a": 1})"), {"a", "b"}));
+}
+
+TEST(Small_JsonFieldReader, HasReportsWhetherAKeyIsPresent)
+{
+    const JsonValue value = parsed(R"({"a": 1})");
+
     EXPECT_TRUE(JsonFieldReader::has(value, "a"));
     EXPECT_FALSE(JsonFieldReader::has(value, "b"));
+}
+
+TEST(Small_JsonFieldReader, AnOptionalObjectRefusesAKeyItDoesNotName)
+{
+    JsonFieldReader reader;
+
     EXPECT_FALSE(reader.object_within(parsed(R"({"c": 1})"), {"a", "b"}));
     EXPECT_EQ(reader.error(), "document: unknown key \"c\"");
 }
 
-TEST(Small_JsonFieldReader, ARefusalNamesItsPathAndKeepsTheFirst)
+TEST(Small_JsonFieldReader, ARefusalNamesItsPath)
 {
     const JsonValue value = parsed(R"({"list": [{"n": 300}]})");
     JsonFieldReader reader;
@@ -108,6 +154,14 @@ TEST(Small_JsonFieldReader, ARefusalNamesItsPathAndKeepsTheFirst)
 
     EXPECT_FALSE(reader.each(value, "list", element));
     EXPECT_EQ(reader.error(), "list[0].n: out of range 0..255");
+}
+
+TEST(Small_JsonFieldReader, TheFirstRefusalStays)
+{
+    JsonFieldReader reader;
+    EXPECT_FALSE(reader.fail("the first refusal"));
+
     EXPECT_FALSE(reader.fail("a later refusal"));
-    EXPECT_EQ(reader.error(), "list[0].n: out of range 0..255");
+
+    EXPECT_EQ(reader.error(), "the first refusal");
 }

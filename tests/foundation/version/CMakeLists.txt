@@ -8,5 +8,5 @@
 sushiprofiler_add_module_tests(
     MODULE version
     SOURCES
-        test_export.cpp
+        compile_export.cpp
         test_version.cpp)

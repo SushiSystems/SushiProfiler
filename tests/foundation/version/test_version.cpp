@@ -32,13 +32,30 @@
 
 #include <gtest/gtest.h>
 
-#include <string>
+#include <array>
+#include <charconv>
+#include <string_view>
 
-TEST(Small_Version, StringIsTheDottedNumbers)
+namespace
 {
-    const std::string dotted = std::to_string(SushiProfiler::K_VERSION_MAJOR) + "." +
-                               std::to_string(SushiProfiler::K_VERSION_MINOR) + "." +
-                               std::to_string(SushiProfiler::K_VERSION_PATCH);
+    /// @brief Reads @p text, three numbers joined by points, into major, minor and patch.
+    std::array<int, 3> numbers_of(std::string_view text)
+    {
+        std::array<int, 3> numbers{};
+        const char* cursor = text.data();
+        const char* const end = text.data() + text.size();
+        for (int& number : numbers)
+        {
+            cursor = std::from_chars(cursor, end, number).ptr + 1;
+        }
+        return numbers;
+    }
+} // namespace
 
-    EXPECT_EQ(dotted, std::string(SushiProfiler::K_VERSION_STRING));
+TEST(Small_Version, TheStringReadsAsTheThreeNumbers)
+{
+    const std::array<int, 3> expected{SushiProfiler::K_VERSION_MAJOR, SushiProfiler::K_VERSION_MINOR,
+                                      SushiProfiler::K_VERSION_PATCH};
+
+    EXPECT_EQ(numbers_of(SushiProfiler::K_VERSION_STRING), expected);
 }

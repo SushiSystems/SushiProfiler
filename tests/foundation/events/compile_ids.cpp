@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_ids.cpp                                                           */
+/* compile_ids.cpp                                                        */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -22,18 +22,16 @@
 /**************************************************************************/
 
 /**
- * @file test_ids.cpp
- * @brief Tests that the largest site id leaves the site word's top four bits to the kind.
+ * @file compile_ids.cpp
+ * @brief Checks at compile time that a site id leaves the top four bits of a site word to the kind.
  * @author Mustafa Garip
  * @see tests/foundation/events/README.md
  */
 
 #include <SushiProfiler/events/ids.hpp>
 
-#include <gtest/gtest.h>
-
-TEST(Small_IDs, TheLargestSiteLeavesFourBitsForTheKind)
+namespace
 {
-    EXPECT_EQ(SushiProfiler::K_MAX_SITE_ID, 0x0FFFFFFFU);
-    EXPECT_EQ(SushiProfiler::K_MAX_SITE_ID >> 28U, 0U);
-}
+    static_assert((SushiProfiler::K_MAX_SITE_ID >> 28U) == 0U,
+                  "a site id leaves the top four bits of a site word to the event kind");
+} // namespace

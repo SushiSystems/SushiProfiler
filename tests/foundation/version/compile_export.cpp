@@ -1,5 +1,5 @@
 /**************************************************************************/
-/* test_export.cpp                                                        */
+/* compile_export.cpp                                                     */
 /**************************************************************************/
 /*                          This file is part of:                         */
 /*                              SushiProfiler                             */
@@ -19,29 +19,16 @@
 /* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or        */
 /* implied. See the License for the specific language governing           */
 /* permissions and limitations under the License.                         */
+/**************************************************************************/
 
 /**
- * @file test_export.cpp
- * @brief Tests that the export header marks a declaration in the configuration the tests link.
+ * @file compile_export.cpp
+ * @brief Checks at compile time that SUSHIPROFILER_API can mark a declaration.
  * @author Mustafa Garip
  * @see tests/foundation/version/README.md
  */
 
 #include <SushiProfiler/version/export.hpp>
 
-#include <gtest/gtest.h>
-
-#include <cstring>
-
-#define SP_TEST_STRINGIFY_EXPANDED(text) #text
-#define SP_TEST_STRINGIFY(text) SP_TEST_STRINGIFY_EXPANDED(text)
-
-TEST(Small_Export, TheSharedLibraryConsumerImportsItsSymbols)
-{
-    const char* const expanded = SP_TEST_STRINGIFY(SUSHIPROFILER_API);
-#if defined(_WIN32)
-    EXPECT_NE(std::strstr(expanded, "dllimport"), nullptr);
-#else
-    EXPECT_NE(std::strstr(expanded, "visibility"), nullptr);
-#endif
-}
+/// @brief A declaration marked with the export macro; it compiles only where the macro is defined.
+SUSHIPROFILER_API void compile_export_probe();

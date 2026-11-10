@@ -36,58 +36,113 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <utility>
 
 using SushiProfiler::JsonKind;
 using SushiProfiler::JsonReadResult;
 using SushiProfiler::JsonValue;
 using SushiProfiler::read_json;
 
-TEST(Small_JsonReader, ReadsEveryKind)
+namespace
 {
-    const JsonReadResult result =
-        read_json(R"({"n": null, "t": true, "f": false, "i": -12, "r": 2.5, "s": "x",)"
-                  R"( "a": [1, [2]]})");
+    using KindRow = std::pair<const char*, JsonKind>;
+
+    /// @brief Returns the value @p text holds.
+    JsonValue parsed(const char* text)
+    {
+        return *read_json(text).value;
+    }
+} // namespace
+
+class Small_JsonReaderKind : public ::testing::TestWithParam<KindRow>
+{
+};
+
+TEST_P(Small_JsonReaderKind, ADocumentReadsAsTheKindItNames)
+{
+    const JsonReadResult result = read_json(GetParam().first);
 
     ASSERT_TRUE(result.ok()) << result.error.message;
-    const JsonValue& value = *result.value;
-    EXPECT_EQ(value.find("n")->kind(), JsonKind::Null);
-    EXPECT_EQ(*value.find("t")->as_bool(), true);
-    EXPECT_EQ(*value.find("f")->as_bool(), false);
-    EXPECT_EQ(*value.find("i")->as_integer(), -12);
-    EXPECT_EQ(*value.find("r")->as_real(), 2.5);
-    EXPECT_EQ(*value.find("s")->as_string(), "x");
-    EXPECT_EQ(value.find("a")->as_array()->size(), 2U);
+    EXPECT_EQ(result.value->kind(), GetParam().second);
 }
 
-TEST(Small_JsonReader, KeepsSixtyFourBitIntegersExact)
-{
-    const JsonReadResult largest = read_json("18446744073709551615");
-    const JsonReadResult smallest = read_json("-9223372036854775808");
-    const JsonReadResult beyond = read_json("18446744073709551616");
+INSTANTIATE_TEST_SUITE_P(Small_Documents, Small_JsonReaderKind,
+                         ::testing::Values(KindRow{"null", JsonKind::Null},
+                                           KindRow{"true", JsonKind::Bool},
+                                           KindRow{"-12", JsonKind::Integer},
+                                           KindRow{"2.5", JsonKind::Real},
+                                           KindRow{"\"x\"", JsonKind::String},
+                                           KindRow{"[1, [2]]", JsonKind::Array},
+                                           KindRow{"{\"a\": 1}", JsonKind::Object}));
 
-    ASSERT_TRUE(largest.ok() && smallest.ok() && beyond.ok());
-    EXPECT_EQ(*largest.value->as_unsigned(), std::numeric_limits<std::uint64_t>::max());
-    EXPECT_EQ(*smallest.value->as_integer(), std::numeric_limits<std::int64_t>::min());
-    EXPECT_EQ(beyond.value->kind(), JsonKind::Real);
+TEST(Small_JsonReader, TrueReadsAsTrue)
+{
+    EXPECT_EQ(*parsed("true").as_bool(), true);
 }
 
-TEST(Small_JsonReader, ReadsRealsWithExponentsAndSignedZero)
+TEST(Small_JsonReader, FalseReadsAsFalse)
 {
-    const JsonReadResult zero = read_json("-0.0");
-    const JsonReadResult large = read_json("1e300");
-
-    ASSERT_TRUE(zero.ok() && large.ok());
-    EXPECT_TRUE(std::signbit(*zero.value->as_real()));
-    EXPECT_EQ(*large.value->as_real(), 1e300);
+    EXPECT_EQ(*parsed("false").as_bool(), false);
 }
 
-TEST(Small_JsonReader, DecodesEscapesAndSurrogatePairs)
+TEST(Small_JsonReader, AnIntegerReadsWithItsValue)
 {
-    const JsonReadResult result =
-        read_json("\"a\\\"b\\\\c\\/\\n\\t\\u00e9\\ud83d\\ude00\"");
+    EXPECT_EQ(*parsed("-12").as_integer(), -12);
+}
 
-    ASSERT_TRUE(result.ok()) << result.error.message;
-    EXPECT_EQ(*result.value->as_string(), "a\"b\\c/\n\t\xC3\xA9\xF0\x9F\x98\x80");
+TEST(Small_JsonReader, ARealReadsWithItsValue)
+{
+    EXPECT_EQ(*parsed("2.5").as_real(), 2.5);
+}
+
+TEST(Small_JsonReader, AStringReadsWithItsText)
+{
+    EXPECT_EQ(*parsed("\"x\"").as_string(), "x");
+}
+
+TEST(Small_JsonReader, AnArrayReadsItsElementsInOrder)
+{
+    const JsonValue array = parsed("[1, [2]]");
+
+    ASSERT_EQ(array.as_array()->size(), 2U);
+    EXPECT_EQ((*array.as_array())[0], JsonValue::integer(1));
+}
+
+TEST(Small_JsonReader, TheLargestUnsignedIntegerReadsExactly)
+{
+    EXPECT_EQ(*parsed("18446744073709551615").as_unsigned(),
+              std::numeric_limits<std::uint64_t>::max());
+}
+
+TEST(Small_JsonReader, TheSmallestSignedIntegerReadsExactly)
+{
+    EXPECT_EQ(*parsed("-9223372036854775808").as_integer(),
+              std::numeric_limits<std::int64_t>::min());
+}
+
+TEST(Small_JsonReader, ANumberPastSixtyFourBitsReadsAsAReal)
+{
+    EXPECT_EQ(parsed("18446744073709551616").kind(), JsonKind::Real);
+}
+
+TEST(Small_JsonReader, ARealKeepsTheSignOfZero)
+{
+    EXPECT_TRUE(std::signbit(*parsed("-0.0").as_real()));
+}
+
+TEST(Small_JsonReader, ARealKeepsItsExponent)
+{
+    EXPECT_EQ(*parsed("1e300").as_real(), 1e300);
+}
+
+TEST(Small_JsonReader, EscapesDecodeToUtf8)
+{
+    EXPECT_EQ(*parsed("\"a\\\"b\\\\c\\/\\n\\t\\u00e9\"").as_string(), "a\"b\\c/\n\t\xC3\xA9");
+}
+
+TEST(Small_JsonReader, ASurrogatePairDecodesToOneUtf8Character)
+{
+    EXPECT_EQ(*parsed("\"\\ud83d\\ude00\"").as_string(), "\xF0\x9F\x98\x80");
 }
 
 TEST(Small_JsonReader, AnErrorNamesItsLineAndColumn)
@@ -99,18 +154,18 @@ TEST(Small_JsonReader, AnErrorNamesItsLineAndColumn)
     EXPECT_EQ(result.error.column, 8U);
 }
 
-TEST(Small_JsonReader, RefusesWhatJsonDoesNotAllow)
+class Small_JsonReaderRefusal : public ::testing::TestWithParam<const char*>
 {
-    EXPECT_FALSE(read_json("").ok());
-    EXPECT_FALSE(read_json("[1,]").ok());
-    EXPECT_FALSE(read_json("{\"a\" 1}").ok());
-    EXPECT_FALSE(read_json("01").ok());
-    EXPECT_FALSE(read_json("1.").ok());
-    EXPECT_FALSE(read_json("\"\x01\"").ok());
-    EXPECT_FALSE(read_json("\"\\ud83d\"").ok());
-    EXPECT_FALSE(read_json("1 2").ok());
-    EXPECT_FALSE(read_json("NaN").ok());
+};
+
+TEST_P(Small_JsonReaderRefusal, TextJsonDoesNotAllowIsRefused)
+{
+    EXPECT_FALSE(read_json(GetParam()).ok());
 }
+
+INSTANTIATE_TEST_SUITE_P(Small_Inputs, Small_JsonReaderRefusal,
+                         ::testing::Values("", "[1,]", "{\"a\" 1}", "01", "1.", "\"\x01\"",
+                                           "\"\\ud83d\"", "1 2", "NaN"));
 
 TEST(Small_JsonReader, RefusesNestingDeeperThanTheLimit)
 {

@@ -37,31 +37,43 @@
 using SushiProfiler::CalibrationPoint;
 using SushiProfiler::TraceClock;
 
-TEST(Small_TraceClock, SteadyTimeNeverGoesBack)
+namespace
 {
-    std::uint64_t previous = TraceClock::steady_now_ns();
-    for (int read = 0; read < 1000; ++read)
+    /// @brief Reads @p clock repeatedly and expects no reading to be smaller than the one before.
+    void expect_readings_never_decrease(std::uint64_t (*clock)())
     {
-        const std::uint64_t now = TraceClock::steady_now_ns();
-        ASSERT_GE(now, previous);
-        previous = now;
+        std::uint64_t previous = clock();
+        for (int read = 0; read < 1000; ++read)
+        {
+            const std::uint64_t now = clock();
+            ASSERT_GE(now, previous);
+            previous = now;
+        }
     }
+
+    /// @brief Skips a test on a processor whose counter ticks are not invariant.
+    class Medium_TraceClockCounter : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                if (!TraceClock::ticks_are_invariant())
+                    GTEST_SKIP() << "this processor has no invariant TSC";
+            }
+    };
+} // namespace
+
+TEST(Medium_TraceClock, SteadyTimeNeverGoesBack)
+{
+    expect_readings_never_decrease(&TraceClock::steady_now_ns);
 }
 
-TEST(Small_TraceClock, TicksNeverGoBackWhenInvariant)
+TEST_F(Medium_TraceClockCounter, TicksNeverGoBackWhenInvariant)
 {
-    if (!TraceClock::ticks_are_invariant())
-        GTEST_SKIP() << "this processor has no invariant TSC";
-    std::uint64_t previous = TraceClock::now();
-    for (int read = 0; read < 1000; ++read)
-    {
-        const std::uint64_t now = TraceClock::now();
-        ASSERT_GE(now, previous);
-        previous = now;
-    }
+    expect_readings_never_decrease(&TraceClock::now);
 }
 
-TEST(Small_TraceClock, SampleBracketsTheSteadyReading)
+TEST(Medium_TraceClock, SampleBracketsTheSteadyReading)
 {
     const std::uint64_t before = TraceClock::steady_now_ns();
     const CalibrationPoint point = TraceClock::sample();

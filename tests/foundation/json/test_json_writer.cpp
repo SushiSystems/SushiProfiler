@@ -38,11 +38,18 @@
 #include <cstdint>
 #include <limits>
 #include <string>
+#include <utility>
 
 using SushiProfiler::JsonLayout;
 using SushiProfiler::JsonValue;
 using SushiProfiler::JsonWriter;
 using SushiProfiler::read_json;
+
+namespace
+{
+    using RealRow = std::pair<double, const char*>;
+    using EscapeRow = std::pair<const char*, const char*>;
+} // namespace
 
 TEST(Small_JsonWriter, WritesACompactDocument)
 {
@@ -60,7 +67,21 @@ TEST(Small_JsonWriter, WritesACompactDocument)
     EXPECT_EQ(writer.text(), R"({"a":1,"b":[true,null]})");
 }
 
-TEST(Small_JsonWriter, IndentsBlocksAndKeepsInlineArraysOnOneLine)
+TEST(Small_JsonWriter, TheIndentedWriterPutsEachMemberOnItsOwnLine)
+{
+    JsonWriter writer(true);
+    writer.begin_object();
+    writer.key("a");
+    writer.integer(1);
+    writer.key("empty");
+    writer.begin_object();
+    writer.end_object();
+    writer.end_object();
+
+    EXPECT_EQ(writer.text(), "{\n  \"a\": 1,\n  \"empty\": {}\n}");
+}
+
+TEST(Small_JsonWriter, AnInlineArrayStaysOnOneLineInTheIndentedWriter)
 {
     JsonWriter writer(true);
     writer.begin_object();
@@ -69,34 +90,44 @@ TEST(Small_JsonWriter, IndentsBlocksAndKeepsInlineArraysOnOneLine)
     writer.integer(1);
     writer.integer(2);
     writer.end_array();
-    writer.key("empty");
-    writer.begin_object();
-    writer.end_object();
     writer.end_object();
 
-    EXPECT_EQ(writer.text(), "{\n  \"columns\": [1, 2],\n  \"empty\": {}\n}");
+    EXPECT_EQ(writer.text(), "{\n  \"columns\": [1, 2]\n}");
 }
 
-TEST(Small_JsonWriter, EscapesControlCharactersAndQuotes)
+class Small_JsonWriterEscape : public ::testing::TestWithParam<EscapeRow>
+{
+};
+
+TEST_P(Small_JsonWriterEscape, AStringWritesItsEscapedForm)
 {
     JsonWriter writer(false);
-    writer.string("a\"b\\\n\x01");
+    writer.string(GetParam().first);
 
-    EXPECT_EQ(writer.text(), "\"a\\\"b\\\\\\n\\u0001\"");
+    EXPECT_EQ(writer.text(), GetParam().second);
 }
 
-TEST(Small_JsonWriter, AWholeRealStaysAReal)
+INSTANTIATE_TEST_SUITE_P(Small_Rules, Small_JsonWriterEscape,
+                         ::testing::Values(EscapeRow{"a\"b", "\"a\\\"b\""},
+                                           EscapeRow{"a\\b", "\"a\\\\b\""},
+                                           EscapeRow{"a\nb", "\"a\\nb\""},
+                                           EscapeRow{"a\x01", "\"a\\u0001\""}));
+
+class Small_JsonWriterReal : public ::testing::TestWithParam<RealRow>
+{
+};
+
+TEST_P(Small_JsonWriterReal, ARealWritesInTheShortestFormThatReadsBackAsAReal)
 {
     JsonWriter writer(false);
-    writer.begin_array();
-    writer.real(1.0);
-    writer.real(-0.0);
-    writer.real(0.1);
-    writer.real(1e300);
-    writer.end_array();
+    writer.real(GetParam().first);
 
-    EXPECT_EQ(writer.text(), "[1.0,-0.0,0.1,1e+300]");
+    EXPECT_EQ(writer.text(), GetParam().second);
 }
+
+INSTANTIATE_TEST_SUITE_P(Small_Values, Small_JsonWriterReal,
+                         ::testing::Values(RealRow{1.0, "1.0"}, RealRow{-0.0, "-0.0"},
+                                           RealRow{0.1, "0.1"}, RealRow{1e300, "1e+300"}));
 
 TEST(Small_JsonWriter, ANonFiniteRealIsNull)
 {

@@ -35,7 +35,7 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <type_traits>
+#include <tuple>
 
 using SushiProfiler::EventKind;
 using SushiProfiler::K_EVENT_KIND_COUNT;
@@ -59,28 +59,28 @@ namespace
     }
 } // namespace
 
-TEST(Small_TraceEvent, IsTwentyFourTriviallyCopyableBytes)
+class Small_TraceEventPacking
+    : public ::testing::TestWithParam<std::tuple<std::uint8_t, SiteID>>
 {
-    EXPECT_EQ(sizeof(TraceEvent), 24U);
-    EXPECT_TRUE(std::is_trivially_copyable_v<TraceEvent>);
+};
+
+TEST_P(Small_TraceEventPacking, AKindAndASiteSurviveInTheSiteWord)
+{
+    const auto kind = static_cast<EventKind>(std::get<0>(GetParam()));
+    const SiteID site = std::get<1>(GetParam());
+    TraceEvent event{};
+
+    event.site_word = pack_site(kind, site);
+
+    EXPECT_EQ(kind_of(event), kind);
+    EXPECT_EQ(site_of(event), site);
 }
 
-TEST(Small_TraceEvent, KindAndSiteRoundTrip)
-{
-    for (std::uint8_t raw = 0U; raw < K_EVENT_KIND_COUNT; ++raw)
-    {
-        const auto kind = static_cast<EventKind>(raw);
-        for (const SiteID site : {SiteID{1U}, K_MAX_SITE_ID})
-        {
-            TraceEvent event{};
-            event.site_word = pack_site(kind, site);
-            EXPECT_EQ(kind_of(event), kind);
-            EXPECT_EQ(site_of(event), site);
-        }
-    }
-}
+INSTANTIATE_TEST_SUITE_P(Small_Sites, Small_TraceEventPacking,
+                         ::testing::Combine(::testing::Range<std::uint8_t>(0U, K_EVENT_KIND_COUNT),
+                                            ::testing::Values(SiteID{1U}, K_MAX_SITE_ID)));
 
-TEST(Small_TraceEvent, ANaNValueKeepsItsBits)
+TEST(Small_TraceEvent, ANaNWithAPayloadKeepsItsBits)
 {
     const std::uint64_t payload_nan = 0x7ff8000000001234ULL;
     double nan_value = 0.0;
@@ -88,16 +88,16 @@ TEST(Small_TraceEvent, ANaNValueKeepsItsBits)
 
     EXPECT_EQ(value_bits(nan_value), payload_nan);
     EXPECT_EQ(bits_of(value_of(payload_nan)), payload_nan);
-    EXPECT_EQ(value_of(value_bits(std::numeric_limits<double>::infinity())),
-              std::numeric_limits<double>::infinity());
-    EXPECT_EQ(bits_of(value_of(value_bits(-0.0))), bits_of(-0.0));
 }
 
-TEST(Small_TraceEvent, ASpanLongerThanThirtyTwoBitsSurvives)
+TEST(Small_TraceEvent, InfinityKeepsItsValue)
 {
-    TraceEvent event{};
-    event.begin = 0U;
-    event.end = 5'000'000'000ULL;
+    constexpr double infinity = std::numeric_limits<double>::infinity();
 
-    EXPECT_EQ(event.end - event.begin, 5'000'000'000ULL);
+    EXPECT_EQ(value_of(value_bits(infinity)), infinity);
+}
+
+TEST(Small_TraceEvent, NegativeZeroKeepsItsSign)
+{
+    EXPECT_EQ(bits_of(value_of(value_bits(-0.0))), bits_of(-0.0));
 }

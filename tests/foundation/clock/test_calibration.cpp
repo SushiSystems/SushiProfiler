@@ -32,6 +32,8 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
+
 using SushiProfiler::Calibration;
 using SushiProfiler::CalibrationPoint;
 
@@ -44,19 +46,36 @@ namespace
     }
 } // namespace
 
-TEST(Small_Calibration, MapsBothEndsExactly)
+TEST(Small_Calibration, MapsTheFirstPointToItsNanosecondsExactly)
 {
-    const Calibration calibration = half_nanosecond_per_tick();
+    EXPECT_EQ(half_nanosecond_per_tick().to_nanoseconds(1000U), 5000U);
+}
 
-    EXPECT_EQ(calibration.to_nanoseconds(1000U), 5000U);
-    EXPECT_EQ(calibration.to_nanoseconds(3000U), 6000U);
-    EXPECT_EQ(calibration.to_nanoseconds(2000U), 5500U);
-    EXPECT_DOUBLE_EQ(calibration.nanoseconds_per_tick(), 0.5);
+TEST(Small_Calibration, MapsTheSecondPointToItsNanosecondsExactly)
+{
+    EXPECT_EQ(half_nanosecond_per_tick().to_nanoseconds(3000U), 6000U);
+}
+
+TEST(Small_Calibration, MapsTicksBetweenThePointsAlongTheirLine)
+{
+    EXPECT_EQ(half_nanosecond_per_tick().to_nanoseconds(2000U), 5500U);
+}
+
+TEST(Small_Calibration, ReportsTheSlopeOfTheLine)
+{
+    EXPECT_DOUBLE_EQ(half_nanosecond_per_tick().nanoseconds_per_tick(), 0.5);
 }
 
 TEST(Small_Calibration, ExtrapolatesBeforeTheBegin)
 {
+    // The line is 0.5 ns per tick through (1000, 5000): 500 ticks give 5000 - 500 * 0.5 = 4750.
     EXPECT_EQ(half_nanosecond_per_tick().to_nanoseconds(500U), 4750U);
+}
+
+TEST(Small_Calibration, ExtrapolatesPastTheEndAlongTheSameLine)
+{
+    // The same line: 4000 ticks give 6000 + 1000 * 0.5 = 6500.
+    EXPECT_EQ(half_nanosecond_per_tick().to_nanoseconds(4000U), 6500U);
 }
 
 TEST(Small_Calibration, EqualTicksKeepOneNanosecondPerTick)
@@ -67,7 +86,14 @@ TEST(Small_Calibration, EqualTicksKeepOneNanosecondPerTick)
     EXPECT_EQ(calibration.to_nanoseconds(110U), 910U);
 }
 
-TEST(Small_Calibration, DefaultIsTheIdentity)
+class Small_CalibrationIdentity : public ::testing::TestWithParam<std::uint64_t>
 {
-    EXPECT_EQ(Calibration().to_nanoseconds(123456789U), 123456789U);
+};
+
+TEST_P(Small_CalibrationIdentity, ADefaultCalibrationMapsATickToTheSameNanoseconds)
+{
+    EXPECT_EQ(Calibration().to_nanoseconds(GetParam()), GetParam());
 }
+
+INSTANTIATE_TEST_SUITE_P(Small_Ticks, Small_CalibrationIdentity,
+                         ::testing::Values(0U, 1U, 123456789U, 1'000'000'000'000U));
