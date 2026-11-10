@@ -1455,7 +1455,9 @@ TEST(Medium_Session, ASourceFactReachesTheRecordFile)
     PeriodTimeline& step = started.session->timeline("facts.step");
     mark_steps(run, step, 4);
     const SessionStop stopped = started.session->stop();
+    const SessionReport report = started.session->report(stopped.record);
 
+    ASSERT_TRUE(report.problems.empty());
     const SushiProfiler::RecordReadResult reread =
         SushiProfiler::read_record(file_text(folder + "/facts.sprec.json"));
     ASSERT_TRUE(reread.ok()) << reread.error;

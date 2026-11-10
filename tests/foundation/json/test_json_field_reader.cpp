@@ -163,5 +163,5 @@ TEST(Small_JsonFieldReader, TheFirstRefusalStays)
 
     EXPECT_FALSE(reader.fail("a later refusal"));
 
-    EXPECT_EQ(reader.error(), "the first refusal");
+    EXPECT_EQ(reader.error(), "document: the first refusal");
 }

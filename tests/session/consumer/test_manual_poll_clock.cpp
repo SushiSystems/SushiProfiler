@@ -41,10 +41,10 @@ using SushiProfiler::ManualPollClock;
 TEST(Small_ManualPollClock, NotesTheLimitOfEachWait)
 {
     ManualPollClock clock;
+    // A wake is one flag, not a count: two wakes before a wait end only that wait.
     clock.wake();
-    clock.wake();
-
     EXPECT_TRUE(clock.wait(std::chrono::milliseconds(3)));
+    clock.wake();
     EXPECT_TRUE(clock.wait(std::chrono::milliseconds(9)));
 
     const std::vector<std::chrono::milliseconds> expected{std::chrono::milliseconds(3),
