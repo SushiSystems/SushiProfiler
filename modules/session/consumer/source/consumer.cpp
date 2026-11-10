@@ -62,6 +62,14 @@ namespace SushiProfiler
 
     }
 
+    Consumer::Consumer(Collector& collector, PeriodAssembler& assembler, const LiveChannel& live,
+                       std::chrono::milliseconds live_slowest, PollClock& clock) noexcept
+        : collector_(collector), assembler_(assembler), live_(&live), live_slowest_(live_slowest),
+          clock_(&clock)
+    {
+
+    }
+
     Consumer::~Consumer()
     {
         stop();
@@ -72,7 +80,7 @@ namespace SushiProfiler
         const std::lock_guard<std::mutex> lock(mutex_);
         if (thread_.joinable())
             return;
-        stopping_ = false;
+        clock_->rearm();
         thread_ = std::thread(&Consumer::run, this);
     }
 
@@ -82,32 +90,19 @@ namespace SushiProfiler
             const std::lock_guard<std::mutex> lock(mutex_);
             if (!thread_.joinable())
                 return;
-            stopping_ = true;
+            clock_->stop();
         }
-        wake_.notify_all();
         thread_.join();
     }
 
     void Consumer::run()
     {
         std::chrono::milliseconds wait = K_FASTEST_POLL;
-        std::unique_lock<std::mutex> lock(mutex_);
-        const auto stopping_or_woken = [this]
+        while (clock_->wait(wait))
         {
-            return stopping_ || woken_;
-        };
-        while (true)
-        {
-            wake_.wait_for(lock, wait, stopping_or_woken);
-            if (stopping_)
-                break;
-            woken_ = false;
-            lock.unlock();
             const double fullest = drain_once();
-            lock.lock();
             wait = next_poll(wait, fullest, slowest_poll());
         }
-        lock.unlock();
         static_cast<void>(drain_once());
         assembler_.finish();
     }
@@ -119,11 +114,7 @@ namespace SushiProfiler
 
     void Consumer::wake()
     {
-        {
-            const std::lock_guard<std::mutex> lock(mutex_);
-            woken_ = true;
-        }
-        wake_.notify_all();
+        clock_->wake();
     }
 
     std::chrono::milliseconds Consumer::slowest_poll() const noexcept

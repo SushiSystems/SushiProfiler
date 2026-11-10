@@ -47,8 +47,14 @@
   retired thread does not hold that back, as three rows of one test), writer switches at a close, and publication (each
   period in order, nothing unwatched, a run cap that leaves the record whole, a period that
   outlives the assembler, publication after the writers and the record, `keep_periods` 0).
-- `test_consumer.cpp` also covers the poll ceiling and a watched consumer's drain rate, and that
-  `wake()` ends a long sleep.
+- `test_consumer.cpp` also covers, on a `ManualPollClock` and a collector of its own on a
+  `ManualTickSource`, with no sleep and no deadline: a watched consumer never asks for a wait over
+  its ceiling in 25 polls, an unwatched one doubles its wait from 1 ms to 1 s, and `wake()` ends a
+  1 s wait at once and the next wait is the ceiling.
+- `test_poll_clock.cpp`: `SteadyPollClock` and `ManualPollClock` each end a wait on a wake, end it
+  with false on a stop and wait again after a rearm.
+- `test_manual_poll_clock.cpp`: `ManualPollClock` lists the limit of each wait.
+- `test_steady_poll_clock.cpp`: `SteadyPollClock` ends a 1 ms wait with true (`Medium_`, real time).
 
 The period assembler and stream writer set tests use `MemorySource` and `MemoryStreamWriter`;
 `test_period_assembler.cpp` keeps a source and a writer of its own that the adapters cannot stand in

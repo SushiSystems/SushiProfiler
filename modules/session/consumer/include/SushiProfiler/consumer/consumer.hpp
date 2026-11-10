@@ -33,13 +33,14 @@
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/collector/drain_batch.hpp>
 #include <SushiProfiler/consumer/period_assembler.hpp>
+#include <SushiProfiler/consumer/poll_clock.hpp>
+#include <SushiProfiler/consumer/steady_poll_clock.hpp>
 #include <SushiProfiler/live/live_channel.hpp>
 #include <SushiProfiler/version/export.hpp>
 
 #include <atomic>
 #include <chrono>
 #include <cstdint>
-#include <condition_variable>
 #include <mutex>
 #include <thread>
 
@@ -82,6 +83,13 @@ namespace SushiProfiler
              */
             Consumer(Collector& collector, PeriodAssembler& assembler, const LiveChannel& live,
                      std::chrono::milliseconds live_slowest) noexcept;
+
+            /**
+             * @brief Like the live constructor, with the waits between drains made through
+             *        @p clock in place of the machine's steady clock; @p clock outlives it too.
+             */
+            Consumer(Collector& collector, PeriodAssembler& assembler, const LiveChannel& live,
+                     std::chrono::milliseconds live_slowest, PollClock& clock) noexcept;
 
             Consumer(const Consumer&) = delete;
             Consumer& operator=(const Consumer&) = delete;
@@ -131,17 +139,14 @@ namespace SushiProfiler
             /// @brief The draining thread.
             std::thread thread_;
 
-            /// @brief Guards stopping_.
+            /// @brief Guards thread_ against two starts or stops at once.
             std::mutex mutex_;
 
-            /// @brief Wakes the thread to stop.
-            std::condition_variable wake_;
+            /// @brief The clock used when none was given: real time.
+            SteadyPollClock own_clock_;
 
-            /// @brief Whether stop() was called.
-            bool stopping_ = false;
-
-            /// @brief Whether wake() was called since the last drain.
-            bool woken_ = false;
+            /// @brief What the thread waits through between drains.
+            PollClock* clock_ = &own_clock_;
 
             /// @brief Drains done; read from other threads.
             std::atomic<std::uint64_t> drains_{0U};

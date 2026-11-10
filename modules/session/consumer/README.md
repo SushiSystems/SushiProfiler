@@ -36,6 +36,13 @@ namespace `SushiProfiler`. The module depends on `clock`, `collector`, `fold`, `
   `LiveView` of the channel exists the ceiling is `live.max_poll_ms`, 4 ms by default, and
   `wake()` ends the current wait so a new viewer is served at once. `drains()` counts the drains
   done, the final one included, so an unwatched idle consumer settles at one a second.
+- `SushiProfiler/consumer/poll_clock.hpp`: `PollClock`, the port the consumer waits through
+  between drains: `wait(limit)` ends at the limit, on `wake()` or on `stop()` and returns false
+  once stopped; `rearm()` undoes a stop. `SteadyPollClock` waits on real time and is what a
+  consumer uses unless it is given another; `ManualPollClock` (`manual_poll_clock.hpp`) is the
+  in-memory adapter: its time moves only through `advance()`, `await_waits(n)` blocks until the
+  consumer has entered its n-th wait and `limits()` lists what each wait asked for. The consumer
+  constructor with a `PollClock&` takes either.
 
 ## How events become periods
 
