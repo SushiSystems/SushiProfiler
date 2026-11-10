@@ -63,7 +63,7 @@ namespace
     }
 
     /// @brief Opens the collector before each test, and closes and empties it after.
-    class Small_Window : public ::testing::Test
+    class Medium_Window : public ::testing::Test
     {
         protected:
             void SetUp() override
@@ -104,16 +104,40 @@ namespace
     };
 } // namespace
 
-TEST(Small_WindowPhases, PlacesEachPeriodInItsCycle)
+namespace
+{
+    /// @brief A period index and the phase the window places it in.
+    struct PhaseRow
+    {
+        std::uint64_t index;
+        WindowPhase phase;
+    };
+} // namespace
+
+class Small_WindowCycle : public ::testing::TestWithParam<PhaseRow>
+{
+};
+
+TEST_P(Small_WindowCycle, APeriodIsPlacedInItsPhaseOfTheCycle)
 {
     const Window window(short_schedule(2U));
-    const std::vector<WindowPhase> expected = {
-        WindowPhase::Skipped, WindowPhase::Waiting, WindowPhase::Warmup, WindowPhase::Active,
-        WindowPhase::Active,  WindowPhase::Waiting, WindowPhase::Warmup, WindowPhase::Active,
-        WindowPhase::Active,  WindowPhase::Done,    WindowPhase::Done};
 
-    for (std::uint64_t index = 0U; index < expected.size(); ++index)
-        EXPECT_EQ(window.phase_of(index), expected[index]) << "period " << index;
+    EXPECT_EQ(window.phase_of(GetParam().index), GetParam().phase);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Small_Periods, Small_WindowCycle,
+    ::testing::Values(PhaseRow{0U, WindowPhase::Skipped}, PhaseRow{1U, WindowPhase::Waiting},
+                      PhaseRow{2U, WindowPhase::Warmup}, PhaseRow{3U, WindowPhase::Active},
+                      PhaseRow{4U, WindowPhase::Active}, PhaseRow{5U, WindowPhase::Waiting},
+                      PhaseRow{6U, WindowPhase::Warmup}, PhaseRow{7U, WindowPhase::Active},
+                      PhaseRow{8U, WindowPhase::Active}, PhaseRow{9U, WindowPhase::Done},
+                      PhaseRow{10U, WindowPhase::Done}));
+
+TEST(Small_WindowPhases, ARecordedPeriodIsRecordedAndAWaitingOneIsNot)
+{
+    const Window window(short_schedule(2U));
+
     EXPECT_TRUE(window.records(2U));
     EXPECT_FALSE(window.records(5U));
 }
@@ -125,7 +149,7 @@ TEST(Small_WindowPhases, RepeatZeroNeverEnds)
     EXPECT_EQ(window.phase_of(1U + 5U * 1000U + 3U), WindowPhase::Active);
 }
 
-TEST_F(Small_Window, WritesTheRecordedMarksAndTheOneAfter)
+TEST_F(Medium_Window, WritesTheRecordedMarksAndTheOneAfter)
 {
     Window window(short_schedule(1U));
     PeriodTimeline timeline("windowed");
@@ -139,33 +163,44 @@ TEST_F(Small_Window, WritesTheRecordedMarksAndTheOneAfter)
     EXPECT_FALSE(Collector::recording());
 }
 
-TEST(Small_WindowPhases, ActiveAllRecordsEveryPeriodAfterWarmup)
+namespace
 {
-    WindowSchedule schedule;
-    schedule.warmup = 3U;
-    schedule.active_all = true;
-    const Window window(schedule);
+    /// @brief Returns a schedule that skips 1, waits 1, warms up 2 and records every period after.
+    WindowSchedule active_all_after_a_lead_in()
+    {
+        WindowSchedule schedule;
+        schedule.skip = 1U;
+        schedule.wait = 1U;
+        schedule.warmup = 2U;
+        schedule.active_all = true;
+        return schedule;
+    }
+} // namespace
 
-    for (std::uint64_t index = 3U; index < 10'000'000U; index += 99'991U)
-        EXPECT_EQ(window.phase_of(index), WindowPhase::Active);
-    EXPECT_EQ(window.phase_of(std::uint64_t{1} << 40U), WindowPhase::Active);
+class Small_WindowActiveAll : public ::testing::TestWithParam<PhaseRow>
+{
+};
+
+TEST_P(Small_WindowActiveAll, SkipWaitAndWarmupApplyOnceThenEveryPeriodIsActive)
+{
+    const Window window(active_all_after_a_lead_in());
+
+    EXPECT_EQ(window.phase_of(GetParam().index), GetParam().phase);
 }
 
-TEST(Small_WindowPhases, ActiveAllAppliesSkipWaitAndWarmupOnce)
-{
-    WindowSchedule schedule;
-    schedule.skip = 1U;
-    schedule.wait = 1U;
-    schedule.warmup = 2U;
-    schedule.active_all = true;
-    const Window window(schedule);
+INSTANTIATE_TEST_SUITE_P(
+    Small_Periods, Small_WindowActiveAll,
+    ::testing::Values(PhaseRow{0U, WindowPhase::Skipped}, PhaseRow{1U, WindowPhase::Waiting},
+                      PhaseRow{2U, WindowPhase::Warmup}, PhaseRow{3U, WindowPhase::Warmup},
+                      PhaseRow{4U, WindowPhase::Active}, PhaseRow{5U, WindowPhase::Active},
+                      PhaseRow{99'994U, WindowPhase::Active},
+                      PhaseRow{10'000'000U, WindowPhase::Active},
+                      PhaseRow{std::uint64_t{1} << 40U, WindowPhase::Active}));
 
-    EXPECT_EQ(window.phase_of(0U), WindowPhase::Skipped);
-    EXPECT_EQ(window.phase_of(1U), WindowPhase::Waiting);
-    EXPECT_EQ(window.phase_of(2U), WindowPhase::Warmup);
-    EXPECT_EQ(window.phase_of(3U), WindowPhase::Warmup);
-    EXPECT_EQ(window.phase_of(4U), WindowPhase::Active);
-    EXPECT_EQ(window.phase_of(5U), WindowPhase::Active);
+TEST(Small_WindowPhases, ActiveAllRecordsFromTheEndOfTheLeadIn)
+{
+    const Window window(active_all_after_a_lead_in());
+
     EXPECT_TRUE(window.records(2U));
     EXPECT_FALSE(window.records(1U));
 }

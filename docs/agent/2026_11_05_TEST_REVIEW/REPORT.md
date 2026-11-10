@@ -76,6 +76,8 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 
 17. M7 group 3 (`session/live`, `session/registry`) split the tests that checked several results, turned the four snapshot changes into rows that serve both the rebuild test and the new `matches` test, and moved the reader loop of the channel test and the publication loop into named helpers. The owed adds `NameSnapshot::sites` and `NameSnapshot::matches` are written. The fake device library in `test_registry.cpp` stays as a fixture of its own, since the guide `docs/guides/CLIENT_LIBRARY.md` quotes it.
 
+18. M7 group 4 (`session/window`, `session/sources`, `session/stream_writers`): the window phases are rows of two tests; the test that drives the process-wide collector is `Medium_Window`. `test_span_sink.cpp` states each refusal as a row (four spans, five attributes) and gains the stored-real test the owed add asks for. The Chrome trace tests are split by event kind and delete their trace file after reading it. Not done: the two `resize` records of `ChromeTraceWriter` (`WritesZonesOnThreadAndLaneRows`, `WritesThePeriodOnItsTimelineRow`), which ask for a seam that builds the trace events apart from the file write, and the `Small_Source` records, whose rewrites `T3` had already applied.
+
 ## Dispatches
 
 dispatch: J15 review, 6 chunks — haiku high, 1 round each, passed, rung 1
