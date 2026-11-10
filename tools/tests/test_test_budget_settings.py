@@ -15,6 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import settings  # noqa: E402
 
+K_TEST_SIZE = "small"
 K_ROOT = Path(__file__).resolve().parents[2]
 K_SKILL = K_ROOT / "skills" / "testing" / "SKILL.md"
 K_HEADING = "## Budget"
@@ -59,23 +60,39 @@ def differences(table: dict[str, int], constants: dict[str, int]) -> list[str]:
 
 
 class TestBudgetSettingsTest(unittest.TestCase):
-    """Reads the real skill when the repository has one, and sample tables otherwise."""
+    """Reads the real skill when the repository has one, and sample tables for the reader."""
 
+    @unittest.skipUnless(K_SKILL.is_file(), "this tree holds no skills/ folder")
     def test_the_skill_table_matches_the_settings(self) -> None:
-        if not K_SKILL.is_file():
-            self.skipTest("this tree holds no skills/ folder")
-        self.assertEqual(differences(read_budget(K_SKILL.read_text(encoding="utf-8")), settings.K_TEST_BUDGET), [])
+        table = read_budget(K_SKILL.read_text(encoding="utf-8"))
 
-    def test_reads_a_number_with_a_thousands_space_and_a_trailing_note(self) -> None:
-        text = ("## Budget\n\n| Limit | Value |\n| --- | --- |\n"
-                "| The whole `large` tier of a repository | 1 800 s |\n"
-                "| A second test program in one module, added by one commit | 0 without the owner |\n"
-                "| A row no key names | 5 |\n\n## Other\n\n| A `small` test | 99 s |\n")
-        self.assertEqual(read_budget(text), {"large_tier_s": 1800, "second_program": 0})
+        self.assertEqual(differences(table, settings.K_TEST_BUDGET), [])
+
+    def test_reads_a_number_with_a_thousands_space(self) -> None:
+        text = "## Budget\n\n| The whole `large` tier of a repository | 1 800 s |\n"
+
+        self.assertEqual(read_budget(text), {"large_tier_s": 1800})
+
+    def test_drops_a_trailing_note_after_the_number(self) -> None:
+        text = ("## Budget\n\n"
+                "| A second test program in one module, added by one commit | 0 without |\n")
+
+        self.assertEqual(read_budget(text), {"second_program": 0})
+
+    def test_ignores_a_row_no_key_names(self) -> None:
+        text = "## Budget\n\n| A row no key names | 5 |\n"
+
+        self.assertEqual(read_budget(text), {})
+
+    def test_ignores_a_row_outside_the_budget_heading(self) -> None:
+        text = "## Other\n\n| A `small` test | 99 s |\n"
+
+        self.assertEqual(read_budget(text), {})
 
     def test_names_each_key_that_differs(self) -> None:
         table = {"small_test_s": 1, "medium_test_s": 10}
         constants = {"small_test_s": 2, "medium_test_s": 10, "large_test_s": 120}
+
         self.assertEqual(differences(table, constants), [
             "large_test_s: the skill says None, settings.py says 120",
             "small_test_s: the skill says 1, settings.py says 2",
