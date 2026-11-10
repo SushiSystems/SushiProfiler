@@ -2,7 +2,7 @@
 # SushiProfiler - https://github.com/sushisystems/sushiprofiler
 # Copyright (c) 2026-present Mustafa Garip & Sushi Systems
 # Licensed under the Apache License 2.0. See LICENSE.
-"""Tests that the console reads nothing until a printer is used, and that help needs no checkout."""
+"""Tests that the console reads nothing until a printer is used, that sushiprofiler wires a lazy one, and that help needs no checkout."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import pytest
 from sushicore.cli_console import LazyConsole
 from typer.testing import CliRunner
 
-from sushiprofiler import cli
+from sushiprofiler import cli, console
 
 
 def _recording_resolver(asked: list[str]):
@@ -36,6 +36,14 @@ class TestALazyConsoleNotYetUsed:
         LazyConsole(_recording_resolver(asked))
 
         assert asked == []
+
+
+@pytest.mark.small
+class TestTheConsoleSushiprofilerWires:
+    """Covers the console that `sushiprofiler.console` wires, through its accessor."""
+
+    def test_sushiprofiler_wires_a_lazy_console(self):
+        assert isinstance(console.wired(), LazyConsole)
 
 
 @pytest.mark.medium

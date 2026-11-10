@@ -42,7 +42,8 @@ sushicore's shared command. `SUSHISTACK_CXX` names a compiler that outranks the 
 
 The console is built on first use, through sushicore's `LazyConsole`. Building it needs this
 repository's `cli/` folder, so building it at import time would make `sp --help` fail outside a
-checkout.
+checkout. `wired()` returns that `LazyConsole` without building it, so a test can check what the
+module wires.
 
 ## env.py
 

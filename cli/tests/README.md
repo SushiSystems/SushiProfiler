@@ -9,8 +9,8 @@ the timeout from it.
 - `test_cli.py`: medium. Each command parses its options and hands them to the project service; the
   help lists every command, `test --all` selects every size, and a failing service becomes the exit code.
 - `test_config.py`: small. The compiler and generator choice, on a `MemoryHost`.
-- `test_console.py`: small, a `LazyConsole` not yet used has built nothing and asked for no folder;
-  medium, `--help` works outside a checkout (it changes the working folder).
+- `test_console.py`: small, a `LazyConsole` not yet used has built nothing and asked for no folder,
+  and `console.wired()` is a `LazyConsole`; medium, `--help` works outside a checkout (it changes the working folder).
 - `test_env.py`: small, without a compiler the environment is the host's, as a copy; medium, a found
   compiler's folder comes first on PATH (it creates the build folder under a temporary folder).
 - `test_host.py`: `HostContract`, the promises of the `Host` port, run on `MemoryHost` (small) and on
