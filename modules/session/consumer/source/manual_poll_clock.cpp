@@ -36,10 +36,12 @@ namespace SushiProfiler
     {
         std::unique_lock<std::mutex> lock(mutex_);
         limits_.push_back(limit);
+        waiting_ = true;
         const std::chrono::milliseconds deadline = elapsed_ + limit;
         entered_.notify_all();
         changed_.wait(lock,
                       [this, deadline] { return stopping_ || woken_ || elapsed_ >= deadline; });
+        waiting_ = false;
         if (stopping_)
             return false;
         woken_ = false;
@@ -77,6 +79,16 @@ namespace SushiProfiler
             elapsed_ += elapsed;
         }
         changed_.notify_all();
+    }
+
+    void ManualPollClock::poll_once()
+    {
+        std::unique_lock<std::mutex> lock(mutex_);
+        entered_.wait(lock, [this] { return waiting_; });
+        const std::size_t waits = limits_.size();
+        elapsed_ += limits_.back();
+        changed_.notify_all();
+        entered_.wait(lock, [this, waits] { return limits_.size() > waits && waiting_; });
     }
 
     void ManualPollClock::await_waits(std::size_t count)

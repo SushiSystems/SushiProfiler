@@ -43,6 +43,7 @@
 #include <SushiProfiler/record/run_record.hpp>
 #include <SushiProfiler/record_writers/record_writer.hpp>
 #include <SushiProfiler/registry/registry.hpp>
+#include <SushiProfiler/session/pause_state.hpp>
 #include <SushiProfiler/sources/source.hpp>
 #include <SushiProfiler/stream_writers/stream_writer.hpp>
 #include <SushiProfiler/version/export.hpp>
@@ -127,6 +128,15 @@ namespace SushiProfiler
                                                     const Registry& registry,
                                                     Collector& collector);
 
+            /**
+             * @brief Starts a session like the overload with a collector, with the consumer's
+             *        waits between drains made through @p poll_clock.
+             * @pre @p collector and @p poll_clock outlive the session.
+             */
+            [[nodiscard]] static SessionStart start(const ProfilerConfig& config,
+                                                    const Registry& registry,
+                                                    Collector& collector, PollClock& poll_clock);
+
             Session(const Session&) = delete;
             Session& operator=(const Session&) = delete;
             Session(Session&&) = delete;
@@ -194,8 +204,15 @@ namespace SushiProfiler
                 bool enabled = true;              /**< Whether report() runs it. */
             };
 
+            /// @brief Starts a session; a null @p poll_clock gives the consumer real time.
+            [[nodiscard]] static SessionStart start_with(const ProfilerConfig& config,
+                                                         const Registry& registry,
+                                                         Collector& collector,
+                                                         PollClock* poll_clock);
+
             /// @brief Builds an idle session of @p config that records into @p collector.
-            Session(const ProfilerConfig& config, const Registry& registry, Collector& collector);
+            Session(const ProfilerConfig& config, const Registry& registry, Collector& collector,
+                    PollClock* poll_clock);
 
             /// @brief Checks the names, makes the parts, opens the collector and starts the run.
             [[nodiscard]] std::string open();
@@ -221,6 +238,7 @@ namespace SushiProfiler
             ProfilerConfig config_;                     /**< The configuration. */
             const Registry& registry_;                  /**< Where parts come from. */
             Collector& collector_;                      /**< What the session records into. */
+            PollClock* poll_clock_;                     /**< The consumer's pacing, or null for real time. */
             mutable std::mutex control_mutex_;          /**< Serialises the control calls. */
             std::shared_ptr<LiveChannel> channel_;      /**< The live channel, for the session's life. */
             std::vector<std::unique_ptr<Source>> sources_; /**< The sources. */
@@ -242,7 +260,7 @@ namespace SushiProfiler
             std::unique_ptr<Consumer> consumer_;        /**< Drains on its own thread. */
             bool holds_slot_ = false;                   /**< Whether this is the running session. */
             bool opened_collector_ = false;             /**< Whether this session opened it. */
-            bool paused_ = false;                       /**< Whether pause() is in effect. */
+            PauseState pause_state_;                    /**< Whether pause() is in effect. */
             bool stopped_ = false;                      /**< Whether stop() ran. */
     };
 } // namespace SushiProfiler

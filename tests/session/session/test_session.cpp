@@ -49,14 +49,18 @@
 #include <vector>
 
 #include <SushiProfiler/checks/verdict.hpp>
+#include <SushiProfiler/clock/manual_tick_source.hpp>
 #include <SushiProfiler/collector/collector.hpp>
 #include <SushiProfiler/compare/compare_records.hpp>
+#include <SushiProfiler/consumer/manual_poll_clock.hpp>
 #include <SushiProfiler/json/json_reader.hpp>
 #include <SushiProfiler/record_json/record_json.hpp>
 #include <SushiProfiler/zones/macros.hpp>
 
 using SushiProfiler::Collector;
 using SushiProfiler::JsonValue;
+using SushiProfiler::ManualPollClock;
+using SushiProfiler::ManualTickSource;
 using SushiProfiler::NamedSettings;
 using SushiProfiler::PeriodRecord;
 using SushiProfiler::PeriodTimeline;
@@ -70,6 +74,15 @@ using SushiProfiler::SessionStart;
 using SushiProfiler::SessionStop;
 using SushiProfiler::ZoneNode;
 using SushiProfiler::ZoneTree;
+
+/// @brief Records the rest of the scope as a zone named @p name in @p collector, with id @p id.
+#define SESSION_TEST_ZONE_IN_ID(id, collector, name)                              \
+    SP_DETAIL_SITE(id, true, name, nullptr, 1, Zone, Add, nullptr);                         \
+    [[maybe_unused]] const ::SushiProfiler::ScopedZone<true> SP_DETAIL_JOIN(sp_zone_, id)(\
+        collector, SP_DETAIL_JOIN(sp_handle_, id))
+
+/// @brief Records the rest of the scope as a zone named @p name in @p collector.
+#define SESSION_TEST_ZONE_IN(collector, name) SESSION_TEST_ZONE_IN_ID(__COUNTER__, collector, name)
 
 namespace
 {
@@ -469,24 +482,53 @@ namespace
     using SushiProfiler::SpanSink;
     using SushiProfiler::WriterSwitch;
 
-    /// @brief Waits up to five seconds for @p condition; returns whether it held.
-    template <class Condition>
-    bool wait_until(Condition condition)
+    /**
+     * @brief A collector on a manual tick source and a manual poll clock: a session started on
+     * them moves only when the test passes time or lets the consumer drain.
+     */
+    class ManualRun final
     {
-        const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-        while (std::chrono::steady_clock::now() < end)
-        {
-            if (condition())
-                return true;
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        }
-        return condition();
-    }
+        public:
+            /// @brief Starts a session of @p config on the collector and the poll clock.
+            [[nodiscard]] SessionStart start(const ProfilerConfig& config, const Registry& registry)
+            {
+                return Session::start(config, registry, collector, clock);
+            }
 
-    /// @brief Sleeps long enough for the periods around it to have length.
-    void breathe()
+            /// @brief Lets @p elapsed pass on the collector's clock.
+            void pass(std::chrono::milliseconds elapsed)
+            {
+                ticks.advance(static_cast<std::uint64_t>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed).count()));
+            }
+
+            /// @brief Lets the consumer drain once and returns when it has.
+            void drain()
+            {
+                clock.poll_once();
+            }
+
+            /// @brief Takes a view of @p session and returns when the drain it woke is done.
+            [[nodiscard]] SushiProfiler::LiveView watch(Session& session)
+            {
+                SushiProfiler::LiveView view = session.live();
+                clock.await_waits(2U);
+                return view;
+            }
+
+            ManualTickSource ticks{1'000'000U}; /**< The collector's time. */
+            Collector collector{ticks};         /**< What the session records into. */
+            ManualPollClock clock;              /**< The consumer's pacing. */
+    };
+
+    /// @brief Marks @p step @p count times, letting a millisecond pass after each mark.
+    void mark_steps(ManualRun& run, PeriodTimeline& step, int count)
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(15));
+        for (int index = 0; index < count; ++index)
+        {
+            static_cast<void>(step.mark());
+            run.pass(std::chrono::milliseconds(1));
+        }
     }
 
     /**
@@ -496,8 +538,9 @@ namespace
     class ProbeSource final : public Source
     {
         public:
-            /// @brief Builds a source that states @p delay_ns.
-            explicit ProbeSource(std::uint64_t delay_ns) noexcept : delay_ns_(delay_ns)
+            /// @brief Builds a source that states @p delay_ns and reads the wish of @p collector.
+            ProbeSource(const Collector& collector, std::uint64_t delay_ns) noexcept
+                : collector_(collector), delay_ns_(delay_ns)
             {
 
             }
@@ -511,7 +554,7 @@ namespace
             /// @brief Notes the flag and adds a track and a name.
             [[nodiscard]] SourceStatus begin(SourceContext& context) override
             {
-                wanted_in_begin = Collector::sources_wanted();
+                wanted_in_begin = collector_.wants_sources();
                 track_ = context.add_track("probe.track");
                 kernel_ = context.intern("probe.kernel");
                 context_ = &context;
@@ -527,7 +570,7 @@ namespace
             /// @brief Notes the flag, sets the fact and hands over the work started in @p period.
             void collect(const PeriodSpan& period, SpanSink& sink) override
             {
-                if (Collector::sources_wanted())
+                if (collector_.wants_sources())
                     wanted_collects.fetch_add(1U);
                 collects.fetch_add(1U);
                 static_cast<void>(sink.set_fact("probe.period", std::to_string(period.index)));
@@ -560,7 +603,7 @@ namespace
             /// @brief Notes the flag.
             void end() override
             {
-                wanted_in_end = Collector::sources_wanted();
+                wanted_in_end = collector_.wants_sources();
             }
 
             /// @brief Queues work that started at the steady time @p start_ns.
@@ -576,6 +619,7 @@ namespace
             std::atomic<std::uint64_t> wanted_collects{0U}; /**< collect() calls that saw the flag. */
 
         private:
+            const Collector& collector_;           /**< The collector whose wish it reads. */
             std::uint64_t delay_ns_;               /**< The stated delay. */
             SourceContext* context_ = nullptr;     /**< The context begin() received. */
             SushiProfiler::TrackID track_ = 0U;    /**< The probe track. */
@@ -632,15 +676,6 @@ namespace
             SourceContext* context_ = nullptr; /**< The context begin() received. */
     };
 
-    /// @brief Returns the steady clock in nanoseconds.
-    std::uint64_t steady_ns()
-    {
-        return static_cast<std::uint64_t>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now().time_since_epoch())
-                .count());
-    }
-
     /// @brief Returns a configuration of every period of timeline @p timeline, no warm-up.
     ProfilerConfig live_config(const char* timeline)
     {
@@ -653,20 +688,23 @@ namespace
     }
 
     /// @brief Registers a `probe` source of @p delay_ns; the last one made is stored in @p made.
-    void add_probe(Registry& registry, std::uint64_t delay_ns, ProbeSource*& made)
+    void add_probe(Registry& registry, const Collector& collector, std::uint64_t delay_ns,
+                   ProbeSource*& made)
     {
         registry.add_source("probe",
-                            [delay_ns, &made](const JsonValue&)
+                            [&collector, delay_ns, &made](const JsonValue&)
                             {
-                                auto source = std::make_unique<ProbeSource>(delay_ns);
+                                auto source = std::make_unique<ProbeSource>(collector, delay_ns);
                                 made = source.get();
                                 return Made<Source>{std::move(source), std::string()};
                             });
     }
 
-    /// @brief Marks @p count periods of @p step with a zone each and returns whether the newest
-    /// closed period @p view shows ever had a lower sequence than one seen before.
-    bool marks_and_watches(PeriodTimeline& step, const LiveView& view, std::uint64_t count)
+    /// @brief Marks @p count periods of @p step with a zone each, drains after each mark and
+    /// returns whether the newest closed period @p view shows ever had a lower sequence than one
+    /// seen before.
+    bool marks_and_watches(ManualRun& run, PeriodTimeline& step, const LiveView& view,
+                           std::uint64_t count)
     {
         std::uint64_t last_sequence = 0U;
         bool went_back = false;
@@ -674,8 +712,10 @@ namespace
         {
             static_cast<void>(step.mark());
             {
-                SP_ZONE("live.zone");
+                SESSION_TEST_ZONE_IN(run.collector, "live.zone");
             }
+            run.pass(std::chrono::milliseconds(1));
+            run.drain();
             const auto latest = view.latest();
             if (latest != nullptr)
             {
@@ -768,6 +808,15 @@ namespace
                            { return period.spans.size() == 1U && period.spans.span(0U).track == track; });
     }
 
+    /// @brief Returns how many spans each of the first @p count periods of @p record holds.
+    std::vector<std::size_t> span_counts(const RunRecord& record, int count)
+    {
+        std::vector<std::size_t> counts;
+        for (int index = 0; index < count; ++index)
+            counts.push_back(record.periods[static_cast<std::size_t>(index)].spans.size());
+        return counts;
+    }
+
     /// @brief Returns whether every period of @p record states `probe.period` as its own index first.
     bool every_period_states_its_index(const RunRecord& record)
     {
@@ -827,22 +876,19 @@ namespace
 
 TEST(Medium_Session, LiveViewShowsEachClosedPeriodWhileTheSessionRuns)
 {
+    ManualRun run;
     const Registry registry;
-    SessionStart started = Session::start(live_config("live.step"), registry);
+    SessionStart started = run.start(live_config("live.step"), registry);
     ASSERT_TRUE(started.ok()) << started.error;
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("live.step");
-    const LiveView view = session.live();
-    const bool went_back = marks_and_watches(step, view, 61U);
-    const bool arrived = wait_until(
-        [&]
-        {
-            const auto latest = view.latest();
-            return latest != nullptr && latest->period.index >= 59U;
-        });
+    const LiveView view = run.watch(session);
+    const bool went_back = marks_and_watches(run, step, view, 61U);
+    const auto latest = view.latest();
     static_cast<void>(session.stop());
 
-    ASSERT_TRUE(arrived);
+    ASSERT_NE(latest, nullptr);
+    EXPECT_EQ(latest->period.index, 59U);
     EXPECT_FALSE(went_back);
     const auto history = view.history(10U);
     ASSERT_EQ(history.size(), 10U);
@@ -852,17 +898,20 @@ TEST(Medium_Session, LiveViewShowsEachClosedPeriodWhileTheSessionRuns)
 
 TEST(Medium_Session, ALiveViewOutlivesTheSessionAndKeepsItsLastPeriods)
 {
+    ManualRun run;
     const Registry registry;
-    SessionStart started = Session::start(live_config("live.step"), registry);
+    SessionStart started = run.start(live_config("live.step"), registry);
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("live.step");
-    const LiveView view = started.session->live();
+    const LiveView view = run.watch(*started.session);
     for (int index = 0; index < 6; ++index)
     {
         static_cast<void>(step.mark());
-        SP_ZONE("live.outlives");
+        SESSION_TEST_ZONE_IN(run.collector, "live.outlives");
+        run.pass(std::chrono::milliseconds(1));
     }
-    ASSERT_TRUE(wait_until([&] { return view.latest() != nullptr; }));
+    run.drain();
+    ASSERT_NE(view.latest(), nullptr);
     static_cast<void>(started.session->stop());
     started.session.reset();
 
@@ -875,51 +924,46 @@ TEST(Medium_Session, ALiveViewOutlivesTheSessionAndKeepsItsLastPeriods)
 
 TEST(Medium_Session, AViewTakenBeforeStopKeepsWorkingAfterRestart)
 {
+    ManualRun run;
     const Registry registry;
-    SessionStart started = Session::start(live_config("live.step"), registry);
+    SessionStart started = run.start(live_config("live.step"), registry);
     ASSERT_TRUE(started.ok()) << started.error;
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("live.step");
-    const LiveView view = session.live();
-    for (int index = 0; index < 8; ++index)
-        static_cast<void>(step.mark());
-    ASSERT_TRUE(wait_until([&] { return view.latest() != nullptr; }));
+    const LiveView view = run.watch(session);
+    mark_steps(run, step, 8);
+    run.drain();
+    ASSERT_NE(view.latest(), nullptr);
     ASSERT_EQ(view.latest()->run, 1U);
     static_cast<void>(session.stop());
 
     ASSERT_EQ(session.restart(), "");
-    for (int index = 0; index < 8; ++index)
-        static_cast<void>(step.mark());
-    const bool second = wait_until(
-        [&]
-        {
-            const auto latest = view.latest();
-            return latest != nullptr && latest->run == 2U;
-        });
+    mark_steps(run, step, 8);
+    run.drain();
+    const auto second = view.latest();
     static_cast<void>(session.stop());
 
-    ASSERT_TRUE(second);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(second->run, 2U);
     EXPECT_TRUE(every_period_in_run(view.history(100U), 2U));
     EXPECT_EQ(view.history(100U).front()->sequence, 0U);
     EXPECT_EQ(view.history(100U).front()->period.index, 0U);
 }
 
-TEST(Medium_Session, KeepsTheLastNPeriodsInTheStoppedRecord)
+TEST(Medium_Session, TheStoppedRecordHoldsKeepPeriodsPeriods)
 {
+    ManualRun run;
     ProfilerConfig config = live_config("keep.step");
     config.record.keep_periods = 5U;
     const Registry registry;
-    SessionStart started = Session::start(config, registry);
+    SessionStart started = run.start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("keep.step");
-    for (int index = 0; index < 31; ++index)
-        static_cast<void>(step.mark());
+    mark_steps(run, step, 31);
 
     const SessionStop stopped = started.session->stop();
 
-    ASSERT_EQ(stopped.record.periods.size(), 5U);
-    EXPECT_EQ(stopped.record.periods.front().index, 25U);
-    EXPECT_EQ(stopped.record.periods.back().index, 29U);
+    EXPECT_EQ(stopped.record.periods.size(), 5U);
 }
 
 namespace
@@ -959,6 +1003,7 @@ TEST_F(Medium_SessionKeepNone, TheLiveViewStillPublishesEveryClosedPeriod)
 
 TEST(Medium_Session, AWriterStartedDisabledWritesNothingUntilEnabledAtABoundary)
 {
+    ManualRun run;
     const std::string folder = ::testing::TempDir() + "sushiprofiler_toggle";
     std::filesystem::remove_all(folder);
     std::ostringstream terminal;
@@ -967,35 +1012,33 @@ TEST(Medium_Session, AWriterStartedDisabledWritesNothingUntilEnabledAtABoundary)
     ProfilerConfig config = live_config("toggle.step");
     config.output = folder;
     config.writers = {NamedSettings{"chrome_trace", parsed(R"({"path": "late.trace.json"})"), false}};
-    SessionStart started = Session::start(config, registry);
+    SessionStart started = run.start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("toggle.step");
-    const LiveView view = session.live();
     for (int index = 0; index < 4; ++index)
     {
         static_cast<void>(step.mark());
-        SP_ZONE("toggle.early");
+        SESSION_TEST_ZONE_IN(run.collector, "toggle.early");
+        run.pass(std::chrono::milliseconds(1));
     }
     static_cast<void>(step.mark());
-    ASSERT_TRUE(wait_until(
-        [&]
-        {
-            const auto latest = view.latest();
-            return latest != nullptr && latest->period.index >= 3U;
-        }));
+    run.pass(std::chrono::milliseconds(1));
+    run.drain();
     EXPECT_FALSE(std::filesystem::exists(folder + "/late.trace.json"));
 
     EXPECT_EQ(session.set_writer_enabled("chrome_trace", true), WriterSwitch::Queued);
     for (int index = 0; index < 6; ++index)
     {
         static_cast<void>(step.mark());
-        SP_ZONE("toggle.late");
+        SESSION_TEST_ZONE_IN(run.collector, "toggle.late");
+        run.pass(std::chrono::milliseconds(1));
     }
     const SessionStop stopped = session.stop();
 
     EXPECT_TRUE(stopped.problems.empty());
     const std::string trace = file_text(folder + "/late.trace.json");
+    std::filesystem::remove_all(folder);
     EXPECT_NE(trace.find("toggle.late"), std::string::npos);
     EXPECT_EQ(trace.find("toggle.early"), std::string::npos);
 }
@@ -1049,160 +1092,240 @@ TEST_F(Medium_SessionToggle, AToggleAfterStopIsNotRecording)
     EXPECT_EQ(session_->set_writer_enabled("chrome_trace", true), WriterSwitch::NotRecording);
 }
 
-TEST(Medium_SessionPause, PauseAndResumeReportWhetherTheyTookEffect)
+TEST(Medium_SessionPause, ADisabledSessionCannotPauseOrResume)
 {
     const Registry registry;
     SessionStart disabled = Session::start(disabled_config(), registry);
     ASSERT_TRUE(disabled.ok()) << disabled.error;
+
     EXPECT_FALSE(disabled.session->pause());
     EXPECT_FALSE(disabled.session->resume());
     static_cast<void>(disabled.session->stop());
-
-    SessionStart started = Session::start(live_config("pause.step"), registry);
-    ASSERT_TRUE(started.ok()) << started.error;
-    Session& session = *started.session;
-    EXPECT_FALSE(session.resume());
-    EXPECT_TRUE(session.pause());
-    EXPECT_FALSE(session.pause());
-    EXPECT_TRUE(session.resume());
-    EXPECT_FALSE(session.resume());
-    static_cast<void>(session.stop());
-    EXPECT_FALSE(session.pause());
 }
 
-TEST(Medium_SessionPause, PauseMarksTheCrossedPeriodsAndResumeRecordsAgain)
+TEST(Medium_SessionPause, ARunningSessionPausesAndResumes)
 {
+    ManualRun run;
     const Registry registry;
-    SessionStart started = Session::start(live_config("pause.step"), registry);
+    SessionStart started = run.start(live_config("pause.step"), registry);
     ASSERT_TRUE(started.ok()) << started.error;
-    Session& session = *started.session;
-    PeriodTimeline& step = session.timeline("pause.step");
 
-    static_cast<void>(step.mark());
-    {
-        SP_ZONE("pause.before");
-    }
-    breathe();
-    static_cast<void>(step.mark());
-    {
-        SP_ZONE("pause.before");
-    }
-    breathe();
-    ASSERT_TRUE(session.pause());
-    breathe();
-    static_cast<void>(step.mark());
-    {
-        SP_ZONE("pause.during");
-    }
-    breathe();
-    static_cast<void>(step.mark());
-    {
-        SP_ZONE("pause.during");
-    }
-    breathe();
-    ASSERT_TRUE(session.resume());
-    static_cast<void>(step.mark());
-    {
-        SP_ZONE("pause.after");
-    }
-    breathe();
-    static_cast<void>(step.mark());
-    {
-        SP_ZONE("pause.after");
-    }
-    breathe();
-    static_cast<void>(step.mark());
-    const SessionStop stopped = session.stop();
-    const RunRecord& record = stopped.record;
+    EXPECT_TRUE(started.session->pause());
+    EXPECT_TRUE(started.session->resume());
+    static_cast<void>(started.session->stop());
+}
 
-    ASSERT_EQ(record.periods.size(), 6U);
-    for (std::size_t index = 0U; index < record.periods.size(); ++index)
+TEST(Medium_SessionPause, AStoppedSessionCannotPause)
+{
+    ManualRun run;
+    const Registry registry;
+    SessionStart started = run.start(live_config("pause.step"), registry);
+    ASSERT_TRUE(started.ok()) << started.error;
+    static_cast<void>(started.session->stop());
+
+    EXPECT_FALSE(started.session->pause());
+}
+
+namespace
+{
+    /// @brief Returns the index of each period of @p record that holds a zone of site @p name.
+    std::vector<std::uint64_t> periods_with_site(const RunRecord& record, const std::string& name)
     {
-        const PeriodRecord& period = record.periods[index];
-        EXPECT_EQ(period.index, index);
-        EXPECT_EQ(is_paused(period), index >= 1U && index <= 3U) << "period " << index;
-        const std::set<std::string> zones = zone_sites(record, period);
-        EXPECT_EQ(zones.count("pause.during"), 0U);
-        EXPECT_EQ(zones.count("pause.after"), index >= 4U ? 1U : 0U);
-        EXPECT_EQ(zones.count("pause.before"), index <= 1U ? 1U : 0U);
+        std::vector<std::uint64_t> indices;
+        for (const PeriodRecord& period : record.periods)
+        {
+            if (zone_sites(record, period).count(name) != 0U)
+                indices.push_back(period.index);
+        }
+        return indices;
     }
+
+    /// @brief Returns the index of each period of @p record that carries the fact `paused`.
+    std::vector<std::uint64_t> paused_indices(const RunRecord& record)
+    {
+        std::vector<std::uint64_t> indices;
+        for (const PeriodRecord& period : record.periods)
+        {
+            if (is_paused(period))
+                indices.push_back(period.index);
+        }
+        return indices;
+    }
+
+    /// @brief Runs six periods, pausing across the second to the fourth, then stops.
+    class Medium_SessionPausedRun : public ::testing::Test
+    {
+        protected:
+            void SetUp() override
+            {
+                SessionStart started = run_.start(live_config("pause.step"), registry_);
+                ASSERT_TRUE(started.ok()) << started.error;
+                Session& session = *started.session;
+                PeriodTimeline& step = session.timeline("pause.step");
+                static_cast<void>(step.mark());
+                {
+                    SESSION_TEST_ZONE_IN(run_.collector, "pause.before");
+                }
+                run_.pass(K_STEP);
+                static_cast<void>(step.mark());
+                {
+                    SESSION_TEST_ZONE_IN(run_.collector, "pause.before");
+                }
+                run_.pass(K_STEP);
+                ASSERT_TRUE(session.pause());
+                run_.pass(K_STEP);
+                static_cast<void>(step.mark());
+                {
+                    SESSION_TEST_ZONE_IN(run_.collector, "pause.during");
+                }
+                run_.pass(K_STEP);
+                static_cast<void>(step.mark());
+                {
+                    SESSION_TEST_ZONE_IN(run_.collector, "pause.during");
+                }
+                run_.pass(K_STEP);
+                ASSERT_TRUE(session.resume());
+                run_.pass(K_STEP);
+                static_cast<void>(step.mark());
+                {
+                    SESSION_TEST_ZONE_IN(run_.collector, "pause.after");
+                }
+                run_.pass(K_STEP);
+                static_cast<void>(step.mark());
+                {
+                    SESSION_TEST_ZONE_IN(run_.collector, "pause.after");
+                }
+                run_.pass(K_STEP);
+                static_cast<void>(step.mark());
+                stopped_ = session.stop();
+            }
+
+            static constexpr std::chrono::milliseconds K_STEP{15}; /**< Time between steps. */
+            ManualRun run_;            /**< The session's collector and clocks. */
+            const Registry registry_;  /**< No parts. */
+            SessionStop stopped_;      /**< What stop() returned. */
+    };
+} // namespace
+
+TEST_F(Medium_SessionPausedRun, KeepsEveryPeriodWithItsIndex)
+{
+    EXPECT_EQ(period_indices(stopped_.record), count_up(6U));
+}
+
+TEST_F(Medium_SessionPausedRun, MarksThePeriodsThePauseCrossed)
+{
+    EXPECT_EQ(paused_indices(stopped_.record), (std::vector<std::uint64_t>{1U, 2U, 3U}));
+}
+
+TEST_F(Medium_SessionPausedRun, RecordsNoZoneWhileThePauseHolds)
+{
+    EXPECT_TRUE(periods_with_site(stopped_.record, "pause.during").empty());
+}
+
+TEST_F(Medium_SessionPausedRun, KeepsTheZonesRecordedBeforeThePause)
+{
+    EXPECT_EQ(periods_with_site(stopped_.record, "pause.before"),
+              (std::vector<std::uint64_t>{0U, 1U}));
+}
+
+TEST_F(Medium_SessionPausedRun, RecordsAgainAfterTheResume)
+{
+    EXPECT_EQ(periods_with_site(stopped_.record, "pause.after"),
+              (std::vector<std::uint64_t>{4U, 5U}));
 }
 
 TEST(Medium_SessionPause, SourcesAreNotWantedWhilePaused)
 {
+    ManualRun run;
     ProbeSource* probe = nullptr;
     Registry registry;
-    add_probe(registry, 0U, probe);
+    add_probe(registry, run.collector, 0U, probe);
     ProfilerConfig config = live_config("pause.step");
     config.sources = {NamedSettings{"probe", parsed("{}")}};
-    EXPECT_FALSE(Collector::sources_wanted());
-    SessionStart started = Session::start(config, registry);
+    EXPECT_FALSE(run.collector.wants_sources());
+    SessionStart started = run.start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     Session& session = *started.session;
     PeriodTimeline& step = session.timeline("pause.step");
-    EXPECT_TRUE(Collector::sources_wanted());
-    for (int index = 0; index < 4; ++index)
-        static_cast<void>(step.mark());
-    ASSERT_TRUE(wait_until([&] { return probe->wanted_collects.load() > 0U; }));
+    EXPECT_TRUE(run.collector.wants_sources());
+    mark_steps(run, step, 4);
+    run.drain();
+    ASSERT_GT(probe->wanted_collects.load(), 0U);
 
     ASSERT_TRUE(session.pause());
-    EXPECT_FALSE(Collector::sources_wanted());
+    EXPECT_FALSE(run.collector.wants_sources());
     ASSERT_TRUE(session.resume());
-    EXPECT_TRUE(Collector::sources_wanted());
+    EXPECT_TRUE(run.collector.wants_sources());
     static_cast<void>(session.stop());
 
-    EXPECT_FALSE(Collector::sources_wanted());
+    EXPECT_FALSE(run.collector.wants_sources());
     ASSERT_NE(probe, nullptr);
     EXPECT_FALSE(probe->wanted_in_begin);
     EXPECT_FALSE(probe->wanted_in_end);
 }
 
-TEST(Medium_Session, ASourceDelayHoldsPeriodsOpenAndLosesNone)
+namespace
 {
-    ProbeSource* probe = nullptr;
-    Registry registry;
-    add_probe(registry, 200'000'000U, probe);
-    ProfilerConfig config = live_config("delay.step");
-    config.sources = {NamedSettings{"probe", parsed("{}")}};
-    SessionStart started = Session::start(config, registry);
-    ASSERT_TRUE(started.ok()) << started.error;
-    Session& session = *started.session;
-    PeriodTimeline& step = session.timeline("delay.step");
-    constexpr int K_PERIODS = 10;
-    std::vector<std::uint64_t> starts;
-    for (int index = 0; index < K_PERIODS + 4; ++index)
+    /// @brief Runs a session whose source states a delay of 200 ms and hands over each period's
+    /// work three periods after the period began, then stops.
+    class Medium_SessionSourceDelay : public ::testing::Test
     {
-        static_cast<void>(step.mark());
-        starts.push_back(steady_ns() + 1'000'000U);
-        if (index >= 3 && index - 3 < K_PERIODS)
-            probe->push(starts[static_cast<std::size_t>(index - 3)]);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-    const SessionStop stopped = session.stop();
+        protected:
+            void SetUp() override
+            {
+                ProbeSource* probe = nullptr;
+                Registry registry;
+                add_probe(registry, run_.collector, 200'000'000U, probe);
+                ProfilerConfig config = live_config("delay.step");
+                config.sources = {NamedSettings{"probe", parsed("{}")}};
+                SessionStart started = run_.start(config, registry);
+                ASSERT_TRUE(started.ok()) << started.error;
+                Session& session = *started.session;
+                PeriodTimeline& step = session.timeline("delay.step");
+                std::vector<std::uint64_t> starts;
+                for (int index = 0; index < K_PERIODS + 4; ++index)
+                {
+                    static_cast<void>(step.mark());
+                    starts.push_back(run_.ticks.now() + 1'000'000U);
+                    if (index >= 3 && index - 3 < K_PERIODS)
+                        probe->push(starts[static_cast<std::size_t>(index - 3)]);
+                    run_.pass(std::chrono::milliseconds(10));
+                    run_.drain();
+                }
+                stopped_ = session.stop();
+            }
 
-    EXPECT_EQ(stopped.record.drops.spans_dropped, 0U);
-    ASSERT_GE(stopped.record.periods.size(), static_cast<std::size_t>(K_PERIODS));
-    for (int index = 0; index < K_PERIODS; ++index)
-    {
-        const PeriodRecord& period = stopped.record.periods[static_cast<std::size_t>(index)];
-        EXPECT_EQ(period.index, static_cast<std::uint64_t>(index));
-        EXPECT_EQ(period.spans.size(), 1U) << "period " << index;
-    }
+            static constexpr int K_PERIODS = 10; /**< Periods whose work is handed over. */
+            ManualRun run_;                      /**< The session's collector and clocks. */
+            SessionStop stopped_;                /**< What stop() returned. */
+    };
+} // namespace
+
+TEST_F(Medium_SessionSourceDelay, LosesNoSpan)
+{
+    EXPECT_EQ(stopped_.record.drops.spans_dropped, 0U);
+}
+
+TEST_F(Medium_SessionSourceDelay, PlacesEachPeriodsSpanInItsPeriod)
+{
+    ASSERT_GE(stopped_.record.periods.size(), static_cast<std::size_t>(K_PERIODS));
+    EXPECT_EQ(span_counts(stopped_.record, K_PERIODS), std::vector<std::size_t>(K_PERIODS, 1U));
 }
 
 TEST(Medium_Session, RefusesASourceDelayAboveTheLimit)
 {
+    ManualRun run;
     ProbeSource* probe = nullptr;
     Registry registry;
-    add_probe(registry, 61'000'000'000U, probe);
+    add_probe(registry, run.collector, 61'000'000'000U, probe);
     ProfilerConfig config = live_config("delay.step");
     config.sources = {NamedSettings{"probe", parsed("{}")}};
 
-    const SessionStart refused = Session::start(config, registry);
+    const SessionStart refused = run.start(config, registry);
 
     EXPECT_FALSE(refused.ok());
     EXPECT_EQ(refused.error, "source \"probe\" states a delay of 61000 ms; the limit is 60000 ms");
-    EXPECT_FALSE(Collector::sources_wanted());
+    EXPECT_FALSE(run.collector.wants_sources());
 }
 
 TEST(Medium_Session, EveryPeriodWindowRecordsAllAfterWarmup)
@@ -1273,14 +1396,11 @@ TEST(Medium_Session, ASourceUsesItsBeginContextInCollect)
                         });
     ProfilerConfig config = live_config("late.step");
     config.sources = {NamedSettings{"late", parsed("{}")}};
-    SessionStart started = Session::start(config, registry);
+    ManualRun run;
+    SessionStart started = run.start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("late.step");
-    for (int index = 0; index < 4; ++index)
-    {
-        static_cast<void>(step.mark());
-        breathe();
-    }
+    mark_steps(run, step, 4);
     const SessionStop stopped = started.session->stop();
 
     ASSERT_TRUE(stopped.problems.empty());
@@ -1295,20 +1415,20 @@ TEST(Medium_Session, ASourceUsesItsBeginContextInCollect)
 TEST(Medium_Session, ASourceFactReachesTheStoppedRecord)
 {
     const std::string folder = ::testing::TempDir() + "sushiprofiler_facts";
+    ManualRun run;
     ProbeSource* probe = nullptr;
     std::ostringstream terminal;
     Registry registry;
     SushiProfiler::register_builtin_writers(registry, terminal);
-    add_probe(registry, 0U, probe);
+    add_probe(registry, run.collector, 0U, probe);
     ProfilerConfig config = live_config("facts.step");
     config.output = folder;
     config.sources = {NamedSettings{"probe", parsed("{}")}};
     config.writers = {NamedSettings{"record", parsed(R"({"path": "facts.sprec.json"})")}};
-    SessionStart started = Session::start(config, registry);
+    SessionStart started = run.start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("facts.step");
-    for (int index = 0; index < 4; ++index)
-        static_cast<void>(step.mark());
+    mark_steps(run, step, 4);
     const SessionStop stopped = started.session->stop();
     const SessionReport report = started.session->report(stopped.record);
 
@@ -1320,20 +1440,20 @@ TEST(Medium_Session, ASourceFactReachesTheStoppedRecord)
 TEST(Medium_Session, ASourceFactReachesTheRecordFile)
 {
     const std::string folder = ::testing::TempDir() + "sushiprofiler_facts_file";
+    ManualRun run;
     ProbeSource* probe = nullptr;
     std::ostringstream terminal;
     Registry registry;
     SushiProfiler::register_builtin_writers(registry, terminal);
-    add_probe(registry, 0U, probe);
+    add_probe(registry, run.collector, 0U, probe);
     ProfilerConfig config = live_config("facts.step");
     config.output = folder;
     config.sources = {NamedSettings{"probe", parsed("{}")}};
     config.writers = {NamedSettings{"record", parsed(R"({"path": "facts.sprec.json"})")}};
-    SessionStart started = Session::start(config, registry);
+    SessionStart started = run.start(config, registry);
     ASSERT_TRUE(started.ok()) << started.error;
     PeriodTimeline& step = started.session->timeline("facts.step");
-    for (int index = 0; index < 4; ++index)
-        static_cast<void>(step.mark());
+    mark_steps(run, step, 4);
     const SessionStop stopped = started.session->stop();
 
     const SushiProfiler::RecordReadResult reread =

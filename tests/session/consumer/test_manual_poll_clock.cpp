@@ -33,6 +33,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <thread>
 #include <vector>
 
 using SushiProfiler::ManualPollClock;
@@ -47,6 +48,25 @@ TEST(Small_ManualPollClock, NotesTheLimitOfEachWait)
     EXPECT_TRUE(clock.wait(std::chrono::milliseconds(9)));
 
     const std::vector<std::chrono::milliseconds> expected{std::chrono::milliseconds(3),
+                                                          std::chrono::milliseconds(9)};
+    EXPECT_EQ(clock.limits(), expected);
+}
+
+TEST(Small_ManualPollClock, PollOnceEndsAWaitAndReturnsOnTheNextOne)
+{
+    ManualPollClock clock;
+    std::thread consumer(
+        [&clock]
+        {
+            static_cast<void>(clock.wait(std::chrono::milliseconds(7)));
+            static_cast<void>(clock.wait(std::chrono::milliseconds(9)));
+        });
+
+    clock.poll_once();
+    clock.stop();
+    consumer.join();
+
+    const std::vector<std::chrono::milliseconds> expected{std::chrono::milliseconds(7),
                                                           std::chrono::milliseconds(9)};
     EXPECT_EQ(clock.limits(), expected);
 }

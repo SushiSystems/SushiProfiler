@@ -9,7 +9,9 @@ and `sites`.
   - `Session::start(config, registry)` returns a `SessionStart`: the session, or why it did not
     start. It records into the process-wide collector; `Session::start(config, registry,
     collector)` records into the `Collector` it is given, and its timelines, window and consumer
-    use that collector.
+    use that collector, and the pause log reads that collector's clock. `Session::start(config,
+    registry, collector, poll_clock)` also makes the consumer's waits between drains through the
+    `PollClock` it is given, so a test lets the consumer drain with `ManualPollClock::poll_once()`.
   - `timeline(name)` returns the session's `PeriodTimeline` of that name, making it on first use.
   - `stop()` returns a `SessionStop`: the `RunRecord`, its newest `record.keep_periods` periods,
     and the problems met outside it.
@@ -21,6 +23,9 @@ and `sites`.
   - `pause()` and `resume()` stop and start recording zones inside a run; period marks are still
     written, a period that crossed the pause carries the fact `paused`, and
     the collector's `wants_sources()` is false while paused. Each returns whether it took effect.
+    `SushiProfiler/session/pause_state.hpp` holds the rule: `PauseState::pause(running)` and
+    `resume(running)` take effect only while the session runs and, for a pause, is not paused, for
+    a resume, is paused.
   - `set_writer_enabled(name, enabled)` switches a stream writer at the next period boundary and
     returns a `WriterSwitch`: `Queued`, `UnknownWriter`, `NotStreaming` for a record writer or
     `NotRecording`.

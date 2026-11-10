@@ -6,4 +6,5 @@
 sushiprofiler_add_module_tests(
     MODULE session
     SOURCES
+        test_pause_state.cpp
         test_session.cpp)

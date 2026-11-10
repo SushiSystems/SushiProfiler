@@ -152,16 +152,11 @@ namespace
                     std::vector<SushiProfiler::Source*>{}, rig.parts());
             }
 
-            /// @brief Lets the consumer through @p polls waits, each ended by advancing the clock
-            ///        by the limit it asked for, and returns once it waits for the next one.
+            /// @brief Lets the consumer through @p polls polls, each ending when its drain is done.
             void poll_through(std::size_t polls)
             {
-                for (std::size_t poll = 1U; poll <= polls; ++poll)
-                {
-                    clock.await_waits(poll);
-                    clock.advance(clock.limits()[poll - 1U]);
-                }
-                clock.await_waits(polls + 1U);
+                for (std::size_t poll = 0U; poll < polls; ++poll)
+                    clock.poll_once();
             }
 
             ManualTickSource ticks{100U};                  /**< The collector's stamps. */

@@ -29,7 +29,7 @@ and one ring per thread that records into it.
   while a session wants it. The session sets it with `set_sources_wanted`: true after its sources
   began, false while the session is paused, true again on resume, and false before its sources
   end.
-- The clock. `stamp()` reads the tick source: TSC ticks when the counter is invariant and steady
+- The clock. `steady_now_ns()` reads the tick source's steady nanoseconds; `stamp()` reads the tick source: TSC ticks when the counter is invariant and steady
   nanoseconds otherwise for `TraceTickSource`, the time it was set to for `ManualTickSource`.
   `DrainBatch::ticks_are_tsc` says which.
 - The rings. `thread_ring()` returns the calling thread's ring, registering it on first use while

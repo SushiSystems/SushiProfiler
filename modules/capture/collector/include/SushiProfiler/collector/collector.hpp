@@ -139,6 +139,12 @@ namespace SushiProfiler
                 return clock_.now();
             }
 
+            /// @brief Returns the steady nanoseconds now, read through the tick source.
+            [[nodiscard]] std::uint64_t steady_now_ns() const noexcept
+            {
+                return clock_.sample().steady_ns;
+            }
+
             /// @brief Returns whether a session wants its sources to measure; one relaxed load.
             [[nodiscard]] bool wants_sources() const noexcept
             {

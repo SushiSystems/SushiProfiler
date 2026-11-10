@@ -70,14 +70,6 @@ namespace SushiProfiler
                                            : "the session following \"" + config.timeline + "\"";
         }
 
-        /// @brief Returns the steady clock in nanoseconds, the clock the pause log keeps.
-        std::uint64_t steady_now_ns() noexcept
-        {
-            const auto since_epoch = std::chrono::steady_clock::now().time_since_epoch();
-            return static_cast<std::uint64_t>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(since_epoch).count());
-        }
-
         /// @brief Returns the mean cost of one read of @p collector's clock, in nanoseconds.
         double measure_read_cost(const Collector& collector) noexcept
         {
@@ -106,15 +98,28 @@ namespace SushiProfiler
     SessionStart Session::start(const ProfilerConfig& config, const Registry& registry,
                                 Collector& collector)
     {
-        std::unique_ptr<Session> session(new Session(config, registry, collector));
+        return start_with(config, registry, collector, nullptr);
+    }
+
+    SessionStart Session::start(const ProfilerConfig& config, const Registry& registry,
+                                Collector& collector, PollClock& poll_clock)
+    {
+        return start_with(config, registry, collector, &poll_clock);
+    }
+
+    SessionStart Session::start_with(const ProfilerConfig& config, const Registry& registry,
+                                     Collector& collector, PollClock* poll_clock)
+    {
+        std::unique_ptr<Session> session(new Session(config, registry, collector, poll_clock));
         const std::string error = session->open();
         if (!error.empty())
             return SessionStart{nullptr, error};
         return SessionStart{std::move(session), std::string()};
     }
 
-    Session::Session(const ProfilerConfig& config, const Registry& registry, Collector& collector)
-        : config_(config), registry_(registry), collector_(collector),
+    Session::Session(const ProfilerConfig& config, const Registry& registry, Collector& collector,
+                     PollClock* poll_clock)
+        : config_(config), registry_(registry), collector_(collector), poll_clock_(poll_clock),
           channel_(std::make_shared<LiveChannel>(config.live.history))
     {
 
@@ -204,24 +209,22 @@ namespace SushiProfiler
     bool Session::pause()
     {
         const std::lock_guard<std::mutex> lock(control_mutex_);
-        if (!running_locked() || paused_)
+        if (!pause_state_.pause(running_locked()))
             return false;
-        pauses_->begin(steady_now_ns());
+        pauses_->begin(collector_.steady_now_ns());
         collector_.hold();
         collector_.set_sources_wanted(false);
-        paused_ = true;
         return true;
     }
 
     bool Session::resume()
     {
         const std::lock_guard<std::mutex> lock(control_mutex_);
-        if (!running_locked() || !paused_)
+        if (!pause_state_.resume(running_locked()))
             return false;
-        pauses_->end(steady_now_ns());
+        pauses_->end(collector_.steady_now_ns());
         collector_.release();
         collector_.set_sources_wanted(true);
-        paused_ = false;
         return true;
     }
 
@@ -260,7 +263,7 @@ namespace SushiProfiler
         records_.clear();
         record_ = RunRecord{};
         opened_collector_ = false;
-        paused_ = false;
+        pause_state_.clear();
     }
 
     std::string Session::open()
@@ -400,9 +403,12 @@ namespace SushiProfiler
         assembler_ = std::make_unique<PeriodAssembler>(
             assembly, record_, collector.names(), collector.sites(), std::move(sources),
             AssemblyParts{*window_, *pauses_, *publisher_, *writer_set_});
-        consumer_ = std::make_unique<Consumer>(
-            collector, *assembler_, *channel_,
-            std::chrono::milliseconds(config_.live.max_poll_ms));
+        const std::chrono::milliseconds live_slowest(config_.live.max_poll_ms);
+        consumer_ = poll_clock_ == nullptr
+                        ? std::make_unique<Consumer>(collector, *assembler_, *channel_,
+                                                     live_slowest)
+                        : std::make_unique<Consumer>(collector, *assembler_, *channel_,
+                                                     live_slowest, *poll_clock_);
         consumer_->start();
         return std::string();
     }
@@ -432,9 +438,9 @@ namespace SushiProfiler
         collector_.set_sources_wanted(false);
         if (followed_ != nullptr)
             followed_->observe(nullptr);
-        if (paused_ && pauses_ != nullptr)
-            pauses_->end(steady_now_ns());
-        paused_ = false;
+        if (pause_state_.paused() && pauses_ != nullptr)
+            pauses_->end(collector_.steady_now_ns());
+        pause_state_.clear();
         if (opened_collector_)
             collector_.close();
         opened_collector_ = false;

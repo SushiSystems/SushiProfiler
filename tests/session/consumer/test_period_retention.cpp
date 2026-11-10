@@ -115,7 +115,8 @@ TEST_P(Small_PeriodRetentionFinalTrim, FinalTrimKeepsTheNewestNInOrder)
 
 INSTANTIATE_TEST_SUITE_P(
     Small_Lists, Small_PeriodRetentionFinalTrim,
-    ::testing::Values(FinalTrimRow{5U, 2U, {3U, 4U}}, FinalTrimRow{10U, 4U, {6U, 7U, 8U, 9U}}));
+    ::testing::Values(FinalTrimRow{5U, 2U, {3U, 4U}}, FinalTrimRow{10U, 4U, {6U, 7U, 8U, 9U}},
+                      FinalTrimRow{30U, 5U, {25U, 26U, 27U, 28U, 29U}}));
 
 TEST(Small_PeriodRetention, AShorterListThanNIsLeftAlone)
 {

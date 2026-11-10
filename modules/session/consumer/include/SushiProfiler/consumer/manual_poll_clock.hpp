@@ -66,6 +66,15 @@ namespace SushiProfiler
             /// @brief Moves the time forward by @p elapsed; a wait whose limit passed ends.
             void advance(std::chrono::milliseconds elapsed);
 
+            /**
+             * @brief Lets the consumer through one poll: waits until it waits, advances the time
+             *        by the limit of that wait, and returns once it has drained and waits again.
+             *
+             * Nothing else may end the consumer's waits meanwhile; a wake() ends one without
+             * this call, so await_waits() the drain it causes first.
+             */
+            void poll_once();
+
             /// @brief Blocks until wait() has been entered @p count times in all.
             void await_waits(std::size_t count);
 
@@ -87,6 +96,9 @@ namespace SushiProfiler
 
             /// @brief The limit of every wait entered.
             std::vector<std::chrono::milliseconds> limits_;
+
+            /// @brief Whether a thread is inside wait().
+            bool waiting_ = false;
 
             /// @brief Whether stop() was called and rearm() has not followed.
             bool stopping_ = false;
