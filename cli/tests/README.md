@@ -17,4 +17,5 @@ the timeout from it.
   `SystemHost` (medium, it reads the real environment).
 - `test_main.py`: medium. `python -m sushiprofiler --help` runs in a child process.
 - `test_package_contract.py`: medium. The `--lean` build, the `package` command and `SUSHISTACK_CXX`.
-- `services/test_project.py`: the command lines the project service hands cmake, ctest and the checkers.
+- `services/test_project.py`: medium. The command lines the project service hands cmake, ctest and the
+  checkers, one test per option; a clean build removes the tree before it configures.

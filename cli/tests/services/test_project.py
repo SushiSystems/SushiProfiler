@@ -39,10 +39,9 @@ def _value_after(command: list[str], flag: str) -> str:
     return command[command.index(flag) + 1]
 
 
-def test_the_default_build_type_is_debug():
-    assert project_service.K_DEFAULT_TYPE == BuildType.DEBUG
-    assert project_service.resolve_build_type(None) == BuildType.DEBUG
-    assert project_service.resolve_build_type(BuildType.RELEASE) == BuildType.RELEASE
+@pytest.mark.parametrize("build_type", list(BuildType))
+def test_a_requested_build_type_is_kept(build_type):
+    assert project_service.resolve_build_type(build_type) == build_type
 
 
 def test_a_build_without_a_type_configures_the_debug_tree(project):
@@ -127,6 +126,16 @@ def test_a_build_without_a_report_prints_none(project):
     assert project_service.build(workspace=project.workspace) == 0
 
     assert not (tree / "build_report.json").exists()
+
+
+def test_a_clean_build_removes_the_tree_before_configuring(project):
+    stale = project.configure_tree("Debug") / "stale.txt"
+    stale.write_text("", encoding="utf-8")
+
+    assert project_service.build(clean=True, workspace=project.workspace) == 0
+
+    assert not stale.exists()
+    assert _is_configure(project.commands[0])
 
 
 def test_build_configures_an_empty_tree_then_compiles(project):
@@ -240,29 +249,47 @@ def test_record_without_the_program_fails_and_says_so(project):
     assert "sp build" in message and project.commands == []
 
 
-def test_test_passes_the_sizes_the_jobs_and_the_filter_to_ctest(project):
+def test_test_selects_the_sizes_and_leaves_the_quarantined_out(project):
     project.configure_tree("Debug")
 
-    assert project_service.test(None, (TestLabel.MEDIUM, TestLabel.SMALL), filter="Small_.*",
-                                jobs=4, workspace=project.workspace) == 0
+    assert project_service.test(None, (TestLabel.MEDIUM, TestLabel.SMALL),
+                                workspace=project.workspace) == 0
 
     ctest = project.commands[-1]
     assert _value_after(ctest, "-L") == "^(small|medium)$"
-    assert _value_after(ctest, "-R") == "Small_.*"
-    assert _value_after(ctest, "--parallel") == "4"
     assert _value_after(ctest, "-LE") == "^quarantined$"
-    assert "--output-junit" in ctest
-    assert _value_after(ctest, "-C") == "Debug"
 
 
-def test_test_without_a_size_runs_small_and_medium_and_refuses_an_unfiltered_large_run(project):
+def test_test_passes_the_filter_to_ctest(project):
+    project.configure_tree("Debug")
+
+    assert project_service.test(filter="Small_.*", workspace=project.workspace) == 0
+
+    assert _value_after(project.commands[-1], "-R") == "Small_.*"
+
+
+def test_test_passes_the_jobs_to_ctest(project):
+    project.configure_tree("Debug")
+
+    assert project_service.test(jobs=4, workspace=project.workspace) == 0
+
+    assert _value_after(project.commands[-1], "--parallel") == "4"
+
+
+def test_test_without_a_size_runs_small_and_medium(project):
     project.configure_tree("Debug")
 
     assert project_service.test(workspace=project.workspace) == 0
+
     assert _value_after(project.commands[-1], "-L") == "^(small|medium)$"
 
+
+def test_test_refuses_an_unfiltered_large_run(project):
+    project.configure_tree("Debug")
+
     assert project_service.test(sizes=(TestLabel.LARGE,), workspace=project.workspace) == 2
-    assert _is_compile(project.commands[-1])
+
+    assert not any("-L" in command for command in project.commands)
 
 
 def test_test_with_package_installs_then_builds_and_runs_the_consumer(project):

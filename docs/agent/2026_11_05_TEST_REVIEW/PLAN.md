@@ -19,7 +19,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | T6 | `tools/testing/check_test_additions.py`, `tools/tests/test_check_test_additions.py` deleted |  | done |
 | M1 | the tests of `capture` (18 files): 17 rewrite, 37 resize, 15 split, 5 delete | T1, T2, T3, T4, T5, T6 | done |
 | M2 | the tests of `cli` (6 files): 23 rewrite, 1 resize, 2 merge | T1, T2, T3, T4, T5, T6 | done |
-| M3 | the tests of `cli/services` (1 file): 28 rewrite, 1 delete | T1, T2, T3, T4, T5, T6 | todo |
+| M3 | the tests of `cli/services` (1 file): 28 rewrite, 1 delete | T1, T2, T3, T4, T5, T6 | done |
 | M4 | the tests of `foundation` (10 files): 12 rewrite, 1 resize, 12 split, 4 delete | T1, T2, T3, T4, T5, T6 | todo |
 | M5 | the tests of `package` (1 file): 1 resize | T1, T2, T3, T4, T5, T6 | todo |
 | M6 | the tests of `record` (34 files): 24 rewrite, 9 split, 10 merge, 4 delete, 1 characterize | T1, T2, T3, T4, T5, T6 | todo |
@@ -30,8 +30,8 @@ writes each add. Nothing in a module job changes production code except a seam a
 
 ## Resume note
 
-M1 and M2 are done and pushed. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
-folder README `cli/tests/README.md`. M3 (`cli/services`, 1 file) is next, then M4 to M10 in table order;
+M1, M2 and M3 are done and pushed. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
+folder README `cli/tests/README.md`. M4 (`foundation`) is next, then M5 to M10 in table order;
 take each module's records from `REPORT.md` by grepping the headings of its test folder and read each
 record range with offset and limit. A test that needs the environment or a `which` takes the `Host`
 port; no test patches `os.environ` or `shutil.which`. Nothing built or ran: the first `sp test` over
