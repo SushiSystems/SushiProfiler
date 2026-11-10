@@ -23,15 +23,17 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M4 | the tests of `foundation` (10 files): 12 rewrite, 1 resize, 12 split, 4 delete | T1, T2, T3, T4, T5, T6 | done |
 | M5 | the tests of `package` (1 file): 1 resize | T1, T2, T3, T4, T5, T6 | done |
 | M6 | the tests of `record` (34 files): 24 rewrite, 9 split, 10 merge, 4 delete, 1 characterize | T1, T2, T3, T4, T5, T6 | done |
-| M7 | the tests of `session` (24 files): 66 rewrite, 6 resize, 26 split, 6 merge, 2 delete | T1, T2, T3, T4, T5, T6 | partial: 24 of 24 files touched; the records that need a clock or a state seam are open (`REPORT.md` decisions 16 to 19, RW-30, RW-31) |
+| M7 | the tests of `session` (24 files): 66 rewrite, 6 resize, 26 split, 6 merge, 2 delete | T1, T2, T3, T4, T5, T6 | done (`REPORT.md` decisions 16 to 20; `StepSource` and `ProbingWriter` stay) |
 | M8 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6 | done |
 | M9 | the tests of `tools/record_tool` (1 file): 5 split | T1, T2, T3, T4, T5, T6 | done |
 | M10 | the tests of `tools/umbrella` (1 file): 1 rewrite | T1, T2, T3, T4, T5, T6 | done |
 
 ## Resume note
 
-M1 to M6 and M8 to M10 are done. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
-folder README `cli/tests/README.md`. M7 (`session`, 24 files) is applied except for the records that need a seam no job built: the two `Consumer` tests on the wall clock (RW-30), the sleeps and the two seam-first `resize` records of `test_session.cpp`, and the two `resize` records of `ChromeTraceWriter` (`REPORT.md` decisions 16 to 19). `StepSource` and `ProbingWriter` stay. A test that needs the environment or a `which` takes the `Host`
+M1 to M10 are done. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
+folder README `cli/tests/README.md`. M7 (`session`, 24 files) is applied: the seams its last records
+asked for were built (`REPORT.md` decision 20; RW-30, RW-31, RW-32). `StepSource` and `ProbingWriter`
+stay. A test that needs the environment or a `which` takes the `Host`
 port; no test patches `os.environ` or `shutil.which`. Nothing built or ran: the first `sp test` over
 `tests/capture` and the first `python -m pytest` over `cli/tests` are still owed. A shared scratchpad is
 used by other agents: name message files with a `prof_` prefix.
