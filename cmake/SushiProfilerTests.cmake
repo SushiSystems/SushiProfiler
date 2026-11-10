@@ -7,8 +7,9 @@
 # tests/<tier>/<module>/, the mirror of its folder under modules/, and build one program there.
 #
 # A test's size is its GoogleTest suite-name prefix: Small_*, Medium_* and Large_*, registered
-# with the label small, medium or large and a timeout of 60, 300 or 900 seconds. A test named
-# in SP_QUARANTINED_TESTS keeps its size and gains the quarantined label.
+# with the label small, medium or large and a timeout of 60, 300 or 900 seconds per case. The cases
+# of a program run in shards per size, <program>.<size>_shard_<i>of<N>. A test named in
+# SP_QUARANTINED_TESTS keeps its size, gains the quarantined label and runs apart.
 # `sp test --label <size>` runs one label.
 
 # Suite.Case names of the intermittent tests, each with its known issue
@@ -22,7 +23,6 @@ if(NOT SP_BUILD_TESTS)
 endif()
 
 enable_testing()
-include(GoogleTest)
 
 # The pinned release is built with the tests, so it shares their configuration and runtime.
 if(NOT TARGET GTest::gtest)
@@ -37,35 +37,102 @@ if(NOT TARGET GTest::gtest)
     FetchContent_MakeAvailable(googletest)
 endif()
 
-# Registers the tests of <program> whose suite opens with each size prefix.
+# The cases one CTest test runs, per size. A process pays its start-up (the runtime, the logger)
+# once, so a case run alone is mostly start-up. A shard runs its share of a program's cases in
+# one process, and the share follows the cost of a case of its size: a small case is a few
+# milliseconds, so 300 of them are a few seconds and the run still spreads over every core; a
+# medium case uses threads or files and takes up to 5 s, so 25 keep a shard well under a minute;
+# a large case takes up to 120 s and runs alone.
+set(SP_SHARD_CASES_SMALL 300)
+set(SP_SHARD_CASES_MEDIUM 25)
+set(SP_SHARD_CASES_LARGE 1)
+
+# Where each shard writes its per-case GoogleTest XML; the time reader reads the folder, so the
+# per-case limits of the testing skill still apply to a case run inside a shard.
+set(SP_GTEST_RESULTS_DIR "${PROJECT_BINARY_DIR}/test_results/gtest")
+
+# Counts the cases of <sources> whose suite opens with <prefix> and sets <out_var> to the count.
+# A TEST_P or TYPED_TEST_P counts once however many instances it gets, so the count is a floor.
+# The suite prefix names the size for TEST_P too, because the suite name of a TEST_P carries it
+# and its instantiation is named Small_<x>/<suite>.<case>/<n>.
+function(sushiprofiler_count_cases out_var prefix)
+    set(count 0)
+    foreach(source IN LISTS ARGN)
+        file(READ "${source}" text)
+        string(REGEX MATCHALL "(TEST|TEST_F|TEST_P|TYPED_TEST|TYPED_TEST_P)[ \t]*[(][ \t\r\n]*${prefix}[A-Za-z0-9_]*"
+            declarations "${text}")
+        list(LENGTH declarations declared)
+        math(EXPR count "${count} + ${declared}")
+    endforeach()
+    set(${out_var} ${count} PARENT_SCOPE)
+endfunction()
+
+# Registers one CTest test that runs <program> with <filter>, as shard <index> of <shards>.
+# GoogleTest splits the filtered cases round-robin by GTEST_TOTAL_SHARDS and GTEST_SHARD_INDEX,
+# and the test writes its per-case XML under SP_GTEST_RESULTS_DIR. GTEST_SHUFFLE and
+# GTEST_RANDOM_SEED of the calling environment reach it.
+function(sushiprofiler_add_shard_test program name filter labels timeout index shards)
+    add_test(NAME ${name}
+        COMMAND ${program} --gtest_filter=${filter}
+            --gtest_output=xml:${SP_GTEST_RESULTS_DIR}/${name}.xml)
+    set_tests_properties(${name} PROPERTIES
+        LABELS "${labels}"
+        TIMEOUT ${timeout}
+        ENVIRONMENT "GTEST_TOTAL_SHARDS=${shards};GTEST_SHARD_INDEX=${index}")
+endfunction()
+
+# Registers the cases of <program> of one size in shards, with the size's label and a timeout of
+# the case timeout times the cases of a shard. The quarantined cases of the size run apart in one
+# test that also carries `quarantined`, and a GoogleTest filter after '-' leaves them out of the
+# shards. <size_group> is "<prefix>|<label>|<case timeout>".
+function(sushiprofiler_register_size_shards program module size_group)
+    string(REPLACE "|" ";" parts "${size_group}")
+    list(GET parts 0 prefix)
+    list(GET parts 1 label)
+    list(GET parts 2 case_timeout)
+    string(TOUPPER "${label}" upper)
+    sushiprofiler_count_cases(cases "${prefix}" ${ARGN})
+
+    # An instantiated suite is named <instance>/<suite>, so each pattern also carries the slash.
+    set(quarantined "")
+    set(quarantined_cases 0)
+    foreach(name IN LISTS SP_QUARANTINED_TESTS)
+        if(name MATCHES "^${prefix}")
+            list(APPEND quarantined "${name}" "*/${name}")
+            math(EXPR quarantined_cases "${quarantined_cases} + 1")
+        endif()
+    endforeach()
+    set(filter "${prefix}*:*/${prefix}*")
+    if(quarantined)
+        list(JOIN quarantined ":" quarantined_filter)
+        string(APPEND filter "-${quarantined_filter}")
+        math(EXPR quarantined_timeout "${case_timeout} * ${quarantined_cases}")
+        sushiprofiler_add_shard_test(${program} ${program}.${label}_quarantined
+            "${quarantined_filter}" "${label};${module};quarantined" ${quarantined_timeout} 0 1)
+        math(EXPR cases "${cases} - ${quarantined_cases}")
+    endif()
+    if(cases LESS 1)
+        return()
+    endif()
+
+    math(EXPR shards "(${cases} + ${SP_SHARD_CASES_${upper}} - 1) / ${SP_SHARD_CASES_${upper}}")
+    math(EXPR shard_cases "(${cases} + ${shards} - 1) / ${shards}")
+    math(EXPR timeout "${case_timeout} * ${shard_cases}")
+    math(EXPR last "${shards} - 1")
+    foreach(index RANGE ${last})
+        sushiprofiler_add_shard_test(${program} ${program}.${label}_shard_${index}of${shards}
+            "${filter}" "${label};${module}" ${timeout} ${index} ${shards})
+    endforeach()
+endfunction()
+
+# Registers the tests of <program> in shards, one block per size: Small_, Medium_ and Large_ with
+# the label small, medium or large and a timeout per case of 60, 300 or 900 seconds. The cases are
+# counted in the source files that follow the module name, given by absolute path. This is the one
+# function that registers shards.
 function(sushiprofiler_register_sized_tests program module)
     set(groups "Small_|small|60" "Medium_|medium|300" "Large_|large|900")
     foreach(group IN LISTS groups)
-        string(REPLACE "|" ";" parts "${group}")
-        list(GET parts 0 prefix)
-        list(GET parts 1 label)
-        list(GET parts 2 timeout)
-
-        set(quarantined "")
-        foreach(name IN LISTS SP_QUARANTINED_TESTS)
-            if(name MATCHES "^${prefix}")
-                list(APPEND quarantined "${name}")
-            endif()
-        endforeach()
-        list(JOIN quarantined ":" quarantined_filter)
-
-        set(filter "${prefix}*")
-        if(quarantined_filter)
-            string(APPEND filter "-${quarantined_filter}")
-            gtest_discover_tests(${program}
-                DISCOVERY_MODE PRE_TEST
-                TEST_FILTER "${quarantined_filter}"
-                PROPERTIES LABELS "${label}\;${module}\;quarantined" TIMEOUT ${timeout})
-        endif()
-        gtest_discover_tests(${program}
-            DISCOVERY_MODE PRE_TEST
-            TEST_FILTER "${filter}"
-            PROPERTIES LABELS "${label}\;${module}" TIMEOUT ${timeout})
+        sushiprofiler_register_size_shards(${program} ${module} "${group}" ${ARGN})
     endforeach()
 endfunction()
 
@@ -93,7 +160,7 @@ endfunction()
 # Called from tests/<tier>/<module>/CMakeLists.txt, with paths relative to that folder. Builds
 # sp_<module>_tests against SushiProfiler::SushiProfiler with tests/ on its include path, so a test
 # reaches tests/support/ as "support/<name>.hpp", copies the DLL beside it, refuses a suite with
-# no size prefix, and registers every test with its size. With SP_BUILD_BENCHMARKS on, each
+# no size prefix, and registers the cases of every size in shards. With SP_BUILD_BENCHMARKS on, each
 # BENCHMARKS file becomes a benchmark program.
 function(sushiprofiler_add_module_tests)
     cmake_parse_arguments(ARG "" "MODULE" "SOURCES;BENCHMARKS" ${ARGN})
@@ -126,7 +193,7 @@ function(sushiprofiler_add_module_tests)
     add_custom_target(${program}_sizes DEPENDS "${stamp}")
     add_dependencies(${program} ${program}_sizes)
 
-    sushiprofiler_register_sized_tests(${program} ${ARG_MODULE})
+    sushiprofiler_register_sized_tests(${program} ${ARG_MODULE} ${sources})
 
     if(SP_BUILD_BENCHMARKS)
         foreach(source IN LISTS ARG_BENCHMARKS)

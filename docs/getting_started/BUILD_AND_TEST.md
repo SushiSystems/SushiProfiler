@@ -43,11 +43,14 @@ and a repository that carries the shared budget reader prints one budget line af
 ```bash
 sp test                                # small and medium
 sp test --label small --label medium   # what a pull request runs
-sp test --filter 'Small_Version.*'     # ctest -R over Suite.Case
+sp test --filter 'sp_version_tests.small'  # ctest -R over the shard names
 sp test --jobs 4                       # four tests at once
 sp test --all                          # every size; the large ones need real hardware
 sp test --package                      # also the consumer of the installed package
 ```
+
+The cases of a program run in CTest tests named `<program>.<size>_shard_<i>of<N>`, so `--filter` is a
+regex over those names; `tests/README.md` describes the shards.
 
 `--package` installs the tree under its `package-prefix/` folder, builds `tests/package/` against it
 and runs its one program.
