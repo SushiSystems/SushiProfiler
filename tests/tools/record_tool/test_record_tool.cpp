@@ -102,99 +102,183 @@ namespace
     }
 } // namespace
 
-TEST(Medium_RecordTool, ValidatesARecordAndRefusesABadOrMissingOne)
+TEST(Medium_RecordTool, ValidateAcceptsAGoodRecordAndNamesItsPeriodsAndThreads)
 {
-    const std::string good = record_file("tool_good.sprec.json", steps_of(100U));
-    const std::string bad =
-        temporary_file("tool_bad.sprec.json", R"({"sushiprofiler_record": 9})");
+    const std::string good = record_file("tool_validate_good.sprec.json", steps_of(100U));
 
     const ToolRun valid = run({"validate", good});
-    const ToolRun invalid = run({"validate", bad});
-    const ToolRun missing = run({"validate", ::testing::TempDir() + "tool_none.sprec.json"});
 
     EXPECT_EQ(valid.code, K_TOOL_OK) << valid.err;
     EXPECT_EQ(valid.out, good + ": valid, 4 periods, 1 threads\n");
+}
+
+TEST(Medium_RecordTool, ValidateFailsOnAnUnsupportedFormatVersion)
+{
+    const std::string bad =
+        temporary_file("tool_validate_bad.sprec.json", R"({"sushiprofiler_record": 9})");
+
+    const ToolRun invalid = run({"validate", bad});
+
     EXPECT_EQ(invalid.code, K_TOOL_FAILED);
     EXPECT_EQ(invalid.err.rfind(bad + ": ", 0U), 0U);
+}
+
+TEST(Medium_RecordTool, ValidateRefusesAMissingFileWithTheUsageCode)
+{
+    const std::string none = ::testing::TempDir() + "tool_validate_none.sprec.json";
+
+    const ToolRun missing = run({"validate", none});
+
     EXPECT_EQ(missing.code, K_TOOL_USAGE);
     EXPECT_NE(missing.err.find("could not be read"), std::string::npos);
 }
 
-TEST(Medium_RecordTool, ShowsTheNamedAnalysesOrRefusesAnUnknownOne)
+TEST(Medium_RecordTool, ShowPrintsOnlyTheNamedAnalysis)
 {
-    const std::string path = record_file("tool_show.sprec.json", steps_of(100U));
+    const std::string path = record_file("tool_show_named.sprec.json", steps_of(100U));
 
     const ToolRun shown = run({"show", path, "--analysis", "distribution", "--top", "3"});
-    const ToolRun defaults = run({"show", path});
-    const ToolRun unknown = run({"show", path, "--analysis", "fastest"});
-    const ToolRun bad_top = run({"show", path, "--top", "zero"});
 
     EXPECT_EQ(shown.code, K_TOOL_OK);
     EXPECT_NE(shown.out.find("== distribution =="), std::string::npos);
     EXPECT_EQ(shown.out.find("== breakdown =="), std::string::npos);
+}
+
+TEST(Medium_RecordTool, ShowPrintsTheDefaultAnalysesWhenNoneIsNamed)
+{
+    const std::string path = record_file("tool_show_default.sprec.json", steps_of(100U));
+
+    const ToolRun defaults = run({"show", path});
+
+    EXPECT_EQ(defaults.code, K_TOOL_OK);
     EXPECT_NE(defaults.out.find("== overhead =="), std::string::npos);
+}
+
+TEST(Medium_RecordTool, ShowRefusesAnUnknownAnalysis)
+{
+    const std::string path = record_file("tool_show_unknown.sprec.json", steps_of(100U));
+
+    const ToolRun unknown = run({"show", path, "--analysis", "fastest"});
+
     EXPECT_EQ(unknown.code, K_TOOL_USAGE);
     EXPECT_NE(unknown.err.find("unknown analysis \"fastest\""), std::string::npos);
+}
+
+TEST(Medium_RecordTool, ShowRefusesATopThatIsNotANumber)
+{
+    const std::string path = record_file("tool_show_top.sprec.json", steps_of(100U));
+
+    const ToolRun bad_top = run({"show", path, "--top", "zero"});
+
     EXPECT_EQ(bad_top.code, K_TOOL_USAGE);
 }
 
-TEST(Medium_RecordTool, ComparesTwoRecordsAndRefusesDifferentBuilds)
+TEST(Medium_RecordTool, CompareNamesTheFasterRecord)
 {
-    const std::string baseline = record_file("tool_base.sprec.json", steps_of(100U));
-    const std::string faster = record_file("tool_fast.sprec.json", steps_of(50U));
-    const std::string debug = record_file("tool_debug.sprec.json", steps_of(50U, "debug"));
+    const std::string baseline = record_file("tool_compare_base.sprec.json", steps_of(100U));
+    const std::string faster = record_file("tool_compare_fast.sprec.json", steps_of(50U));
 
     const ToolRun compared = run({"compare", baseline, faster});
-    const ToolRun refused = run({"compare", baseline, debug});
-    const ToolRun allowed = run({"compare", baseline, debug, "--allow-build-mismatch"});
 
     EXPECT_EQ(compared.code, K_TOOL_OK);
     EXPECT_NE(compared.out.find("== compare =="), std::string::npos);
     EXPECT_NE(compared.out.find("faster"), std::string::npos);
+}
+
+TEST(Medium_RecordTool, CompareRefusesRecordsOfDifferentBuilds)
+{
+    const std::string baseline = record_file("tool_refuse_base.sprec.json", steps_of(100U));
+    const std::string debug = record_file("tool_refuse_debug.sprec.json", steps_of(50U, "debug"));
+
+    const ToolRun refused = run({"compare", baseline, debug});
+
     EXPECT_EQ(refused.code, K_TOOL_FAILED);
     EXPECT_NE(refused.err.find("the builds differ at \"build_type\""), std::string::npos);
+}
+
+TEST(Medium_RecordTool, CompareComparesDifferentBuildsWhenTheMismatchIsAllowed)
+{
+    const std::string baseline = record_file("tool_allow_base.sprec.json", steps_of(100U));
+    const std::string debug = record_file("tool_allow_debug.sprec.json", steps_of(50U, "debug"));
+
+    const ToolRun allowed = run({"compare", baseline, debug, "--allow-build-mismatch"});
+
     EXPECT_EQ(allowed.code, K_TOOL_OK);
 }
 
-TEST(Medium_RecordTool, ChecksARecordAndFailsWhenACheckFails)
+TEST(Medium_RecordTool, CheckPrintsPassForACheckThatHolds)
 {
-    const std::string path = record_file("tool_check.sprec.json", steps_of(100U));
+    const std::string path = record_file("tool_check_pass.sprec.json", steps_of(100U));
     const std::string passing = temporary_file(
-        "tool_pass.json",
+        "tool_check_pass.json",
         R"([{"subject": "timeline:step", "statistic": "median", "at_most_ns": 150}])");
-    const std::string failing = temporary_file(
-        "tool_fail.json",
-        R"([{"subject": "timeline:step", "statistic": "max", "at_most_ns": 90},
-            {"subject": "timeline:step", "statistic": "min", "at_least_ns": 50}])");
-    const std::string broken = temporary_file("tool_broken.json", R"([{"subject": 1}])");
 
     const ToolRun passed = run({"check", path, passing});
-    const ToolRun failed = run({"check", path, failing});
-    const ToolRun refused = run({"check", path, broken});
 
     EXPECT_EQ(passed.code, K_TOOL_OK);
     EXPECT_EQ(passed.out, "pass  timeline:step median = 100\n1 of 1 checks passed\n");
+}
+
+TEST(Medium_RecordTool, CheckFailsWhenOneCheckFails)
+{
+    const std::string path = record_file("tool_check_fail.sprec.json", steps_of(100U));
+    const std::string failing = temporary_file(
+        "tool_check_fail.json",
+        R"([{"subject": "timeline:step", "statistic": "max", "at_most_ns": 90},
+            {"subject": "timeline:step", "statistic": "min", "at_least_ns": 50}])");
+
+    const ToolRun failed = run({"check", path, failing});
+
     EXPECT_EQ(failed.code, K_TOOL_FAILED);
     EXPECT_EQ(failed.out, "FAIL  timeline:step: max is 100 ns, above at most 90 ns\n"
                           "pass  timeline:step min = 100\n1 of 2 checks passed\n");
+}
+
+TEST(Medium_RecordTool, CheckRefusesAFileOfChecksThatDoesNotParse)
+{
+    const std::string path = record_file("tool_check_broken.sprec.json", steps_of(100U));
+    const std::string broken = temporary_file("tool_check_broken.json", R"([{"subject": 1}])");
+
+    const ToolRun refused = run({"check", path, broken});
+
     EXPECT_EQ(refused.code, K_TOOL_USAGE);
     EXPECT_EQ(refused.err, broken + ": checks[0].subject: a string was expected\n");
 }
 
-TEST(Small_RecordTool, ExplainsItsUsage)
+TEST(Small_RecordTool, NoCommandPrintsTheUsageAndExitsWithTheUsageCode)
 {
     const ToolRun empty = run({});
-    const ToolRun help = run({"help"});
-    const ToolRun unknown = run({"plot"});
-    const ToolRun option = run({"validate", "a.json", "--fast"});
-    const ToolRun missing_value = run({"show", "a.json", "--top"});
 
     EXPECT_EQ(empty.code, K_TOOL_USAGE);
     EXPECT_EQ(empty.err.rfind("usage: sp_record", 0U), 0U);
+}
+
+TEST(Small_RecordTool, HelpPrintsTheUsageAndSucceeds)
+{
+    const ToolRun help = run({"help"});
+
     EXPECT_EQ(help.code, K_TOOL_OK);
     EXPECT_EQ(help.out.rfind("usage: sp_record", 0U), 0U);
+}
+
+TEST(Small_RecordTool, AnUnknownCommandIsNamed)
+{
+    const ToolRun unknown = run({"plot"});
+
     EXPECT_EQ(unknown.code, K_TOOL_USAGE);
     EXPECT_EQ(unknown.err.rfind("unknown command \"plot\"", 0U), 0U);
+}
+
+TEST(Small_RecordTool, AnUnknownOptionIsNamed)
+{
+    const ToolRun option = run({"validate", "a.json", "--fast"});
+
     EXPECT_EQ(option.err, "unknown option --fast\n");
+}
+
+TEST(Small_RecordTool, AnOptionWithoutItsValueIsNamed)
+{
+    const ToolRun missing_value = run({"show", "a.json", "--top"});
+
     EXPECT_EQ(missing_value.err, "--top needs a value\n");
 }

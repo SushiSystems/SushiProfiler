@@ -25,12 +25,12 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M6 | the tests of `record` (34 files): 24 rewrite, 9 split, 10 merge, 4 delete, 1 characterize | T1, T2, T3, T4, T5, T6 | todo |
 | M7 | the tests of `session` (24 files): 66 rewrite, 6 resize, 26 split, 6 merge, 2 delete | T1, T2, T3, T4, T5, T6 | todo |
 | M8 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6 | todo |
-| M9 | the tests of `tools/record_tool` (1 file): 5 split | T1, T2, T3, T4, T5, T6 | todo |
-| M10 | the tests of `tools/umbrella` (1 file): 1 rewrite | T1, T2, T3, T4, T5, T6 | todo |
+| M9 | the tests of `tools/record_tool` (1 file): 5 split | T1, T2, T3, T4, T5, T6 | done |
+| M10 | the tests of `tools/umbrella` (1 file): 1 rewrite | T1, T2, T3, T4, T5, T6 | done |
 
 ## Resume note
 
-M1, M2 and M3 are done and pushed. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
+M1, M2, M3, M5, M9 and M10 are done and pushed. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
 folder README `cli/tests/README.md`. M4 (`foundation`) is next, then M5 to M10 in table order;
 take each module's records from `REPORT.md` by grepping the headings of its test folder and read each
 record range with offset and limit. A test that needs the environment or a `which` takes the `Host`
