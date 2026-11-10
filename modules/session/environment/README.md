@@ -13,7 +13,8 @@ module depends on `record`.
   interface a library implements to add its facts: SushiRuntime's adds the device, driver and
   backend, and each library adds its name, tag and commit. `gather_facts(contributors)` starts
   from the host facts and the library's build facts and runs each contributor in order, so a host
-  can set its own `build_type` over the library's.
+  can set its own `build_type` over the library's. `gather_facts(base, contributors)` runs the
+  contributors over facts the caller already holds, and reads no machine.
 
 `compare_records` refuses records whose `build` facts differ, so only facts that change what is
 measured go there.

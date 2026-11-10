@@ -29,10 +29,12 @@
 - `assembly_rig.hpp`: the collaborators of an assembler for a test: a window that records every
   period until given a schedule, a pause log, a live channel and its publisher, and a writer set.
 - `test_period_retention.cpp`: absent keeps all; 0 clears; the list is trimmed when it reaches
-  twice `keep` and exactly at the end; the newest periods stay in order.
-- `test_pause_log.cpp`: overlap across the start and the end of a pause, a boundary touch that
-  is none, an open pause, an idempotent `begin`, forgetting, `ends_after`, the cap, and one
-  writer against two readers.
+  twice `keep` and exactly at the end; rows of one test show the final trim keeping the newest
+  periods in order for 5 periods and a `keep` of 2, and for 10 and 4.
+- `test_pause_log.cpp`: rows of one test for an overlap across the start, across the end and inside
+  a pause, a boundary touch that is none, an open pause, an `end` without a `begin` and a second
+  `begin` that are ignored, forgetting, `ends_after`, the cap, and one writer against two readers
+  (a named driver counts the wrong answers).
 - `test_stream_writer_set.cpp`: a disabled writer is not begun until enabled; a request applies
   only in `apply_requests`; turning off keeps the output open until the end; a failed begin or
   write stops the writer and is named; `end_all` ends each begun writer once; an unknown name is

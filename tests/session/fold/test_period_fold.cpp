@@ -87,18 +87,30 @@ namespace
     }
 } // namespace
 
-TEST(Small_PeriodFold, NestsZonesByTimeAndMergesCalls)
+TEST(Small_PeriodFold, NestsZonesByTime)
 {
     const std::vector<ThreadEvents> threads = {
-        {0U, {zone(2U, 10U, 20U), zone(2U, 30U, 40U), zone(3U, 50U, 60U), zone(1U, 0U, 100U)}}};
+        {0U, {zone(2U, 10U, 20U), zone(3U, 50U, 60U), zone(1U, 0U, 100U)}}};
 
     const PeriodFold fold = SushiProfiler::fold_period(threads);
 
     ASSERT_EQ(fold.zones.size(), 1U);
     expect_nodes(fold.zones[0].nodes,
-                 {node(1U, -1, 100U, 70U, 1U), node(2U, 0, 20U, 20U, 2U),
+                 {node(1U, -1, 100U, 80U, 1U), node(2U, 0, 10U, 10U, 1U),
                   node(3U, 0, 10U, 10U, 1U)});
     EXPECT_TRUE(fold.unmatched.empty());
+}
+
+TEST(Small_PeriodFold, MergesTheCallsOfOneSiteUnderOneParent)
+{
+    const std::vector<ThreadEvents> threads = {
+        {0U, {zone(2U, 10U, 20U), zone(2U, 30U, 40U), zone(1U, 0U, 100U)}}};
+
+    const PeriodFold fold = SushiProfiler::fold_period(threads);
+
+    ASSERT_EQ(fold.zones.size(), 1U);
+    expect_nodes(fold.zones[0].nodes,
+                 {node(1U, -1, 100U, 80U, 1U), node(2U, 0, 20U, 20U, 2U)});
 }
 
 TEST(Small_PeriodFold, OneSiteUnderTwoParentsIsTwoNodes)
@@ -170,8 +182,6 @@ TEST(Small_PeriodFold, FoldsSamplesBySiteThenThread)
          {point(EventKind::Counter, 5U, 10U, SushiProfiler::value_bits(3.0)),
           point(EventKind::Instant, 6U, 12U, 12U),
           point(EventKind::FlowBegin, 7U, 13U, 99U),
-          point(EventKind::PeriodMark, 0U, 14U, 2U),
-          point(EventKind::LaneBegin, 0U, 15U, 0U),
           point(EventKind::Counter, 5U, 20U, SushiProfiler::value_bits(4.5))}},
         {0U,
          {point(EventKind::Value, 5U, 11U, SushiProfiler::value_bits(-1.0)),
@@ -191,6 +201,17 @@ TEST(Small_PeriodFold, FoldsSamplesBySiteThenThread)
     EXPECT_EQ(std::make_pair(flow_end.site, flow_end.thread), std::make_pair(7U, 0U));
     EXPECT_EQ(flow_end.points, std::vector<FlowPoint>{FlowPoint::End});
     EXPECT_EQ(fold.samples[4].items, std::vector<std::uint64_t>{99U});
+}
+
+TEST(Small_PeriodFold, PeriodAndLaneEventsFoldIntoNothing)
+{
+    const std::vector<ThreadEvents> threads = {
+        {1U,
+         {point(EventKind::PeriodMark, 0U, 14U, 2U), point(EventKind::LaneBegin, 0U, 15U, 0U)}}};
+
+    const PeriodFold fold = SushiProfiler::fold_period(threads);
+
+    EXPECT_TRUE(fold.samples.empty());
     EXPECT_TRUE(fold.zones.empty());
 }
 

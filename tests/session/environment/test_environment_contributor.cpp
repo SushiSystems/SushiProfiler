@@ -51,20 +51,9 @@ namespace
         contributor.state_build("build_type", build);
         return contributor;
     }
-
-    /// @brief Returns the value of @p name in @p facts, or an empty string.
-    std::string value_of(const std::vector<Fact>& facts, const std::string& name)
-    {
-        for (const Fact& fact : facts)
-        {
-            if (fact.name == name)
-                return fact.value;
-        }
-        return std::string();
-    }
 } // namespace
 
-TEST(Small_EnvironmentContributor, StartsFromTheHostAndTheLibraryBuild)
+TEST(Medium_EnvironmentContributor, StartsFromTheHostAndTheLibraryBuild)
 {
     const RecordFacts facts = SushiProfiler::gather_facts({});
 
@@ -74,13 +63,16 @@ TEST(Small_EnvironmentContributor, StartsFromTheHostAndTheLibraryBuild)
 
 TEST(Small_EnvironmentContributor, AppliesContributorsInOrderAndTheLastWins)
 {
+    RecordFacts base;
+    base.environment = {{"os", "Linux"}};
+    base.build = {{"compiler", "clang 18"}};
     const MemoryContributor first = library_facts("sushiai v0.4", "debug");
     const MemoryContributor second = library_facts("sushiai v0.5", "release");
 
-    const RecordFacts facts = SushiProfiler::gather_facts({&first, &second});
+    const RecordFacts facts = SushiProfiler::gather_facts(base, {&first, &second});
 
-    EXPECT_EQ(facts.environment.size(), SushiProfiler::host_facts().size() + 1U);
-    EXPECT_EQ(value_of(facts.environment, "library"), "sushiai v0.5");
-    EXPECT_EQ(value_of(facts.build, "build_type"), "release");
-    EXPECT_EQ(facts.build.size(), 2U);
+    EXPECT_EQ(facts.environment,
+              (std::vector<Fact>{{"os", "Linux"}, {"library", "sushiai v0.5"}}));
+    EXPECT_EQ(facts.build,
+              (std::vector<Fact>{{"compiler", "clang 18"}, {"build_type", "release"}}));
 }

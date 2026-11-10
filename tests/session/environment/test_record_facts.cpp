@@ -36,17 +36,25 @@
 
 using SushiProfiler::Fact;
 
-TEST(Small_RecordFacts, SetFactAddsThenReplacesInPlace)
+TEST(Small_RecordFacts, SetFactAppendsAnUnknownName)
 {
     std::vector<Fact> facts = {{"os", "Linux"}};
 
     SushiProfiler::set_fact(facts, "commit", "abc123");
+
+    EXPECT_EQ(facts, (std::vector<Fact>{{"os", "Linux"}, {"commit", "abc123"}}));
+}
+
+TEST(Small_RecordFacts, SetFactReplacesAKnownNameInPlace)
+{
+    std::vector<Fact> facts = {{"os", "Linux"}, {"commit", "abc123"}};
+
     SushiProfiler::set_fact(facts, "os", "Windows");
 
     EXPECT_EQ(facts, (std::vector<Fact>{{"os", "Windows"}, {"commit", "abc123"}}));
 }
 
-TEST(Small_RecordFacts, HostFactsNameTheSystemCPUAndThreads)
+TEST(Medium_RecordFacts, HostFactsNameTheSystemCPUAndThreads)
 {
     const std::vector<Fact> facts = SushiProfiler::host_facts();
 

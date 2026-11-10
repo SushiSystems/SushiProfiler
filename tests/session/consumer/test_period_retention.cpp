@@ -32,6 +32,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <vector>
 
 using SushiProfiler::PeriodRecord;
@@ -47,6 +48,23 @@ namespace
             periods[index].index = index;
         return periods;
     }
+
+    /// @brief Returns the index of each of @p periods, in order.
+    std::vector<std::uint64_t> indexes_of(const std::vector<PeriodRecord>& periods)
+    {
+        std::vector<std::uint64_t> indexes;
+        for (const PeriodRecord& period : periods)
+            indexes.push_back(period.index);
+        return indexes;
+    }
+
+    /// @brief A list of @p total periods, the count to keep and the indexes that must remain.
+    struct FinalTrimRow
+    {
+        std::uint64_t total;
+        std::uint32_t keep;
+        std::vector<std::uint64_t> remaining;
+    };
 } // namespace
 
 TEST(Small_PeriodRetention, AbsentKeepsEverything)
@@ -82,26 +100,22 @@ TEST(Small_PeriodRetention, TrimsToNWhenTheListReachesTwoN)
     EXPECT_EQ(periods.front().index, 3U);
 }
 
-TEST(Small_PeriodRetention, FinalTrimLeavesExactlyN)
+class Small_PeriodRetentionFinalTrim : public ::testing::TestWithParam<FinalTrimRow>
 {
-    std::vector<PeriodRecord> periods = numbered(5U);
+};
 
-    trim_periods(periods, 2U, true);
+TEST_P(Small_PeriodRetentionFinalTrim, FinalTrimKeepsTheNewestNInOrder)
+{
+    std::vector<PeriodRecord> periods = numbered(GetParam().total);
 
-    ASSERT_EQ(periods.size(), 2U);
-    EXPECT_EQ(periods[0].index, 3U);
-    EXPECT_EQ(periods[1].index, 4U);
+    trim_periods(periods, GetParam().keep, true);
+
+    EXPECT_EQ(indexes_of(periods), GetParam().remaining);
 }
 
-TEST(Small_PeriodRetention, KeepsTheNewestPeriodsInOrder)
-{
-    std::vector<PeriodRecord> periods = numbered(10U);
-
-    trim_periods(periods, 4U, true);
-
-    for (std::size_t slot = 0U; slot < periods.size(); ++slot)
-        EXPECT_EQ(periods[slot].index, 6U + slot);
-}
+INSTANTIATE_TEST_SUITE_P(
+    Small_Lists, Small_PeriodRetentionFinalTrim,
+    ::testing::Values(FinalTrimRow{5U, 2U, {3U, 4U}}, FinalTrimRow{10U, 4U, {6U, 7U, 8U, 9U}}));
 
 TEST(Small_PeriodRetention, AShorterListThanNIsLeftAlone)
 {

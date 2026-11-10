@@ -33,28 +33,79 @@
 #include <gtest/gtest.h>
 
 #include <atomic>
+#include <cstdint>
 #include <thread>
+#include <vector>
 
 using SushiProfiler::PauseLog;
 
-TEST(Small_PauseLog, OverlapsAPeriodThatCrossesTheStart)
+namespace
+{
+    /// @brief Adds @p count closed intervals to @p log, interval i from 10 i to 10 i + 5.
+    void add_intervals(PauseLog& log, std::uint64_t count)
+    {
+        for (std::uint64_t index = 0U; index < count; ++index)
+        {
+            log.begin(index * 10U);
+            log.end(index * 10U + 5U);
+        }
+    }
+
+    /// @brief Runs 10 000 intervals against two readers and returns how often a reader saw an
+    /// overlap with [0, 500), which no interval has.
+    int wrong_overlaps_under_concurrent_use(PauseLog& log)
+    {
+        std::atomic<bool> done{false};
+        std::atomic<int> wrong{0};
+        std::vector<std::thread> readers;
+        for (int reader = 0; reader < 2; ++reader)
+        {
+            readers.emplace_back(
+                [&]
+                {
+                    while (!done.load(std::memory_order_acquire))
+                    {
+                        if (log.overlaps(0U, 500U))
+                            wrong.fetch_add(1);
+                        static_cast<void>(log.ends_after(0U));
+                    }
+                });
+        }
+        for (std::uint64_t index = 0U; index < 10'000U; ++index)
+        {
+            log.begin(1'000U + index * 10U);
+            log.end(1'000U + index * 10U + 5U);
+        }
+        done.store(true, std::memory_order_release);
+        for (std::thread& reader : readers)
+            reader.join();
+        return wrong.load();
+    }
+
+    /// @brief The bounds of a period asked about an interval from 100 to 200.
+    struct PeriodRow
+    {
+        std::uint64_t begin;
+        std::uint64_t end;
+    };
+} // namespace
+
+class Small_PauseLogOverlap : public ::testing::TestWithParam<PeriodRow>
+{
+};
+
+TEST_P(Small_PauseLogOverlap, APeriodSharingTimeWithAnIntervalOverlapsIt)
 {
     PauseLog log;
     log.begin(100U);
     log.end(200U);
 
-    EXPECT_TRUE(log.overlaps(50U, 150U));
+    EXPECT_TRUE(log.overlaps(GetParam().begin, GetParam().end));
 }
 
-TEST(Small_PauseLog, OverlapsAPeriodThatCrossesTheEnd)
-{
-    PauseLog log;
-    log.begin(100U);
-    log.end(200U);
-
-    EXPECT_TRUE(log.overlaps(150U, 250U));
-    EXPECT_TRUE(log.overlaps(120U, 130U));
-}
+INSTANTIATE_TEST_SUITE_P(Small_Periods, Small_PauseLogOverlap,
+                         ::testing::Values(PeriodRow{50U, 150U}, PeriodRow{150U, 250U},
+                                           PeriodRow{120U, 130U}));
 
 TEST(Small_PauseLog, ABoundaryTouchIsNotAnOverlap)
 {
@@ -76,13 +127,19 @@ TEST(Small_PauseLog, AnOpenIntervalOverlapsEverythingAfterItsStart)
     EXPECT_FALSE(log.overlaps(0U, 100U));
 }
 
-TEST(Small_PauseLog, BeginIsIdempotentAndEndWithoutBeginIsIgnored)
+TEST(Small_PauseLog, AnEndWithoutABeginIsIgnored)
 {
     PauseLog log;
+
     log.end(10U);
+
     EXPECT_FALSE(log.paused());
     EXPECT_TRUE(log.ends_after(0U).empty());
+}
 
+TEST(Small_PauseLog, ASecondBeginWhileOpenIsIgnored)
+{
+    PauseLog log;
     log.begin(100U);
     log.begin(150U);
     log.end(200U);
@@ -123,11 +180,7 @@ TEST(Small_PauseLog, EndsAfterReturnsOnlyLaterEnds)
 TEST(Small_PauseLog, DropsTheOldestIntervalPastTheCap)
 {
     PauseLog log;
-    for (std::uint64_t index = 0U; index < PauseLog::K_MAX_INTERVALS + 5U; ++index)
-    {
-        log.begin(index * 10U);
-        log.end(index * 10U + 5U);
-    }
+    add_intervals(log, PauseLog::K_MAX_INTERVALS + 5U);
 
     EXPECT_EQ(log.ends_after(0U).size(), PauseLog::K_MAX_INTERVALS);
     EXPECT_FALSE(log.overlaps(0U, 5U));
@@ -136,31 +189,7 @@ TEST(Small_PauseLog, DropsTheOldestIntervalPastTheCap)
 TEST(Medium_PauseLog, ConcurrentBeginEndAndOverlapsAgree)
 {
     PauseLog log;
-    std::atomic<bool> done{false};
-    std::atomic<int> wrong{0};
-    std::vector<std::thread> readers;
-    for (int reader = 0; reader < 2; ++reader)
-    {
-        readers.emplace_back(
-            [&]
-            {
-                while (!done.load(std::memory_order_acquire))
-                {
-                    if (log.overlaps(0U, 500U))
-                        wrong.fetch_add(1);
-                    static_cast<void>(log.ends_after(0U));
-                }
-            });
-    }
-    for (std::uint64_t index = 0U; index < 10'000U; ++index)
-    {
-        log.begin(1'000U + index * 10U);
-        log.end(1'000U + index * 10U + 5U);
-    }
-    done.store(true, std::memory_order_release);
-    for (std::thread& reader : readers)
-        reader.join();
 
-    EXPECT_EQ(wrong.load(), 0);
+    EXPECT_EQ(wrong_overlaps_under_concurrent_use(log), 0);
     EXPECT_FALSE(log.paused());
 }

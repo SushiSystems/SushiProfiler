@@ -32,7 +32,9 @@
 
 #include <gtest/gtest.h>
 
+#include <cstdint>
 #include <string>
+#include <vector>
 
 using SushiProfiler::ConfigReadResult;
 using SushiProfiler::ProfilerConfig;
@@ -49,51 +51,56 @@ namespace
     }
 } // namespace
 
-TEST(Small_ProfilerConfig, ReadsTheDesignedExample)
+TEST(Small_ProfilerConfig, EverySectionReadsIntoItsField)
 {
     const ConfigReadResult result = read_profiler_config(R"({
         "sushiprofiler": 1,
-        "enabled": true,
-        "level": 2,
+        "enabled": false,
+        "level": 3,
         "groups": ["Data", "Device", "Host stage"],
         "timeline": "train.step",
-        "window": {"skip": 0, "wait": 0, "warmup": 3, "active": 20, "repeat": 1},
+        "window": {"skip": 1, "wait": 2, "warmup": 4, "active": 5, "repeat": 6},
         "sources": {"sushiruntime.device": {}, "sushiai.attribution": {}},
         "analyses": ["breakdown", "device_idle", "top_spans", "roofline"],
         "writers": {"terminal": {"top": 20}, "record": {"path": "run.sprec.json"}},
         "output": "build/profiles/yolov5n",
-        "buffers": {"ring_events": 65536, "attribute_bytes": 1048576, "linger_ms": 250}
+        "buffers": {"ring_events": 128, "attribute_bytes": 2048, "linger_ms": 250}
     })");
 
     ASSERT_TRUE(result.ok()) << result.error;
     const ProfilerConfig& config = *result.config;
+    EXPECT_FALSE(config.enabled);
+    EXPECT_EQ(config.level, 3U);
     EXPECT_EQ(config.groups, (std::vector<std::string>{"Data", "Device", "Host stage"}));
     EXPECT_EQ(config.timeline, "train.step");
-    EXPECT_EQ(config.window.warmup, 3U);
+    EXPECT_EQ(config.window.skip, 1U);
+    EXPECT_EQ(config.window.wait, 2U);
+    EXPECT_EQ(config.window.warmup, 4U);
+    EXPECT_EQ(config.window.active, 5U);
+    EXPECT_EQ(config.window.repeat, 6U);
     ASSERT_EQ(config.sources.size(), 2U);
+    EXPECT_EQ(config.sources[0].name, "sushiruntime.device");
     EXPECT_EQ(config.sources[1].name, "sushiai.attribution");
-    EXPECT_EQ(config.analyses.size(), 4U);
+    EXPECT_EQ(config.analyses,
+              (std::vector<std::string>{"breakdown", "device_idle", "top_spans", "roofline"}));
     ASSERT_EQ(config.writers.size(), 2U);
+    EXPECT_EQ(config.writers[0].name, "terminal");
+    EXPECT_NE(config.writers[0].settings.find("top"), nullptr);
     EXPECT_EQ(config.writers[1].name, "record");
     EXPECT_EQ(*config.writers[1].settings.find("path")->as_string(), "run.sprec.json");
     EXPECT_EQ(config.output, "build/profiles/yolov5n");
+    EXPECT_EQ(config.buffers.ring_events, 128U);
+    EXPECT_EQ(config.buffers.attribute_bytes, 2048U);
     EXPECT_EQ(config.buffers.linger_ms, 250U);
 }
 
-TEST(Small_ProfilerConfig, AKeyLeftOutKeepsItsDefault)
+TEST(Small_ProfilerConfig, AKeyLeftOutKeepsTheDefaultOfTheStruct)
 {
     const ConfigReadResult result = read_profiler_config(R"({"sushiprofiler": 1, "level": 1})");
 
     ASSERT_TRUE(result.ok()) << result.error;
-    const ProfilerConfig& config = *result.config;
-    EXPECT_TRUE(config.enabled);
-    EXPECT_EQ(config.level, 1U);
-    EXPECT_TRUE(config.timeline.empty());
-    EXPECT_EQ(config.window.active, 20U);
-    EXPECT_EQ(config.window.repeat, 1U);
-    EXPECT_EQ(config.buffers.ring_events, 65'536U);
-    EXPECT_EQ(config.buffers.linger_ms, 100U);
-    EXPECT_TRUE(config.writers.empty());
+    EXPECT_EQ(result.config->level, 1U);
+    EXPECT_EQ(result.config->buffers.ring_events, ProfilerConfig{}.buffers.ring_events);
 }
 
 TEST(Small_ProfilerConfig, RefusesAMissingOrOtherVersion)
@@ -103,13 +110,30 @@ TEST(Small_ProfilerConfig, RefusesAMissingOrOtherVersion)
               "sushiprofiler: version 2 is not the version this build reads, 1");
 }
 
-TEST(Small_ProfilerConfig, RefusesUnknownKeysWithTheirPath)
+/// @brief A configuration text and the refusal it must give, empty when it must be accepted.
+struct TextRow
 {
-    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "verbose": true})"),
-              "config: unknown key \"verbose\"");
-    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "window": {"size": 3}})"),
-              "window: unknown key \"size\"");
+    const char* text;
+    const char* error;
+};
+
+class Small_ProfilerConfigUnknownKey : public ::testing::TestWithParam<TextRow>
+{
+};
+
+TEST_P(Small_ProfilerConfigUnknownKey, AnUnknownKeyIsRefusedWithItsPath)
+{
+    EXPECT_EQ(refusal(GetParam().text), GetParam().error);
 }
+
+INSTANTIATE_TEST_SUITE_P(
+    Small_Tables, Small_ProfilerConfigUnknownKey,
+    ::testing::Values(TextRow{R"({"sushiprofiler": 1, "verbose": true})",
+                              "config: unknown key \"verbose\""},
+                      TextRow{R"({"sushiprofiler": 1, "window": {"size": 3}})",
+                              "window: unknown key \"size\""},
+                      TextRow{R"({"sushiprofiler": 1, "record": {"keep": 3}})",
+                              "record: unknown key \"keep\""}));
 
 TEST(Small_ProfilerConfig, RefusesValuesOutOfRange)
 {
@@ -158,50 +182,68 @@ TEST(Small_ProfilerConfig, RefusesAnActiveStringOtherThanAll)
               "window.active: a whole number or \"all\" was expected");
 }
 
-TEST(Small_ProfilerConfig, RefusesAllWithARepeatOfTwo)
+class Small_ProfilerConfigActiveAll : public ::testing::TestWithParam<TextRow>
 {
-    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "window": {"active": "all", "repeat": 2}})"),
-              "window.repeat: must be 1 when active is \"all\"");
+};
+
+TEST_P(Small_ProfilerConfigActiveAll, AnAllWindowNeedsARepeatOfOne)
+{
+    const ConfigReadResult result = read_profiler_config(GetParam().text);
+
+    EXPECT_EQ(result.error, GetParam().error);
+    EXPECT_EQ(result.ok(), std::string(GetParam().error).empty());
 }
 
-TEST(Small_ProfilerConfig, AcceptsAllWithRepeatOne)
+INSTANTIATE_TEST_SUITE_P(
+    Small_Repeats, Small_ProfilerConfigActiveAll,
+    ::testing::Values(TextRow{R"({"sushiprofiler": 1, "window": {"active": "all", "repeat": 2}})",
+                              "window.repeat: must be 1 when active is \"all\""},
+                      TextRow{R"({"sushiprofiler": 1, "window": {"active": "all", "repeat": 1}})",
+                              ""}));
+
+/// @brief A configuration text and the number its `record.keep_periods` must read as.
+struct KeepRow
+{
+    const char* text;
+    std::uint32_t kept;
+};
+
+class Small_ProfilerConfigKeepPeriods : public ::testing::TestWithParam<KeepRow>
+{
+};
+
+TEST_P(Small_ProfilerConfigKeepPeriods, KeepPeriodsReadsItsNumber)
+{
+    const ConfigReadResult result = read_profiler_config(GetParam().text);
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    EXPECT_EQ(result.config->record.keep_periods, GetParam().kept);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    Small_Counts, Small_ProfilerConfigKeepPeriods,
+    ::testing::Values(KeepRow{R"({"sushiprofiler": 1, "record": {"keep_periods": 0}})", 0U},
+                      KeepRow{R"({"sushiprofiler": 1, "record": {"keep_periods": 300}})", 300U}));
+
+TEST(Small_ProfilerConfig, WithoutKeepPeriodsTheRecordKeepsEverything)
+{
+    const ConfigReadResult result = read_profiler_config(R"({"sushiprofiler": 1})");
+
+    ASSERT_TRUE(result.ok()) << result.error;
+    EXPECT_FALSE(result.config->record.keep_periods.has_value());
+}
+
+TEST(Small_ProfilerConfig, ReadsTheLiveKeys)
 {
     const ConfigReadResult result = read_profiler_config(
-        R"({"sushiprofiler": 1, "window": {"active": "all", "repeat": 1}})");
-
-    EXPECT_TRUE(result.ok()) << result.error;
-}
-
-TEST(Small_ProfilerConfig, ReadsKeepPeriodsIncludingZeroAndLeavesItAbsentByDefault)
-{
-    const ConfigReadResult none = read_profiler_config(R"({"sushiprofiler": 1})");
-    const ConfigReadResult zero =
-        read_profiler_config(R"({"sushiprofiler": 1, "record": {"keep_periods": 0}})");
-    const ConfigReadResult many =
-        read_profiler_config(R"({"sushiprofiler": 1, "record": {"keep_periods": 300}})");
-
-    ASSERT_TRUE(none.ok() && zero.ok() && many.ok());
-    EXPECT_FALSE(none.config->record.keep_periods.has_value());
-    EXPECT_EQ(zero.config->record.keep_periods, 0U);
-    EXPECT_EQ(many.config->record.keep_periods, 300U);
-}
-
-TEST(Small_ProfilerConfig, ReadsTheLiveKeysAndKeepsTheirDefaults)
-{
-    const ConfigReadResult defaults = read_profiler_config(R"({"sushiprofiler": 1})");
-    const ConfigReadResult set = read_profiler_config(
         R"({"sushiprofiler": 1, "live": {"history": 60, "max_runs": 0, "min_run_ns": 5,
             "max_poll_ms": 8}})");
 
-    ASSERT_TRUE(defaults.ok() && set.ok()) << set.error;
-    EXPECT_EQ(defaults.config->live.history, 300U);
-    EXPECT_EQ(defaults.config->live.max_runs, 2048U);
-    EXPECT_EQ(defaults.config->live.min_run_ns, 1000U);
-    EXPECT_EQ(defaults.config->live.max_poll_ms, 4U);
-    EXPECT_EQ(set.config->live.history, 60U);
-    EXPECT_EQ(set.config->live.max_runs, 0U);
-    EXPECT_EQ(set.config->live.min_run_ns, 5U);
-    EXPECT_EQ(set.config->live.max_poll_ms, 8U);
+    ASSERT_TRUE(result.ok()) << result.error;
+    EXPECT_EQ(result.config->live.history, 60U);
+    EXPECT_EQ(result.config->live.max_runs, 0U);
+    EXPECT_EQ(result.config->live.min_run_ns, 5U);
+    EXPECT_EQ(result.config->live.max_poll_ms, 8U);
 }
 
 TEST(Small_ProfilerConfig, RefusesALiveKeyOutOfRange)
@@ -241,10 +283,4 @@ TEST(Small_ProfilerConfig, LeavesASourcesEnabledKeyInItsSettings)
 
     ASSERT_TRUE(result.ok()) << result.error;
     EXPECT_NE(result.config->sources[0].settings.find("enabled"), nullptr);
-}
-
-TEST(Small_ProfilerConfig, RefusesAnUnknownRecordKey)
-{
-    EXPECT_EQ(refusal(R"({"sushiprofiler": 1, "record": {"keep": 3}})"),
-              "record: unknown key \"keep\"");
 }

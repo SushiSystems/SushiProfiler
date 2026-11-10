@@ -23,7 +23,7 @@ writes each add. Nothing in a module job changes production code except a seam a
 | M4 | the tests of `foundation` (10 files): 12 rewrite, 1 resize, 12 split, 4 delete | T1, T2, T3, T4, T5, T6 | done |
 | M5 | the tests of `package` (1 file): 1 resize | T1, T2, T3, T4, T5, T6 | done |
 | M6 | the tests of `record` (34 files): 24 rewrite, 9 split, 10 merge, 4 delete, 1 characterize | T1, T2, T3, T4, T5, T6 | done |
-| M7 | the tests of `session` (24 files): 66 rewrite, 6 resize, 26 split, 6 merge, 2 delete | T1, T2, T3, T4, T5, T6 | todo |
+| M7 | the tests of `session` (24 files): 66 rewrite, 6 resize, 26 split, 6 merge, 2 delete | T1, T2, T3, T4, T5, T6 | partial: 8 of 24 files |
 | M8 | the tests of `tools` (2 files): 1 rewrite, 2 resize, 1 split, 5 delete | T1, T2, T3, T4, T5, T6 | done |
 | M9 | the tests of `tools/record_tool` (1 file): 5 split | T1, T2, T3, T4, T5, T6 | done |
 | M10 | the tests of `tools/umbrella` (1 file): 1 rewrite | T1, T2, T3, T4, T5, T6 | done |
@@ -31,8 +31,12 @@ writes each add. Nothing in a module job changes production code except a seam a
 ## Resume note
 
 M1 to M6 and M8 to M10 are done. M2 added the `Host` port to `cli` (`REPORT.md` decision 11) and the
-folder README `cli/tests/README.md`. M7 (`session`, 24 files) is next;
-take each module's records from `REPORT.md` by grepping the headings of its test folder and read each
+folder README `cli/tests/README.md`. M7 (`session`, 24 files) is under way: `config`, `consumer/test_pause_log.cpp`,
+`consumer/test_period_retention.cpp`, `environment` and `fold` are done (`REPORT.md` decision 15). Still to do, in
+this order: `consumer/test_stream_writer_set.cpp`, `consumer/test_period_assembler.cpp` (the largest: 30 of its tests
+use spies of `Source` and `StreamWriter` that `MemorySource` and `MemoryStreamWriter` replace; `StepSource` and
+`ProbingWriter` stay), `consumer/test_consumer.cpp` (clock-injected rewrites), `live`, `registry`, `session`,
+`sources`, `stream_writers` and `window`. Take each module's records from `REPORT.md` by grepping the headings of its test folder and read each
 record range with offset and limit. A test that needs the environment or a `which` takes the `Host`
 port; no test patches `os.environ` or `shutil.which`. Nothing built or ran: the first `sp test` over
 `tests/capture` and the first `python -m pytest` over `cli/tests` are still owed. A shared scratchpad is

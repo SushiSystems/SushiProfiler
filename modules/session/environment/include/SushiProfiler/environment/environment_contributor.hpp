@@ -55,4 +55,13 @@ namespace SushiProfiler
      */
     [[nodiscard]] SUSHIPROFILER_API RecordFacts gather_facts(
         const std::vector<const EnvironmentContributor*>& contributors);
+
+    /**
+     * @brief Returns @p base with each contributor's facts set in order.
+     *
+     * The one-argument overload calls it with the host's facts and this library's build; a caller
+     * that already holds the base facts, such as a test, reads no machine.
+     */
+    [[nodiscard]] SUSHIPROFILER_API RecordFacts gather_facts(
+        RecordFacts base, const std::vector<const EnvironmentContributor*>& contributors);
 } // namespace SushiProfiler

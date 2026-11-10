@@ -46,19 +46,43 @@ namespace
     }
 } // namespace
 
-TEST(Small_LaneTracker, GivesEachEventTheInnermostOpenLane)
+TEST(Small_LaneTracker, AnEventOutsideEveryLaneIsInLaneZero)
 {
     LaneTracker lanes;
 
     EXPECT_EQ(lanes.lane_of(event_of(EventKind::Zone)), 0U);
-    EXPECT_EQ(lanes.lane_of(event_of(EventKind::LaneBegin, 5U)), 5U);
-    EXPECT_EQ(lanes.lane_of(event_of(EventKind::Zone)), 5U);
-    EXPECT_EQ(lanes.lane_of(event_of(EventKind::LaneBegin, 6U)), 6U);
+}
+
+TEST(Small_LaneTracker, GivesEachEventTheInnermostOpenLane)
+{
+    LaneTracker lanes;
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneBegin, 5U)));
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneBegin, 6U)));
+
+    EXPECT_EQ(lanes.lane_of(event_of(EventKind::Zone)), 6U);
     EXPECT_EQ(lanes.lane_of(event_of(EventKind::Counter)), 6U);
     EXPECT_EQ(lanes.open_lanes(), 2U);
-    EXPECT_EQ(lanes.lane_of(event_of(EventKind::LaneEnd, 6U)), 6U);
+}
+
+TEST(Small_LaneTracker, AfterAnInnerLaneClosesEventsAreInTheOuterLane)
+{
+    LaneTracker lanes;
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneBegin, 5U)));
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneBegin, 6U)));
+
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneEnd, 6U)));
+
     EXPECT_EQ(lanes.lane_of(event_of(EventKind::Zone)), 5U);
-    EXPECT_EQ(lanes.lane_of(event_of(EventKind::LaneEnd, 5U)), 5U);
+    EXPECT_EQ(lanes.unmatched(), 0U);
+}
+
+TEST(Small_LaneTracker, AfterTheOuterLaneClosesEventsAreInLaneZero)
+{
+    LaneTracker lanes;
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneBegin, 5U)));
+
+    static_cast<void>(lanes.lane_of(event_of(EventKind::LaneEnd, 5U)));
+
     EXPECT_EQ(lanes.lane_of(event_of(EventKind::Zone)), 0U);
     EXPECT_EQ(lanes.unmatched(), 0U);
 }

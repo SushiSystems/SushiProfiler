@@ -60,8 +60,26 @@ TEST(Small_RecordClock, MapsTicksThroughTheCalibration)
     const RecordClock clock = tsc_clock();
 
     EXPECT_EQ(clock.from_ticks(2'000U), 500U);
+}
+
+TEST(Small_RecordClock, ATickBeforeTheOriginMapsToZero)
+{
+    const RecordClock clock = tsc_clock();
+
     EXPECT_EQ(clock.from_ticks(1'000U), 0U);
+}
+
+TEST(Small_RecordClock, MapsSteadyTimeThroughTheOrigin)
+{
+    const RecordClock clock = tsc_clock();
+
     EXPECT_EQ(clock.from_steady(5'750U), 750U);
+}
+
+TEST(Small_RecordClock, ASteadyTimeBeforeTheOriginMapsToZero)
+{
+    const RecordClock clock = tsc_clock();
+
     EXPECT_EQ(clock.from_steady(4'000U), 0U);
 }
 
@@ -72,18 +90,32 @@ TEST(Small_RecordClock, TakesSteadyTicksAsTheyAre)
     EXPECT_EQ(clock.from_ticks(350U), 250U);
 }
 
-TEST(Small_RecordClock, ConvertsOnlyTheFieldsThatHoldTimes)
+TEST(Small_RecordClock, AZoneConvertsBothOfItsTimes)
 {
     const RecordClock clock = tsc_clock();
 
     const TraceEvent zone = clock.to_record(event_of(EventKind::Zone, 2'000U, 3'000U));
-    const TraceEvent external = clock.to_record(event_of(EventKind::ExternalZone, 5'100U, 5'200U));
-    const TraceEvent counter = clock.to_record(event_of(EventKind::Counter, 2'000U, 77U));
 
     EXPECT_EQ(zone.begin, 500U);
     EXPECT_EQ(zone.end, 1'000U);
+}
+
+TEST(Small_RecordClock, AnExternalZoneConvertsBothOfItsTimesFromSteadyTime)
+{
+    const RecordClock clock = tsc_clock();
+
+    const TraceEvent external = clock.to_record(event_of(EventKind::ExternalZone, 5'100U, 5'200U));
+
     EXPECT_EQ(external.begin, 100U);
     EXPECT_EQ(external.end, 200U);
+}
+
+TEST(Small_RecordClock, ACounterConvertsOnlyItsTime)
+{
+    const RecordClock clock = tsc_clock();
+
+    const TraceEvent counter = clock.to_record(event_of(EventKind::Counter, 2'000U, 77U));
+
     EXPECT_EQ(counter.begin, 500U);
     EXPECT_EQ(counter.end, 77U);
     EXPECT_EQ(counter.site_word, SushiProfiler::pack_site(EventKind::Counter, 4U));

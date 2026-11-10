@@ -70,6 +70,8 @@ The owner delegated these decisions on 2026-11-05. Each ruling below is final fo
 
 14. The owner ruled on 2026-11-10 that `sushiprofiler.console` gets a small public read-only accessor. `wired()` returns the `LazyConsole` that `current()` builds the console from, and builds nothing. `test_console.py` asserts through it that sushiprofiler wires a `LazyConsole`, which closes the "stays unobserved" of decision 11. It does not assert that the console is unbuilt, since other tests in the same process may have built it.
 
+15. M7 group 1 (config, pause log, period retention, environment, fold) took one seam and one resize. `gather_facts(RecordFacts base, contributors)` is an overload whose default keeps today's behaviour (decision 1): the one-argument call builds the host and build facts and passes them in, so the "last contributor wins" test holds its own base facts and reads no machine. The test that the facts start from the host and the library build, and the host-facts test, are `Medium_` since they read the machine. `PauseLog` holds a mutex and cannot be returned, so its cap test fills one through a named helper. The rows of `test_profiler_config.cpp` take a configuration text and its refusal; an accepted text has an empty refusal.
+
 ## Dispatches
 
 dispatch: J15 review, 6 chunks — haiku high, 1 round each, passed, rung 1

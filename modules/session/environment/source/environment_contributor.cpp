@@ -30,15 +30,23 @@
 
 #include <SushiProfiler/environment/environment_contributor.hpp>
 
+#include <utility>
+
 namespace SushiProfiler
 {
     RecordFacts gather_facts(const std::vector<const EnvironmentContributor*>& contributors)
     {
-        RecordFacts facts;
-        facts.environment = host_facts();
-        facts.build = library_build_facts();
+        RecordFacts base;
+        base.environment = host_facts();
+        base.build = library_build_facts();
+        return gather_facts(std::move(base), contributors);
+    }
+
+    RecordFacts gather_facts(RecordFacts base,
+                             const std::vector<const EnvironmentContributor*>& contributors)
+    {
         for (const EnvironmentContributor* const contributor : contributors)
-            contributor->contribute(facts);
-        return facts;
+            contributor->contribute(base);
+        return base;
     }
 } // namespace SushiProfiler
