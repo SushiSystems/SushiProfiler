@@ -335,7 +335,9 @@ namespace
                               std::string::npos);
             }
 
-            const std::string folder_ = ::testing::TempDir() + "sushiprofiler_session"; /**< Output. */
+            /** Output: one folder per case, so cases run by other shard processes never share it. */
+            const std::string folder_ = ::testing::TempDir() + "sushiprofiler_session_" +
+                                        ::testing::UnitTest::GetInstance()->current_test_info()->name();
             std::ostringstream terminal_;  /**< What the terminal writer wrote. */
             SessionStop stopped_;          /**< What stop() returned. */
             SessionReport report_;         /**< The report of the record. */
@@ -1135,7 +1137,8 @@ namespace
             {
                 SushiProfiler::register_builtin_writers(registry_, terminal_);
                 ProfilerConfig config = live_config("refuse.step");
-                config.output = ::testing::TempDir() + "sushiprofiler_refuse";
+                config.output = ::testing::TempDir() + "sushiprofiler_refuse_" +
+                                ::testing::UnitTest::GetInstance()->current_test_info()->name();
                 config.writers = {NamedSettings{"record", parsed(R"({"path": "r.json"})")},
                                   NamedSettings{"chrome_trace", parsed(R"({"path": "t.json"})")}};
                 SessionStart started = Session::start(config, registry_);
