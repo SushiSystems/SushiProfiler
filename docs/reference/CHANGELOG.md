@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-10 — session: Inject a clock into Consumer so the live poll tests need no wall clock (RW-30, `53e95f6`).
 - 2026-11-10 — continuous_integration: Cleared the known findings of the shared checkers (RW-25, `5289974`).
 - 2026-11-10 — lock_wait: Added `SP_LOCK_WAIT_IN`, `SP_LOCK_WAIT_IN_AT`, `SP_LOCK_WAIT_NAMED_IN` and `SP_LOCK_WAIT_NAMED_IN_AT`, which record the wait in a `Collector` the caller passes; the existing macros keep the process-wide one.
 - 2026-11-09 — tests: Fixed the test defects of the review that sit in one test: the collector reopen test owns its collector, the no-op build-type test is gone, the package test is medium.
