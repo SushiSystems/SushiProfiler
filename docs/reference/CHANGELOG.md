@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-11-11 — tests: Moved to medium the `PeriodAssembler` case that assembles 4,200 periods, which the time gate found over the small limit.
+- 2026-11-11 — cli: Required sushicore 0.13, whose test command fails a run of a current tree that breaks a time limit, and told it whether the tree is current; the large shards each hold the one accelerator slot.
 - 2026-11-11 — tools: Dropped the copied skill-table test of the time budget, which SushiSkills replaced with the one that runs where the skill lives (RW-29, `52fff37`).
 - 2026-11-10 — stream_writers: Added `MemoryStreamWriter::watch_writes`, a function run at the start of each write (`e311773`).
 - 2026-11-10 — cli: Required sushicore 0.12.2, which narrows a sharded test run by `--filter` and reruns a failed shard's cases.

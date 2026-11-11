@@ -255,6 +255,11 @@ namespace
             RunRecord record_;                  /**< The record filled. */
             std::size_t afterwards_ = 0U;       /**< Periods the record held mid-session. */
     };
+
+    /// @brief The same fixture for a case that assembles thousands of periods.
+    class Medium_PeriodAssembler : public Small_PeriodAssembler
+    {
+    };
 } // namespace
 
 TEST_F(Small_PeriodAssembler, RecordsARunWithoutATimelineAsOnePeriod)
@@ -629,7 +634,7 @@ TEST_F(Small_PeriodAssembler, ALateEventOfATrimmedPeriodIsStillCountedLate)
     EXPECT_EQ(record_.drops.outside_periods, 0U);
 }
 
-TEST_F(Small_PeriodAssembler, ALateEventOlderThanTheTrackedSpansCountsAsOutside)
+TEST_F(Medium_PeriodAssembler, ALateEventOlderThanTheTrackedSpansCountsAsOutside)
 {
     WindowSchedule gappy;
     gappy.wait = 1U;

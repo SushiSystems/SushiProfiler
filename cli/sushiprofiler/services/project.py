@@ -333,7 +333,9 @@ def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (), c
         profile=PROFILE, project_root=lambda: root, console=lambda: space.console,
         build_tree=lambda: tree, run=space.runner.run,
         run_ctest=lambda directory, **options: driver.ctest_run(cfg, directory, env, config=config, **options),
-        run_program=ProgramRunner(tree, space.runner.run, env))
+        run_program=ProgramRunner(tree, space.runner.run, env),
+        # The build above succeeded just now, so the tree is current whatever its generator.
+        rebuilt=lambda directory: True)
     selection = select_labels(sizes, every_size=every_size)
     rc = run_tests(module, selection, name_filter=filter, repeat=repeat, jobs=jobs, every_size=every_size)
     if rc != 0 or not package:
