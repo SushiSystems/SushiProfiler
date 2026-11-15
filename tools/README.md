@@ -1,7 +1,7 @@
 # tools
 
-The ten checkers every Sushi Systems repository carries, copied from SushiSkills with
-`checking/copy_shared_tools.py` and never edited here; a fix lands in SushiSkills first. SushiProfiler
+The ten checkers every Sushi Systems repository carries, copied from a SushiCore release tag with
+`python -m sushicore.shared_tools sync` and never edited here; a fix lands in SushiCore first. SushiProfiler
 has no tool of its own. Its settings are `settings.py`: the tiers `foundation`, `capture`, `record`,
 `session` and `tools`, lowest first, the macro prefix `SP`, and `cli` as the one path that writes
 to the console.
@@ -10,7 +10,7 @@ to the console.
 | --- | --- | --- |
 | `check_all.py` | Nothing itself; runs the ten checkers, then the repository's own `<area>/check_<what>.py` files and the tests, and prints only what failed | Repository root |
 | `checking/checker.py` | Nothing itself; runs a checker's rule table and prints findings | |
-| `checking/copy_shared_tools.py` | Nothing; copies these files, `.github/CODE_OF_CONDUCT.md` and `.github/SECURITY.md` into a repository, keeping its license blocks, `settings.py`, this README and its own tools, or lists the files that differ with `--report` | Repository root, `--from` |
+| `checking/check_shared_tools.py` | The shared tools lock: present, readable, and every locked file present and hashing to its lock | Repository root |
 | `settings.py` | Nothing; holds the settings that differ between repositories | |
 | `checking/ignored_paths.py` | Nothing itself; names the files and folders git ignores, which no checker reads | |
 | `documentation/check_source_comments.py` | C++, GLSL, TypeScript and Python: license block, file header, block ceiling, `//` and `#` runs, separators, history words, `@date` | Files or folders |
