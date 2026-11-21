@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.5.0 — 2026-11-21
+
 - 2026-11-21 — cli: Breaking change: `sp build` refuses a tree of another generator or source folder and names `sp clean`; a build never removes a tree (RW-36, `89adb75`).
 - 2026-11-21 — cli: Breaking change: Removed `--clean` from build and test, and added `sp clean`, the shared command, which removes trees only with `--yes` (RW-35, `207d4a0`).
 - 2026-11-21 — cli: Added `sp run`, which runs a built program by name or picks one of the built examples, each with its description; `--all` lists every program (RW-34, `5824db9`).
@@ -30,6 +32,3 @@
 - 2026-10-31 — cli: Ran `sp test` through the shared test options and `run_tests` of sushicore, so it runs small and medium by default and prints the budget line (RW-24, `4cb86b8`).
 - 2026-10-30 — continuous_integration: Turn the red CI green: checkers, package test, and the sanitizer allocation counter (RW-23, `799daf1`).
 - 2026-10-29 — build: Let a Debug tree link an imported package built as `None`, such as Ubuntu's GTest (`cmake/`).
-## v0.4.1 — 2026-10-29
-
-- 2026-10-29 — version: Set `version.hpp` to the version `project()` declares, so the v0.4.0 configure no longer stops on the mismatch (`version.hpp`).
