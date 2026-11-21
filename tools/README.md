@@ -8,9 +8,9 @@ to the console.
 
 | Path | Checks | Takes |
 | --- | --- | --- |
-| `check_all.py` | Nothing itself; runs the ten checkers, then the repository's own `<area>/check_<what>.py` files and the tests, and prints only what failed | Repository root |
+| `check_all.py` | Nothing itself; runs the eleven checkers, then the repository's own `<area>/check_<what>.py` files and the tests, and prints only what failed | Repository root |
 | `checking/checker.py` | Nothing itself; runs a checker's rule table and prints findings | |
-| `checking/check_shared_tools.py` | The shared tools lock: present, readable, and every locked file present and hashing to its lock | Repository root |
+| `checking/check_shared_tools.py` | The shared tools lock: present unless the repository is SushiCore, readable, and every locked file present and hashing to its lock | Repository root |
 | `settings.py` | Nothing; holds the settings that differ between repositories | |
 | `checking/ignored_paths.py` | Nothing itself; names the files and folders git ignores, which no checker reads | |
 | `documentation/check_source_comments.py` | C++, GLSL, TypeScript and Python: license block, file header, block ceiling, `//` and `#` runs, separators, history words, `@date` | Files or folders |
@@ -27,6 +27,7 @@ to the console.
 | `licensing/write_license_block.py` | Nothing; writes the license block of `source-comments` into every tracked source file, or lists the files that lack it with `--report` | Repository root, `--project` |
 | `routing/summarize_dispatches.py` | Nothing; sums the dispatch lines of every `REPORT.md` per model and effort, for `model-routing` | Repository root |
 | `tests/` | Unit tests for the checker rules; run `python -m unittest discover -s tools/tests` | |
+| `documentation/check_design_format.py` | Design documents: the five sections in order, a status line of at most 160 characters, the phase table and its states, no commit hash, no line that dates built or merged work | Repository root |
 
 `check_docs_layout.py` reads inline Markdown links, with or without a title, wrapped over a
 line or in angle brackets. It does not read reference-style links or a link around an image.
