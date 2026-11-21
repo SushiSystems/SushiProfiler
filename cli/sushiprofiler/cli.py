@@ -16,6 +16,7 @@ from typing import Any, Optional
 
 import typer
 from sushicore.backlog import register_backlog_commands
+from sushicore.clean_command import register_clean_command
 from sushicore.docs_bundle import register_docs_commands
 from sushicore.design import register_design_commands
 from sushicore.entry import run as run_app
@@ -79,11 +80,6 @@ def _lean_option() -> Any:
                              "package build of SushiProfiler uses.")
 
 
-def _clean_option() -> Any:
-    """Returns the default of a `--clean` parameter."""
-    return typer.Option(False, "--clean", help="Delete the build tree before configuring.")
-
-
 @app.command(
     "build",
     rich_help_panel=K_PANEL,
@@ -97,7 +93,6 @@ def _clean_option() -> Any:
 def build(
     ctx: typer.Context,
     type: Optional[BuildType] = _type_option(),
-    clean: bool = _clean_option(),
     define: Optional[list[str]] = typer.Option(
         None, "--define", "-D", metavar="VAR=VALUE",
         help="Pass a CMake cache variable; a configured tree reconfigures. Repeatable."),
@@ -114,7 +109,7 @@ def build(
              "into the tree."),
 ) -> None:
     """Configure when needed, then build the library and the tests."""
-    raise typer.Exit(project_service.build(type, clean=clean, defines=define or (),
+    raise typer.Exit(project_service.build(type, defines=define or (),
                                            sanitizer=sanitize, benchmarks=benchmarks,
                                            lean=lean, tree_path=build_dir,
                                            report=report, workspace=ctx.obj))
@@ -137,14 +132,13 @@ def test(
     repeat: int = repeat_option(),
     jobs: Optional[int] = jobs_option(),
     all_sizes: bool = all_option(),
-    clean: bool = _clean_option(),
     sanitize: Optional[Sanitizer] = _sanitize_option(),
     package: bool = typer.Option(
         False, "--package",
         help="Install the tree, build tests/package/ against it and run its test."),
 ) -> None:
     """Build when needed, then run the tests of the sizes and the filter, then print the budget line."""
-    raise typer.Exit(project_service.test(type, label or (), clean=clean, filter=filter,
+    raise typer.Exit(project_service.test(type, label or (), filter=filter,
                                           sanitizer=sanitize, jobs=jobs, package=package,
                                           repeat=repeat, every_size=all_sizes,
                                           workspace=ctx.obj))
@@ -166,6 +160,14 @@ def bench(
     with sp build --benchmarks --type release first; bench runs the release ones.
     """
     raise typer.Exit(project_service.bench(type, workspace=ctx.obj))
+
+
+register_clean_command(
+    app, lambda ctx: project_service.clean_target(ctx.obj), program=K_PROGRAM, panel=K_PANEL,
+    names={None: project_service.K_TREE_NAME[None],
+           **{sanitizer.value: name for sanitizer, name in project_service.K_TREE_NAME.items()
+              if sanitizer is not None}},
+    build_types=[build_type.value for build_type in BuildType])
 
 
 @app.command(

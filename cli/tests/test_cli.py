@@ -276,3 +276,51 @@ def test_record_exits_with_the_programs_code(project):
     result = _invoke(project, "record", "validate", "run.json")
 
     assert result.exit_code == 1
+
+
+def test_clean_without_yes_says_what_it_would_remove_and_removes_none(project):
+    debug = project.configure_tree("Debug")
+    release = project.configure_tree("Release")
+
+    result = _invoke(project, "clean")
+
+    assert result.exit_code == 2
+    assert debug.is_dir() and release.is_dir()
+
+
+def test_clean_with_a_type_and_yes_removes_the_plain_tree_of_that_type_only(project):
+    debug = project.configure_tree("Debug")
+    release = project.configure_tree("Release")
+
+    result = _invoke(project, "clean", "--type", "debug", "--yes")
+
+    assert result.exit_code == 0
+    assert not debug.exists() and release.is_dir()
+
+
+def test_clean_with_a_sanitizer_and_yes_removes_the_trees_of_that_sanitizer(project):
+    debug = project.configure_tree("Debug")
+    thread = project.configure_tree("Debug", name="tsan")
+
+    result = _invoke(project, "clean", "--sanitize", "thread", "--yes")
+
+    assert result.exit_code == 0
+    assert debug.is_dir() and not thread.exists()
+
+
+def test_clean_with_yes_alone_removes_every_tree(project):
+    debug = project.configure_tree("Debug")
+    release = project.configure_tree("Release")
+
+    assert _invoke(project, "clean", "--yes").exit_code == 0
+
+    assert not debug.exists() and not release.exists()
+
+
+def test_build_no_longer_takes_clean(project):
+    tree = project.configure_tree("Debug")
+
+    result = _invoke(project, "build", "--clean")
+
+    assert result.exit_code == 2
+    assert tree.is_dir()

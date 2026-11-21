@@ -4,6 +4,7 @@
 
 | ID | Pri | State | Title | Done when | Blocked by | Source | Opened |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| RW-35 | P1 | open | Add the shared clean command to sp and drop --clean from build and test | sp clean says what it would remove and removes trees only with --yes, and sp build and test have no --clean |  | `cli/sushiprofiler/cli.py` | 2026-11-21 |
 
 ## Known issues
 

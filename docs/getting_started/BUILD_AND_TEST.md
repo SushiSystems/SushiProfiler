@@ -23,7 +23,6 @@ sp build --type release       # its own tree, build/default-release/
 sp build --sanitize address   # ASan and UBSan, in build/asan-debug/
 sp build --sanitize thread    # ThreadSanitizer, in build/tsan-debug/
 sp build -D SP_BUILD_TESTS=OFF
-sp build --clean
 sp build --report             # also times the edges and the memory the build used
 ```
 
@@ -71,6 +70,23 @@ A pick prints the examples the build registered, each with the `@brief` of its s
 tree that registers none lists every program; `--all` lists every program of any tree. With no
 name, the pick runs.
 `--type` and `--sanitize` choose the tree, as they do for `sp build`.
+
+## sp clean
+
+Says which build trees it would remove, with their sizes, and removes them only with `--yes`.
+Without it nothing is removed and the exit code is 2, so a script that expected the trees gone
+sees that they are not. `sp build` and `sp test` take no `--clean`: a build never removes the
+tree it configures.
+
+```bash
+sp clean                              # list every tree, remove none
+sp clean --yes                        # remove every tree
+sp clean --type debug --yes           # remove build/default-debug only
+sp clean --sanitize thread --yes      # remove the trees of one sanitizer
+```
+
+`--type` and `--sanitize` are repeatable. `--type` selects the plain tree of that type,
+`--sanitize` the trees of that sanitizer, and with neither every tree is selected.
 
 ## sp check
 

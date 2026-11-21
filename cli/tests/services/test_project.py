@@ -128,16 +128,6 @@ def test_a_build_without_a_report_prints_none(project):
     assert not (tree / "build_report.json").exists()
 
 
-def test_a_clean_build_removes_the_tree_before_configuring(project):
-    stale = project.configure_tree("Debug") / "stale.txt"
-    stale.write_text("", encoding="utf-8")
-
-    assert project_service.build(clean=True, workspace=project.workspace) == 0
-
-    assert not stale.exists()
-    assert _is_configure(project.commands[0])
-
-
 def test_build_configures_an_empty_tree_then_compiles(project):
     assert project_service.build(BuildType.RELEASE, workspace=project.workspace) == 0
 

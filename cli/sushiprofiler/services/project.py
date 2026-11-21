@@ -240,7 +240,7 @@ def _needs_configure(space: Workspace, tree: Path, build_type: BuildType,
     return any(cmake_cache.cached_value(tree, key) != value for key, value in expect.items())
 
 
-def build(build_type: BuildType | None = None, clean: bool = False,
+def build(build_type: BuildType | None = None,
           defines: Sequence[str] = (), sanitizer: Sanitizer | None = None,
           benchmarks: bool | None = None, lean: bool = False,
           tree_path: str | None = None, report: bool = False,
@@ -249,7 +249,6 @@ def build(build_type: BuildType | None = None, clean: bool = False,
     given, then compiles it.
 
     Args:
-        clean: Removes the tree first.
         defines: `VAR=VALUE` cache variables; any of them reconfigures a configured tree.
         build_type: The type to build; debug when None. Each type has its own tree.
         sanitizer: Builds in that sanitizer's own tree, build/asan-<type>/ or build/tsan-<type>/.
@@ -272,8 +271,6 @@ def build(build_type: BuildType | None = None, clean: bool = False,
     root, cfg = space.root, space.config
     build_type = resolve_build_type(build_type)
     tree = build_dir(root, sanitizer, build_type, tree_path)
-    if clean:
-        space.driver.clean_tree(tree)
     env = space.build_env(tree)
 
     if defines or _needs_configure(space, tree, build_type, sanitizer, switches):
@@ -304,7 +301,7 @@ def _print_report(space: Workspace, tree: Path, offset: int) -> None:
     space.console.info(f"Report: {measured.write(tree)}")
 
 
-def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (), clean: bool = False,
+def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (),
          filter: str | None = None, sanitizer: Sanitizer | None = None,
          jobs: int | None = None, package: bool = False, repeat: int = 0,
          every_size: bool = False, workspace: Workspace | None = None) -> int:
@@ -323,7 +320,7 @@ def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (), c
     """
     space = workspace or current_workspace()
     build_type = resolve_build_type(build_type)
-    rc = build(build_type, clean=clean, sanitizer=sanitizer, workspace=space)
+    rc = build(build_type, sanitizer=sanitizer, workspace=space)
     if rc != 0:
         return rc
 
@@ -425,6 +422,21 @@ def record(arguments: Sequence[str], build_type: BuildType | None = None,
         space.console.error(f"no {K_RECORD_PROGRAM} in {folder}; run {PROFILE.program} build first")
         return 1
     return space.runner.run([str(program), *arguments], Path.cwd(), space.build_env(tree))
+
+
+@dataclass(frozen=True)
+class CleanTarget:
+    """What the shared `clean` command acts on: the checkout, where it prints and the driver."""
+
+    root: Path
+    console: ServiceConsole
+    driver: CMakeDriver
+
+
+def clean_target(workspace: Workspace | None = None) -> CleanTarget:
+    """Returns the checkout *workspace* holds, or the one `sp` runs in, for the clean command."""
+    space = workspace or current_workspace()
+    return CleanTarget(space.root, space.console, space.driver)
 
 
 _INDEX = ExecutableIndex(skip_dirs=PROFILE.sibling_skip_dirs())
