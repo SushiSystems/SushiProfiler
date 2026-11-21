@@ -313,7 +313,7 @@ namespace SushiProfiler
         while (!open_.empty() && open_.front().ended && open_.front().period.end_ns <= horizon_ns)
         {
             close(open_.front());
-            open_.erase(open_.begin());
+            open_.pop_front();
             prune_lists();
         }
     }
@@ -358,7 +358,7 @@ namespace SushiProfiler
         else
             closed_.emplace_back(begin_ns, end_ns);
         if (closed_.size() > K_MAX_CLOSED_SPANS)
-            closed_.erase(closed_.begin());
+            closed_.pop_front();
     }
 
     void PeriodAssembler::prune_lists()

@@ -52,7 +52,7 @@ namespace SushiProfiler
         open_ = false;
         closed_.push_back(Interval{open_begin_ns_, std::max(steady_ns, open_begin_ns_)});
         if (closed_.size() > K_MAX_INTERVALS)
-            closed_.erase(closed_.begin());
+            closed_.pop_front();
     }
 
     bool PauseLog::paused() const

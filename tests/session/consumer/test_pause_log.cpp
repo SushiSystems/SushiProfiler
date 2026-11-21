@@ -51,8 +51,9 @@ namespace
         }
     }
 
-    /// @brief Runs 10 000 intervals against two readers and returns how often a reader saw an
-    /// overlap with [0, 500), which no interval has.
+    /// @brief Runs 10 000 intervals against two readers, which yield between queries so the writer
+    /// is not starved of the mutex, and returns how often a reader saw an overlap with [0, 500),
+    /// which no interval has.
     int wrong_overlaps_under_concurrent_use(PauseLog& log)
     {
         std::atomic<bool> done{false};
@@ -68,6 +69,7 @@ namespace
                         if (log.overlaps(0U, 500U))
                             wrong.fetch_add(1);
                         static_cast<void>(log.ends_after(0U));
+                        std::this_thread::yield();
                     }
                 });
         }

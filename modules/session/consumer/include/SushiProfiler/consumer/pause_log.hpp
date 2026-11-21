@@ -34,6 +34,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <mutex>
 #include <vector>
 
@@ -83,7 +84,7 @@ namespace SushiProfiler
             };
 
             mutable std::mutex mutex_;          /**< Guards every member below. */
-            std::vector<Interval> closed_;      /**< The closed intervals, oldest first. */
+            std::deque<Interval> closed_;       /**< The closed intervals, oldest first. */
             bool open_ = false;                 /**< Whether an interval is open. */
             std::uint64_t open_begin_ns_ = 0U;  /**< When the open interval began. */
     };

@@ -181,9 +181,9 @@ namespace SushiProfiler
             AssemblyParts parts_;                       /**< The collaborators. */
             Calibration calibration_;                   /**< The latest tick calibration. */
             std::map<std::uint32_t, ThreadState> threads_; /**< Per-thread state. */
-            std::vector<OpenPeriod> open_;              /**< Periods not closed, in order. */
+            std::deque<OpenPeriod> open_;               /**< Periods not closed, in order. */
             /// @brief Closed spans, sorted and disjoint, at most K_MAX_CLOSED_SPANS.
-            std::vector<std::pair<std::uint64_t, std::uint64_t>> closed_;
+            std::deque<std::pair<std::uint64_t, std::uint64_t>> closed_;
             /// @brief When the gate reopened: window gaps and pause ends, at most K_MAX_REOPENS.
             std::vector<std::uint64_t> reopened_ns_;
             std::uint64_t pause_watermark_steady_ns_ = 0U; /**< The latest pause end read. */
