@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- 2026-11-21 — cli: Breaking change: `sp build` refuses a tree of another generator or source folder and names `sp clean`; a build never removes a tree (RW-36, `89adb75`).
 - 2026-11-21 — cli: Breaking change: Removed `--clean` from build and test, and added `sp clean`, the shared command, which removes trees only with `--yes` (RW-35, `207d4a0`).
 - 2026-11-21 — cli: Added `sp run`, which runs a built program by name or picks one of the built examples, each with its description; `--all` lists every program (RW-34, `5824db9`).
 - 2026-11-16 — tools: Took the shared tools from SushiCore v0.14.1, which leaves out its two own checkers and writes this repository's licence header, through `hub bump` (`tools/shared_tools.lock`).
