@@ -24,7 +24,9 @@ from typing import Protocol
 from sushicore import build_admission, build_report, cmake_cache
 from sushicore.build_tree import K_DEFAULT_BUILD_TYPE, refuse_another_build_type, tree_dir
 from sushicore.cmake_driver import CMakeDriver
+from sushicore.discovery import ExecutableIndex
 from sushicore.proc import CommandRunner, ConsoleLike, Runner
+from sushicore.run_program import run_program
 from sushicore.testing import ModuleTests, TestLabel, run_tests, select_labels
 from sushicore.testing.program_runner import ProgramRunner
 from sushicore.toolchain_args import c_compiler_for
@@ -423,6 +425,37 @@ def record(arguments: Sequence[str], build_type: BuildType | None = None,
         space.console.error(f"no {K_RECORD_PROGRAM} in {folder}; run {PROFILE.program} build first")
         return 1
     return space.runner.run([str(program), *arguments], Path.cwd(), space.build_env(tree))
+
+
+_INDEX = ExecutableIndex(skip_dirs=PROFILE.sibling_skip_dirs())
+
+
+def run(target: str | None = None, pick: bool = False, list_all: bool = False,
+        app_args: Sequence[str] = (), build_type: BuildType | None = None,
+        sanitizer: Sanitizer | None = None, workspace: Workspace | None = None) -> int:
+    """Runs a program the tree of *build_type* and *sanitizer* already holds, without building first.
+
+    Args:
+        target: The program's name, matched exactly and then as a substring; with none, the pick runs.
+        pick: Prompts for one built example from a list and ignores *target*.
+        list_all: Makes the prompt list every program, not only the examples.
+        app_args: Arguments handed to the program unchanged.
+        build_type: Whose tree to look in; debug when None.
+        workspace: The checkout to run from; none uses the one `sp` runs in.
+
+    Returns:
+        1 when there is no build tree or no match, else the program's exit code.
+    """
+    space = workspace or current_workspace()
+    tree = build_dir(space.root, sanitizer, resolve_build_type(build_type))
+    if not tree.is_dir():
+        space.console.error(f"{tree} does not exist. Run `{PROFILE.program} build` first.")
+        return 1
+    space.console.header("Project Run")
+    return run_program(
+        _INDEX, space.console, space.runner, build_dir=tree, project_root=space.root,
+        env=space.build_env(tree), target=target, pick=pick or target is None,
+        list_all=list_all, app_args=app_args)
 
 
 def check(report: bool = False, rule: str | None = None,

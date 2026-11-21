@@ -10,10 +10,13 @@ what a command passed on shows in the argv the workspace's runner recorded.
 
 from __future__ import annotations
 
+import dataclasses
+import os
 import re
 from pathlib import Path
 
 import pytest
+from sushicore.console_memory import RecordingConsole
 from typer.testing import CliRunner
 
 from sushiprofiler import cli
@@ -41,7 +44,7 @@ def _plant_program(folder: Path, name: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "command", ["build", "test", "bench", "check", "record", "docs", "backlog", "design"])
+    "command", ["build", "test", "bench", "run", "check", "record", "docs", "backlog", "design"])
 def test_help_lists_each_command(project, command):
     result = _invoke(project, "--help")
 
@@ -203,6 +206,67 @@ def test_record_validate_passes_its_file(project):
     assert result.exit_code == 0
     (command,) = project.commands
     assert command[1:] == ["validate", "run.json"]
+
+
+def _plant_built(tree: Path, name: str) -> None:
+    """Writes an empty file that the discovery of built programs takes for the program *name*."""
+    tree.mkdir(parents=True, exist_ok=True)
+    path = tree / (f"{name}.exe" if os.name == "nt" else name)
+    path.write_bytes(b"")
+    path.chmod(0o755)
+
+
+@pytest.fixture
+def built(project):
+    """The project whose tree holds one registered example beside a test program."""
+    examples = project.root / "applications" / "examples"
+    examples.mkdir(parents=True)
+    (examples / "CMakeLists.txt").write_text("add_executable(demo demo.cpp)\n", encoding="utf-8")
+    tree = project.tree_of("Debug")
+    _plant_built(tree, "sushiprofiler_tests")
+    _plant_built(tree, "demo")
+    return project
+
+
+def _answering(project, answer: str):
+    """Returns the project with a console that answers the prompt with *answer*."""
+    console = RecordingConsole(answer=answer)
+    workspace = dataclasses.replace(project.workspace, console=console)
+    return dataclasses.replace(project, console=console, workspace=workspace)
+
+
+def test_run_starts_the_program_the_name_matches_with_the_arguments_after_the_dashes(built):
+    result = _invoke(built, "run", "sushiprofiler_t", "--", "--gtest_filter=A.*")
+
+    assert result.exit_code == 0
+    (command,) = built.commands
+    assert (Path(command[0]).stem, command[1:]) == ("sushiprofiler_tests", ["--gtest_filter=A.*"])
+
+
+def test_run_with_no_target_picks_among_the_registered_examples(built):
+    picking = _answering(built, "2")
+
+    result = _invoke(picking, "run")
+
+    assert result.exit_code == 1
+    assert picking.console.texts("error") == ["'2' is not a number from 1 to 1."]
+
+
+def test_run_pick_with_all_reaches_a_program_that_is_not_an_example(built):
+    picking = _answering(built, "2")
+
+    result = _invoke(picking, "run", "--pick", "--all")
+
+    assert result.exit_code == 0
+    assert Path(picking.commands[0][0]).stem == "sushiprofiler_tests"
+
+
+def test_run_without_a_build_tree_names_sp_build(project):
+    result = _invoke(project, "run", "sushiprofiler_tests")
+
+    assert result.exit_code == 1
+    assert "Run `sp build` first." in project.console.texts("error")[0]
+    assert project.commands == []
 
 
 def test_record_exits_with_the_programs_code(project):

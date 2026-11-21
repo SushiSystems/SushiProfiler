@@ -22,6 +22,7 @@ from sushicore.entry import run as run_app
 from sushicore.provision.commands import ModuleProvision
 from sushicore.provision.package_command import register_package_command
 from sushicore.root_options import register_root_options
+from sushicore.run_options import list_all_option, pick_option
 from sushicore.testing import (TestLabel, all_option, filter_option, jobs_option, label_option,
                                repeat_option)
 from sushicore.typer_help import help_group
@@ -165,6 +166,29 @@ def bench(
     with sp build --benchmarks --type release first; bench runs the release ones.
     """
     raise typer.Exit(project_service.bench(type, workspace=ctx.obj))
+
+
+@app.command(
+    "run",
+    rich_help_panel=K_PANEL,
+    epilog="sp run  # Pick an example from a list\n"
+           "sp run sp_record\n"
+           "sp run --pick --all  # Pick from every program, tests and benchmarks included\n"
+           "sp run sushiprofiler_tests -- --gtest_filter='Small_Version.*'  # Flags after -- go to it",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)
+def run(
+    ctx: typer.Context,
+    target: Optional[str] = typer.Argument(
+        None, help="Program name to run (exact, then substring match). Without one, the pick runs."),
+    pick: bool = pick_option(),
+    list_all: bool = list_all_option(),
+    type: Optional[BuildType] = _type_option(),
+    sanitize: Optional[Sanitizer] = _sanitize_option(),
+) -> None:
+    """Run a built program. Args after `--` are forwarded to it."""
+    raise typer.Exit(project_service.run(target, pick, list_all, list(ctx.args), type, sanitize,
+                                         workspace=ctx.obj))
 
 
 @app.command(

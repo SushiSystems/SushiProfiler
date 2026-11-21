@@ -55,6 +55,23 @@ regex over those names; `tests/README.md` describes the shards.
 `--package` installs the tree under its `package-prefix/` folder, builds `tests/package/` against it
 and runs its one program.
 
+## sp run
+
+Runs a program the tree already holds. It does not build first; without the tree it names
+`sp build` and exits 1.
+
+```bash
+sp run                                 # pick one of the built examples
+sp run --pick --all                    # pick from every program, tests and benchmarks included
+sp run sp_record                       # a program by name: an exact match, then a substring
+sp run sushiprofiler_tests -- --gtest_filter='Small_Version.*'   # what follows `--` reaches it
+```
+
+A pick prints the examples the build registered, each with the `@brief` of its source, and a
+tree that registers none lists every program; `--all` lists every program of any tree. With no
+name, the pick runs.
+`--type` and `--sanitize` choose the tree, as they do for `sp build`.
+
 ## sp check
 
 Runs nine of the shared checkers under `tools/`. `python -I tools/check_all.py .` runs all twelve,
