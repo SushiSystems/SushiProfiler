@@ -4,7 +4,6 @@
 
 | ID | Pri | State | Title | Done when | Blocked by | Source | Opened |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| RW-34 | P2 | open | Add sp run, which picks and runs a built program like the sibling CLIs | sp run NAME runs a built program and sp run --pick lists the built examples with --all for every program |  | `cli/sushiprofiler/services/project.py` | 2026-11-21 |
 
 ## Known issues
 

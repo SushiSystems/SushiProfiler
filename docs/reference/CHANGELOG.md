@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- 2026-11-21 — cli: Added `sp run`, which runs a built program by name or picks one of the built examples, each with its description; `--all` lists every program (RW-34).
+- 2026-11-21 — cli: Added `sp run`, which runs a built program by name or picks one of the built examples, each with its description; `--all` lists every program (RW-34, `5824db9`).
 - 2026-11-16 — tools: Took the shared tools from SushiCore v0.14.1, which leaves out its two own checkers and writes this repository's licence header, through `hub bump` (`tools/shared_tools.lock`).
 - 2026-11-16 — tools: Took the shared tools from SushiCore v0.14.0 into a lock file and moved the SushiCore pin to 0.14 (`tools/shared_tools.lock`).
 - 2026-11-11 — tests: Moved to medium the `PeriodAssembler` case that assembles 4,200 periods, which the time gate found over the small limit.
