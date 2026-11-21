@@ -51,12 +51,14 @@ namespace
         }
     }
 
-    /// @brief Runs 10 000 intervals against two readers, which yield between queries so the writer
-    /// is not starved of the mutex, and returns how often a reader saw an overlap with [0, 500),
-    /// which no interval has.
+    /// @brief Runs 4 200 intervals, more than the log keeps, against two readers that query once after
+    /// each interval the writer publishes, and returns how often a reader saw an overlap with [0, 500),
+    /// which no interval has. A reader that spun on the log would hold its mutex against the writer.
     int wrong_overlaps_under_concurrent_use(PauseLog& log)
     {
+        constexpr std::uint64_t K_INTERVALS = 4'200U;
         std::atomic<bool> done{false};
+        std::atomic<std::uint64_t> published{0U};
         std::atomic<int> wrong{0};
         std::vector<std::thread> readers;
         for (int reader = 0; reader < 2; ++reader)
@@ -64,19 +66,27 @@ namespace
             readers.emplace_back(
                 [&]
                 {
+                    std::uint64_t seen = 0U;
                     while (!done.load(std::memory_order_acquire))
                     {
+                        const std::uint64_t now = published.load(std::memory_order_acquire);
+                        if (now == seen)
+                        {
+                            std::this_thread::yield();
+                            continue;
+                        }
+                        seen = now;
                         if (log.overlaps(0U, 500U))
                             wrong.fetch_add(1);
                         static_cast<void>(log.ends_after(0U));
-                        std::this_thread::yield();
                     }
                 });
         }
-        for (std::uint64_t index = 0U; index < 10'000U; ++index)
+        for (std::uint64_t index = 0U; index < K_INTERVALS; ++index)
         {
             log.begin(1'000U + index * 10U);
             log.end(1'000U + index * 10U + 5U);
+            published.store(index + 1U, std::memory_order_release);
         }
         done.store(true, std::memory_order_release);
         for (std::thread& reader : readers)
