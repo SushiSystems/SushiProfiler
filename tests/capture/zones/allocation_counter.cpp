@@ -30,8 +30,13 @@
 
 #include "allocation_counter.hpp"
 
+#include <algorithm>
 #include <cstdlib>
 #include <new>
+
+#if defined(_WIN32)
+#include <malloc.h>
+#endif
 
 namespace
 {
@@ -52,6 +57,40 @@ namespace
         if (memory == nullptr)
             throw std::bad_alloc();
         return memory;
+    }
+
+    /// @brief Counts one allocation and returns @p size bytes aligned to @p alignment, or null when
+    /// it fails.
+    void* counted_allocate_aligned_or_null(std::size_t size, std::align_val_t alignment) noexcept
+    {
+        ++t_allocations;
+        const std::size_t bytes = size != 0U ? size : 1U;
+#if defined(_WIN32)
+        return _aligned_malloc(bytes, static_cast<std::size_t>(alignment));
+#else
+        void* memory = nullptr;
+        const std::size_t boundary = std::max(static_cast<std::size_t>(alignment), sizeof(void*));
+        return posix_memalign(&memory, boundary, bytes) == 0 ? memory : nullptr;
+#endif
+    }
+
+    /// @brief Counts one allocation and returns @p size bytes aligned to @p alignment.
+    void* counted_allocate_aligned(std::size_t size, std::align_val_t alignment)
+    {
+        void* const memory = counted_allocate_aligned_or_null(size, alignment);
+        if (memory == nullptr)
+            throw std::bad_alloc();
+        return memory;
+    }
+
+    /// @brief Frees memory that counted_allocate_aligned_or_null returned.
+    void free_aligned(void* memory) noexcept
+    {
+#if defined(_WIN32)
+        _aligned_free(memory);
+#else
+        std::free(memory);
+#endif
     }
 } // namespace
 
@@ -122,4 +161,67 @@ void operator delete(void* memory, const std::nothrow_t&) noexcept
 void operator delete[](void* memory, const std::nothrow_t&) noexcept
 {
     std::free(memory);
+}
+
+/// @brief Counts and allocates one over-aligned object. The sanitizer runtime defines every form of
+/// the family in one object, so all of them are replaced, or its copy would clash with ours.
+void* operator new(std::size_t size, std::align_val_t alignment)
+{
+    return counted_allocate_aligned(size, alignment);
+}
+
+/// @brief Counts and allocates one over-aligned array.
+void* operator new[](std::size_t size, std::align_val_t alignment)
+{
+    return counted_allocate_aligned(size, alignment);
+}
+
+/// @brief Counts and allocates one over-aligned object, returning null when it fails.
+void* operator new(std::size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept
+{
+    return counted_allocate_aligned_or_null(size, alignment);
+}
+
+/// @brief Counts and allocates one over-aligned array, returning null when it fails.
+void* operator new[](std::size_t size, std::align_val_t alignment, const std::nothrow_t&) noexcept
+{
+    return counted_allocate_aligned_or_null(size, alignment);
+}
+
+/// @brief Frees one over-aligned object.
+void operator delete(void* memory, std::align_val_t) noexcept
+{
+    free_aligned(memory);
+}
+
+/// @brief Frees one over-aligned array.
+void operator delete[](void* memory, std::align_val_t) noexcept
+{
+    free_aligned(memory);
+}
+
+/// @brief Frees one over-aligned object of a known size.
+void operator delete(void* memory, std::size_t, std::align_val_t) noexcept
+{
+    free_aligned(memory);
+}
+
+/// @brief Frees one over-aligned array of a known size.
+void operator delete[](void* memory, std::size_t, std::align_val_t) noexcept
+{
+    free_aligned(memory);
+}
+
+/// @brief Frees one over-aligned object whose nothrow allocation was followed by a throwing
+/// constructor.
+void operator delete(void* memory, std::align_val_t, const std::nothrow_t&) noexcept
+{
+    free_aligned(memory);
+}
+
+/// @brief Frees one over-aligned array whose nothrow allocation was followed by a throwing
+/// constructor.
+void operator delete[](void* memory, std::align_val_t, const std::nothrow_t&) noexcept
+{
+    free_aligned(memory);
 }
