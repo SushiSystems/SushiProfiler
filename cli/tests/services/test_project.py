@@ -74,6 +74,20 @@ def test_a_configure_of_another_type_into_a_tree_is_refused(project):
     assert project.commands == []
 
 
+def test_a_tree_of_another_generator_is_refused_and_kept(project):
+    tree = project.configure_tree("Debug")
+    cache = tree / "CMakeCache.txt"
+    cache.write_text(cache.read_text(encoding="utf-8").replace("=Ninja", "=Another Generator"),
+                     encoding="utf-8")
+    (tree / "object.o").write_text("", encoding="utf-8")
+
+    with pytest.raises(ConfigError, match="`sp clean`"):
+        project_service.build(BuildType.DEBUG, defines=["A=1"], workspace=project.workspace)
+
+    assert project.commands == []
+    assert (tree / "object.o").is_file()
+
+
 def test_a_define_of_the_build_type_is_refused(project):
     with pytest.raises(ConfigError, match="CMAKE_BUILD_TYPE"):
         project_service.build(defines=["CMAKE_BUILD_TYPE=Release"], workspace=project.workspace)

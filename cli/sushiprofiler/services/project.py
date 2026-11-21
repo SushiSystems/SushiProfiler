@@ -30,6 +30,7 @@ from sushicore.run_program import run_program
 from sushicore.testing import ModuleTests, TestLabel, run_tests, select_labels
 from sushicore.testing.program_runner import ProgramRunner
 from sushicore.toolchain_args import c_compiler_for
+from sushicore.tree_reuse import refuse_unreusable_tree
 
 from .. import console
 from ..config import PROFILE, Config, find_project_root, load_config
@@ -210,11 +211,14 @@ def _configure(space: Workspace, tree: Path, cmake_type: str, command: list[str]
     """Configures *tree* with *command* and the gate, once the tree is known to be its own.
 
     Raises:
-        sushicore.errors.ConfigError: *tree* is configured as another build type than *cmake_type*.
+        sushicore.errors.ConfigError: *tree* is configured as another build type than *cmake_type*,
+            with another generator, or for another source folder.
         sushicore.build_admission.BuildStoppedError: the owner stopped builds of *tree*.
     """
     refuse_another_build_type(tree, cmake_type, defines)
     build_admission.refuse_a_stopped_gate(tree)
+    refuse_unreusable_tree(space.driver, tree, generator=space.config.resolved_generator(),
+                           root=space.root, program="sp")
     return space.driver.configure([*command, *_gate_arguments(space.config, tree)],
                                   cwd=space.root, env=env)
 
