@@ -38,11 +38,20 @@
 #include <malloc.h>
 #endif
 
+#if defined(__SANITIZE_THREAD__)
+#define SUSHIPROFILER_TEST_UNDER_THREAD_SANITIZER 1
+#elif defined(__has_feature)
+#if __has_feature(thread_sanitizer)
+#define SUSHIPROFILER_TEST_UNDER_THREAD_SANITIZER 1
+#endif
+#endif
+
 namespace
 {
     /// @brief The calling thread's calls to the global operator new.
     thread_local std::uint64_t t_allocations = 0U;
 
+#if !defined(SUSHIPROFILER_TEST_UNDER_THREAD_SANITIZER)
     /// @brief Counts one allocation and returns @p size bytes from malloc, or null when it fails.
     void* counted_allocate_or_null(std::size_t size) noexcept
     {
@@ -92,6 +101,7 @@ namespace
         std::free(memory);
 #endif
     }
+#endif
 } // namespace
 
 namespace SushiProfilerTests
@@ -100,8 +110,18 @@ namespace SushiProfilerTests
     {
         return t_allocations;
     }
+
+    bool allocations_are_counted() noexcept
+    {
+#if defined(SUSHIPROFILER_TEST_UNDER_THREAD_SANITIZER)
+        return false;
+#else
+        return true;
+#endif
+    }
 } // namespace SushiProfilerTests
 
+#if !defined(SUSHIPROFILER_TEST_UNDER_THREAD_SANITIZER)
 /// @brief Counts and allocates one object.
 void* operator new(std::size_t size)
 {
@@ -225,3 +245,4 @@ void operator delete[](void* memory, std::align_val_t, const std::nothrow_t&) no
 {
     free_aligned(memory);
 }
+#endif

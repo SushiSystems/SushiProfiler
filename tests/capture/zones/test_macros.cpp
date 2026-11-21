@@ -149,6 +149,8 @@ TEST_F(Medium_Macros, SpFlowEndWritesAFlowEnd)
 
 TEST_F(Medium_Macros, TheRecordingThreadNeverAllocates)
 {
+    if (!SushiProfilerTests::allocations_are_counted())
+        GTEST_SKIP() << "ThreadSanitizer defines the global operator new, so no allocation is counted.";
     const NameID lane = Collector::instance().names().intern("allocations");
     record_every_kind(lane, 0U);
     const std::uint64_t before = SushiProfilerTests::allocations_on_this_thread();

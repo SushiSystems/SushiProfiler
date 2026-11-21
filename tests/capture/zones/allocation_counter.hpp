@@ -36,4 +36,8 @@ namespace SushiProfilerTests
 {
     /// @brief Returns how many times the calling thread called the global operator new.
     [[nodiscard]] std::uint64_t allocations_on_this_thread() noexcept;
+
+    /// @brief Returns whether the counter sees allocations; it does not under ThreadSanitizer, whose
+    /// runtime defines the global operator new and delete itself.
+    [[nodiscard]] bool allocations_are_counted() noexcept;
 } // namespace SushiProfilerTests

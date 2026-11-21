@@ -6,7 +6,9 @@
   with the same `drain_mine()`; the small tests use it.
 - `allocation_counter.hpp`, `allocation_counter.cpp`: replace the program's global `operator new`
   and `delete` with `malloc` and `free` that count each thread's allocations;
-  `allocations_on_this_thread()` reads the count.
+  `allocations_on_this_thread()` reads the count. ThreadSanitizer's runtime defines the global
+  operator new itself, so under it nothing is replaced, `allocations_are_counted()` returns false and
+  the one test that reads the count skips.
 - `benchmark_zones.cpp`: the program `sp_bench_zones`, built with `sp build --benchmarks --type release` and run
   by `sp bench`. It prints the median nanoseconds of 31 runs of 1,000,000 iterations, after 3
   warm-up runs, for a zone compiled out, with the gate closed, at a disabled site and recording,
