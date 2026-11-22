@@ -48,8 +48,12 @@ class Project:
 
     @property
     def commands(self) -> list[list[str]]:
-        """Returns the argv of every command the runner was handed, in order."""
-        return [list(command.argv) for command in self.runner.commands]
+        """Returns the argv of every command the runner was handed to run, in order.
+
+        The queries sushicore only captures, such as its question to the compiler for ld.lld,
+        are left out.
+        """
+        return [list(command.argv) for command in self.runner.commands if not command.captured]
 
     def tree_of(self, build_type: str = "Debug", name: str = "default") -> Path:
         """Returns the tree `build/<name>-<type>` of *build_type*, the way sushicore names it."""
