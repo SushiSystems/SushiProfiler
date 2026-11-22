@@ -27,7 +27,7 @@ from sushicore.cmake_driver import CMakeDriver
 from sushicore.discovery import ExecutableIndex
 from sushicore.proc import CommandRunner, ConsoleLike, Runner
 from sushicore.run_program import run_program
-from sushicore.testing import ModuleTests, TestLabel, run_tests, select_labels
+from sushicore.testing import ModuleTests, SanitizedTests, TestLabel, run_tests, select_labels
 from sushicore.testing.program_runner import ProgramRunner
 from sushicore.toolchain_args import c_compiler_for
 from sushicore.tree_reuse import refuse_unreusable_tree
@@ -324,9 +324,11 @@ def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (),
     """
     space = workspace or current_workspace()
     build_type = resolve_build_type(build_type)
-    rc = build(build_type, sanitizer=sanitizer, workspace=space)
-    if rc != 0:
-        return rc
+    # The shared command builds a sanitizer's tree itself, and judges no time limit under it.
+    if sanitizer is None:
+        rc = build(build_type, workspace=space)
+        if rc != 0:
+            return rc
 
     root, cfg, driver = space.root, space.config, space.driver
     tree = build_dir(root, sanitizer, build_type)
@@ -338,12 +340,22 @@ def test(build_type: BuildType | None = None, sizes: Sequence[TestLabel] = (),
         run_ctest=lambda directory, **options: driver.ctest_run(cfg, directory, env, config=config, **options),
         run_program=ProgramRunner(tree, space.runner.run, env),
         # The build above succeeded just now, so the tree is current whatever its generator.
-        rebuilt=lambda directory: True)
+        rebuilt=lambda directory: True,
+        sanitized=_sanitized_tests(space, build_type))
     selection = select_labels(sizes, every_size=every_size)
-    rc = run_tests(module, selection, name_filter=filter, repeat=repeat, jobs=jobs, every_size=every_size)
+    rc = run_tests(module, selection, name_filter=filter, repeat=repeat, jobs=jobs, every_size=every_size,
+                   sanitizer=sanitizer.value if sanitizer else None)
     if rc != 0 or not package:
         return rc
     return _test_package(space, tree, env, config)
+
+
+def _sanitized_tests(space: Workspace, build_type: BuildType) -> SanitizedTests:
+    """Returns the sanitizer trees of *build_type* the shared test command builds and tests."""
+    return SanitizedTests(
+        names=tuple(item.value for item in Sanitizer),
+        build=lambda name: build(build_type, sanitizer=Sanitizer(name), workspace=space),
+        tree=lambda name: build_dir(space.root, Sanitizer(name), build_type))
 
 
 def _test_package(space: Workspace, tree: Path, env: dict[str, str], config: str) -> int:

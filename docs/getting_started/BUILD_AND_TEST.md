@@ -38,6 +38,8 @@ tree. Benchmarks measure the type that ships: `sp build --benchmarks --type rele
 Builds when needed, then runs the tests. The quarantined ones are left out. Without a label it runs `small`
 and `medium`; `large` needs `--filter` or `--all`. CTest writes a JUnit file under the tree's `Testing` folder,
 and a repository that carries the shared budget reader prints one budget line after the run.
+A run with `--sanitize` judges no time limit, since the sanitizer slows every test; its oracle is
+the sanitizer's report.
 
 ```bash
 sp test                                # small and medium

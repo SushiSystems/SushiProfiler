@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- 2026-11-22 — cli: Fixed `sp test --sanitize`, which judged the time limits; it hands the sanitizer to the shared test command, which judges none under a sanitizer (`cli/sushiprofiler/services/project.py`).
+
 ## v0.5.0 — 2026-11-21
 
 - 2026-11-21 — cli: Breaking change: `sp build` refuses a tree of another generator or source folder and names `sp clean`; a build never removes a tree (RW-36, `89adb75`).

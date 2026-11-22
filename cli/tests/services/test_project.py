@@ -19,6 +19,7 @@ from sushicore.errors import ConfigError
 
 from sushiprofiler.services import project as project_service
 from sushicore.testing import TestLabel
+from sushicore.testing.session import K_UNJUDGED_TEXT
 from sushiprofiler.services.project import BuildType, Sanitizer
 
 pytestmark = pytest.mark.medium
@@ -294,6 +295,15 @@ def test_test_refuses_an_unfiltered_large_run(project):
     assert project_service.test(sizes=(TestLabel.LARGE,), workspace=project.workspace) == 2
 
     assert not any("-L" in command for command in project.commands)
+
+
+def test_test_with_a_sanitizer_runs_its_tree_and_judges_no_time_limit(project):
+    project.configure_tree("Debug", sanitize="thread", name="tsan")
+
+    assert project_service.test(sanitizer=Sanitizer.THREAD, workspace=project.workspace) == 0
+
+    assert Path(_value_after(project.commands[-1], "--test-dir")) == project.tree_of("Debug", "tsan")
+    assert K_UNJUDGED_TEXT in project.console.texts("info")
 
 
 def test_test_with_package_installs_then_builds_and_runs_the_consumer(project):
