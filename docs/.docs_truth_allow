@@ -1,2 +1,2 @@
 cli/config\.local\.toml # machine-specific CLI config that git ignores, so no checkout holds it
-applications/(probes|benchmarks) # the shared tools/README.md names where check_probes.py looks; this repository has no probe or scenario benchmark yet
+^(sushicore\.tools(\.[\w.]+)?|check_[a-z_]+|write_license_block|gtest_discover_tests)$  # the shared checkers and test helpers, held in the sushicore package

@@ -9,5 +9,5 @@ CTest directly. In PowerShell `sp` is a built-in alias; type `sushiprofiler`.
 Check before reporting work as finished:
 
 ```
-python tools/check_all.py .
+python -m sushicore.tools check .
 ```

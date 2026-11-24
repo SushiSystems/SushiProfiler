@@ -93,7 +93,7 @@ sp clean --sanitize thread --yes      # remove the trees of one sanitizer
 
 ## sp check
 
-Runs nine of the shared checkers under `tools/`. `python -I tools/check_all.py .` runs all twelve,
+Runs nine of the shared checkers under `tools/`. `python -I sushicore.tools.check_all .` runs all twelve,
 with the backlog and design checkers, then the tests.
 
 ```bash

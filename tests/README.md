@@ -11,7 +11,7 @@ The tests mirror `modules/`: the test of
 
 ## Sizes
 
-A test's size is the prefix of its GoogleTest suite. A suite without one is never registered with ctest, and `tools/testing/check_test_sizes.py` fails on it. A `TEST_P` suite carries the prefix in its own name and in the name of its instantiation, `Small_<x>`.
+A test's size is the prefix of its GoogleTest suite. A suite without one is never registered with ctest, and `sushicore.tools.testing.check_test_sizes` fails on it. A `TEST_P` suite carries the prefix in its own name and in the name of its instantiation, `Small_<x>`.
 
 | Size | The test may use | Timeout |
 | --- | --- | --- |
@@ -36,7 +36,7 @@ program's sources, so a parametrised suite counts once and N is a floor. A shard
 size's timeout times the cases it holds.
 
 Each shard writes its cases to `test_results/gtest/<shard>.xml` in the build tree.
-`tools/testing/test_budget.py --cases <folder>` reads those files, so the per-case limits apply to
+`python -m sushicore.tools.testing.test_budget --cases <folder>` reads those files, so the per-case limits apply to
 a case in a shard. `GTEST_SHUFFLE` and `GTEST_RANDOM_SEED` of the calling environment reach every
 shard.
 

@@ -33,7 +33,7 @@ the rule.
   higher tier, or that sits in the same tier without a listed edge. A module's public include
   roots are those of its own and its `DEPENDS`, and each public header is compiled alone with
   them, so a header that includes any other module does not compile.
-- The checker. `tools/layering/check_layering.py` reads the same order and fails an upward
+- The checker. `sushicore.tools.layering.check_layering` reads the same order and fails an upward
   include, an include of another module's `source/`, and an include the module did not declare.
 
 The module `umbrella` sits in the top tier and includes every public header of the library. Every
