@@ -9,7 +9,7 @@ set(SP_CMAKE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 include("${SP_CMAKE_DIR}/SushiProfilerOptions.cmake")
 
-project(SushiProfiler VERSION 0.5.1 LANGUAGES CXX)
+project(SushiProfiler VERSION 0.5.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

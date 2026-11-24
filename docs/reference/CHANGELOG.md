@@ -1,6 +1,5 @@
 # Changelog
 
-## v0.5.1 — 2026-11-22
+## v0.5.2 — 2026-11-24
 
-- 2026-11-22 — cli: Required SushiCore 0.16, the release the stack's CLIs share (`cli/pyproject.toml`).
-- 2026-11-22 — cli: Fixed `sp test --sanitize`, which judged the time limits; it hands the sanitizer to the shared test command, which judges none under a sanitizer (`cli/sushiprofiler/services/project.py`).
+- 2026-11-24 — cli: Required SushiCore 0.17.1 with no upper bound, so a SushiCore release no longer forces one of this library (`cli/pyproject.toml`).
